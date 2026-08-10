@@ -19,9 +19,10 @@ import analyticsRoutes from './modules/analytics/analytics.routes';
 import billingRoutes from './modules/billing/billing.routes';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // CORS Policy
-const allowedOrigins = [env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000',  'https://mako-frontend.vercel.app'];
+const allowedOrigins = [env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000', 'https://mako-frontend.vercel.app'];
 
 app.use(
   cors({
@@ -67,7 +68,7 @@ app.use('/widget.js', (req, res, next) => {
 app.use('/public', express.static(publicDir));
 
 // Health Check
-app.get('/health', (req, res) => {
+app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'AI Shopping Widget API', timestamp: new Date().toISOString() });
 });
 
