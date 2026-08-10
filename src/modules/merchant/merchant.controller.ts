@@ -213,3 +213,26 @@ export async function logout(req: Request, res: Response): Promise<void> {
   res.clearCookie('token');
   res.json({ message: 'Logged out successfully' });
 }
+
+export async function scrapeUrl(req: DashboardAuthRequest, res: Response): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+    const { url } = req.body;
+
+    if (!url) {
+      res.status(400).json({ error: 'Target URL is required.' });
+      return;
+    }
+
+    const { scrapeWebsite } = await import('../../services/scraper.service');
+    const result = await scrapeWebsite(url, merchantId);
+
+    res.json({
+      message: 'Website scraped and catalog indexed successfully!',
+      result,
+    });
+  } catch (error: any) {
+    logger.error('Scrape URL Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to scrape website.' });
+  }
+}

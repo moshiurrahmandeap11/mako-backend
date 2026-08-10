@@ -6,6 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.processChatMessage = processChatMessage;
 const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const openai_1 = __importDefault(require("openai"));
+const js_yaml_1 = __importDefault(require("js-yaml"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 const db_1 = require("../../config/db");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
@@ -28,6 +31,20 @@ const openrouter = env_1.env.OPENROUTER_API_KEY
         },
     })
     : null;
+// Helper to load YAML prompt configuration
+function loadAiPromptsYaml() {
+    try {
+        const yamlPath = path_1.default.resolve(process.cwd(), 'config/ai-prompts.yml');
+        if (fs_1.default.existsSync(yamlPath)) {
+            const content = fs_1.default.readFileSync(yamlPath, 'utf8');
+            return js_yaml_1.default.load(content);
+        }
+    }
+    catch (err) {
+        logger_1.logger.error('Failed to load config/ai-prompts.yml:', err);
+    }
+    return null;
+}
 function isSimpleGreeting(message) {
     const clean = message.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
     const commonGreetings = [
@@ -39,31 +56,31 @@ function isSimpleGreeting(message) {
     return commonGreetings.some(g => clean === g || clean.includes(g) && clean.length < 20);
 }
 function getSystemPrompt(botMode, customPrompt) {
-    let basePrompt = '';
+    const yamlConfig = loadAiPromptsYaml();
     if (customPrompt) {
-        basePrompt = customPrompt;
+        return customPrompt;
     }
-    else if (botMode === 'support') {
-        basePrompt = `You are a polite, direct customer support agent. Help the user with FAQs, shipping info, refunds, or website issues. Do NOT actively pitch or sell products.`;
-    }
-    else if (botMode === 'sales') {
-        basePrompt = `You are a highly enthusiastic and persuasive Sales Agent. Pitch products from our catalog aggressively, suggest matching accessories, mention imaginary limited-time deals, and guide them to buy.`;
+    let personaPrompt = '';
+    if (yamlConfig?.system_instructions?.personas?.[botMode]) {
+        personaPrompt = yamlConfig.system_instructions.personas[botMode];
     }
     else {
-        basePrompt = `You are a helpful, polite, and knowledgeable AI Shopping Assistant for an e-commerce storefront.
-Your goal is to help shoppers find products, answer store questions, provide recommendations, and help them add items to their cart.`;
+        personaPrompt = yamlConfig?.system_instructions?.base_role || `You are a helpful AI Shopping Assistant for this storefront.`;
     }
-    return `${basePrompt}
+    const rules = yamlConfig?.system_instructions?.strict_rules;
+    const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message.`;
+    const formatRule = rules?.formatting?.instructions || `Use GitHub Flavored Markdown formatting.`;
+    const cartRule = rules?.cart_action?.instructions || `Append [ADD_TO_CART: productId] when user asks to buy item.`;
+    const scopeRule = rules?.scope_lock?.instructions || `Stick strictly to storefront queries.`;
+    return `${personaPrompt}
 
-Strict Output Rules:
-1. Dynamic Length: Adjust your response length dynamically based on the complexity of the user's question. For simple greetings (e.g. "hi", "kemon achis"), casual comments, or thank yous, reply with a very short, friendly sentence. For product requests, explanations, or customer queries, provide a complete, clear, and helpful answer.
-2. NEVER mention function names, code blocks, JSON parameters, or coding schemas (e.g. do not output "<function=...>" or "search_products").
-3. Respond in the same language or tone as the user. If the user greets you briefly, greet them back briefly. However, if the user writes in Romanized Bengali (Banglish) or Bengali script, always reply in fluent, natural Bengali script (বাংলা) to ensure grammatical correctness and native tone.
-4. When the user explicitly wants to add a product to their cart or buy it, append the following special tag at the very end of your response text (do not use code blocks): [ADD_TO_CART: productId]
-5. STRICT SCOPE LOCK: You are strictly an assistant for this storefront and customer service. You MUST NOT answer general-purpose queries unrelated to e-commerce, storefront operations, store policies, or products (such as writing general programming code, coding games, solving homework, writing articles, or unrelated trivia). However, you MUST allow and reply with a warm, friendly response to greetings, casual pleasantries, and thank yous (e.g., "hi", "hello", "kire beta", "thanks"). Only block actual out-of-scope tasks.
-6. BENGALI LANGUAGE RULE: If the user communicates in Bengali (বাংলা) or Romanized Bengali (Banglish), always respond in standard, fluent, and grammatically correct Bengali script (বাংলা) rather than Romanized Banglish. Speak naturally, professionally, and warmly like a local storefront support helper (e.g., say "আমি আপনাকে কীভাবে সাহায্য করতে পারি?" or "দুঃখিত, আমি এই বিষয়ে সাহায্য করতে পারছি না"). Avoid awkward translations.`;
+Strict Rules (Loaded from config/ai-prompts.yml):
+1. LANGUAGE RULE: ${langRule}
+2. FORMATTING RULE: ${formatRule}
+3. CART ACTION RULE: ${cartRule}
+4. SCOPE LOCK RULE: ${scopeRule}`;
 }
-async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template) {
+async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
     // 1. Get or create conversation record
     let conversation = await db_1.prisma.conversation.findFirst({
         where: { merchantId, sessionId },
@@ -80,7 +97,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
         data: {
             conversationId: conversation.id,
             role: 'user',
-            content: userMessage,
+            content: imageUrl ? `${userMessage}\n\n![Uploaded Image](${imageUrl})` : userMessage,
         },
     });
     let recommendedProducts = [];
@@ -88,25 +105,34 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
     let ragContext = '';
     let cartAction = null;
     let finalReply = '';
-    // Only perform product retrieval (RAG) for shopping configuration and non-greetings
-    const isShopping = template === 'E-commerce Shopping' || (!template && botMode === 'shopping');
-    if (isShopping && !isSimpleGreeting(userMessage)) {
-        try {
-            retrievedProducts = await (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage, undefined, 5);
-            if (retrievedProducts.length > 0) {
-                ragContext = `\n\nRetrieved Products from Catalog (RAG Context):\n` +
-                    retrievedProducts.map(p => `- Product ID: ${p.id} | Title: ${p.title} | Price: ${p.price} ${p.currency || 'USD'} | URL: ${p.productUrl || `/products/${p.id}`} | Stock: ${p.inStock ? 'In Stock' : 'Out of Stock'}`).join('\n') +
-                    `\n\nInstructions: Recommend only the matching products from the retrieved catalog above. Do not invent products.`;
-            }
+    // Perform Catalog RAG Search
+    try {
+        retrievedProducts = await (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage, undefined, 5);
+        // Fallback: If query search returned 0 items, fetch top catalog items for context
+        if (retrievedProducts.length === 0) {
+            retrievedProducts = await db_1.prisma.product.findMany({
+                where: { merchantId },
+                take: 8,
+            });
         }
-        catch (err) {
-            logger_1.logger.error('RAG Product Search Error:', err);
+        if (retrievedProducts.length > 0) {
+            ragContext = `\n\n### Store Catalog & Available Products:\n` +
+                retrievedProducts.map(p => `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`).join('\n') +
+                `\n\nInstructions: Use the catalog items above to explain what this website provides or recommend items. Include product page links where appropriate.`;
         }
+        else {
+            // Store Context fallback when no products exist yet
+            ragContext = `\n\n### Website / Platform Context:
+This platform is Labto AI — an AI-powered Shopping & Customer Support Assistant platform for e-commerce websites. It provides merchants with automated AI chat widgets, vector product search, direct add-to-cart integration, and visitor analytics.`;
+        }
+    }
+    catch (err) {
+        logger_1.logger.error('RAG Product Search Error:', err);
     }
     // Resolve LLM Provider
     let selectedProvider = provider || '';
     if (!selectedProvider) {
-        if (env_1.env.GROQ_API_KEY)
+        if (env_1.env.GROQ_API_KEY && !imageUrl)
             selectedProvider = 'groq';
         else if (env_1.env.OPENROUTER_API_KEY)
             selectedProvider = 'openrouter';
@@ -127,7 +153,15 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
                 role: m.role === 'user' ? 'user' : 'assistant',
                 content: m.content,
             }));
-            messagesParam.push({ role: 'user', content: userMessage });
+            // Construct user content (Multimodal Vision array if imageUrl present)
+            const formattedUserText = `### User Input:\n${userMessage || 'Analyzing attached image.'}`;
+            const userContent = imageUrl
+                ? [
+                    { type: 'text', text: formattedUserText },
+                    { type: 'image_url', image_url: { url: imageUrl } },
+                ]
+                : formattedUserText;
+            messagesParam.push({ role: 'user', content: userContent });
             const completion = await client.chat.completions.create({
                 model: model,
                 messages: [

@@ -67,11 +67,12 @@ export class WidgetAPI {
     sessionId: string,
     message: string,
     botMode?: string,
-    provider?: string
+    provider?: string,
+    imageUrl?: string
   ): Promise<ChatResponse> {
     return this.fetch<ChatResponse>('/api/widget/chat', {
       method: 'POST',
-      body: JSON.stringify({ sessionId, message, botMode, provider }),
+      body: JSON.stringify({ sessionId, message, botMode, provider, imageUrl }),
     });
   }
 }

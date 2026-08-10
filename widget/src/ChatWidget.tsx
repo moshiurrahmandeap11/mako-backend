@@ -12,8 +12,50 @@ interface MessageItem {
   id: string;
   sender: 'user' | 'bot';
   text: string;
+  imageUrl?: string;
   products?: ProductCard[];
   time: string;
+}
+
+function renderMarkdownText(text: string) {
+  if (!text) return null;
+
+  // Simple Markdown Parser for Links [text](url) and Bold **text**
+  const parts = [];
+  const regex = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+
+    if (match[1] && match[2]) {
+      // Link [text](url)
+      parts.push(
+        <a
+          href={match[2]}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: '#2563eb', textDecoration: 'underline', fontWeight: '600' }}
+        >
+          {match[1]}
+        </a>
+      );
+    } else if (match[3]) {
+      // Bold **text**
+      parts.push(<strong style={{ fontWeight: '700' }}>{match[3]}</strong>);
+    }
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts;
 }
 
 export function ChatWidget({ api }: ChatWidgetProps) {
@@ -30,8 +72,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // 1. Fetch Config
@@ -73,24 +117,44 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  const handleImageFileChange = (e: any) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image file size must be smaller than 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSend = async (e?: Event) => {
     if (e) e.preventDefault();
     const text = inputValue.trim();
-    if (!text || isLoading) return;
+    const imageToAttach = selectedImage;
+
+    if ((!text && !imageToAttach) || isLoading) return;
 
     const userMsg: MessageItem = {
       id: `user_${Date.now()}`,
       sender: 'user',
       text,
+      imageUrl: imageToAttach || undefined,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputValue('');
+    setSelectedImage(null);
     setIsLoading(true);
 
     try {
-      const res = await api.sendMessage(sessionId, text);
+      const res = await api.sendMessage(sessionId, text, undefined, undefined, imageToAttach || undefined);
 
       // Handle AI returned cart action
       if (res.cartAction && config.eventBridgeEnabled) {
@@ -247,20 +311,40 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start',
                 }}
               >
-                <div
-                  style={{
-                    maxWidth: '85%',
-                    backgroundColor: msg.sender === 'user' ? primaryColor : '#ffffff',
-                    color: msg.sender === 'user' ? '#ffffff' : '#1f2937',
-                    padding: '12px 16px',
-                    borderRadius: msg.sender === 'user' ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                    fontSize: '14px',
-                    lineHeight: '1.45',
-                    boxShadow: msg.sender === 'bot' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                  }}
-                >
-                  {msg.text}
-                </div>
+                {/* User Uploaded Image Preview in Bubble */}
+                {msg.imageUrl && (
+                  <img
+                    src={msg.imageUrl}
+                    alt="Attached input"
+                    style={{
+                      maxWidth: '180px',
+                      maxHeight: '140px',
+                      borderRadius: '12px',
+                      marginBottom: '6px',
+                      objectFit: 'cover',
+                      border: '1px solid #e5e7eb',
+                    }}
+                  />
+                )}
+
+                {msg.text && (
+                  <div
+                    style={{
+                      maxWidth: '85%',
+                      backgroundColor: msg.sender === 'user' ? primaryColor : '#ffffff',
+                      color: msg.sender === 'user' ? '#ffffff' : '#1f2937',
+                      padding: '12px 16px',
+                      borderRadius: msg.sender === 'user' ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                      fontSize: '14px',
+                      lineHeight: '1.45',
+                      boxShadow: msg.sender === 'bot' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {renderMarkdownText(msg.text)}
+                  </div>
+                )}
 
                 {/* Product Cards Carousel / Grid */}
                 {msg.products && msg.products.length > 0 && (
@@ -380,11 +464,20 @@ export function ChatWidget({ api }: ChatWidgetProps) {
 
             {isLoading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '12px' }}>
-                <span style={{ fontSize: '14px' }}>🤖</span> Thinking...
+                <span style={{ fontSize: '14px' }}>🤖</span> Analyzing request & catalog...
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Selected Image Attachment Thumbnail Badge */}
+          {selectedImage && (
+            <div style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <img src={selectedImage} alt="Attachment" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
+              <span style={{ fontSize: '12px', color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Photo attached</span>
+              <button onClick={() => setSelectedImage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }}>✕</button>
+            </div>
+          )}
 
           {/* Footer Input */}
           <form
@@ -395,11 +488,40 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               borderTop: '1px solid #e5e7eb',
               display: 'flex',
               gap: '8px',
+              alignItems: 'center',
             }}
           >
             <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleImageFileChange}
+              style={{ display: 'none' }}
+            />
+            
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach photo / image"
+              style={{
+                background: 'none',
+                border: '1px solid #d1d5db',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#6b7280',
+              }}
+            >
+              📷
+            </button>
+
+            <input
               type="text"
-              placeholder="Ask about products, sizes, prices..."
+              placeholder="Ask products or attach photo..."
               value={inputValue}
               onInput={(e: any) => setInputValue(e.target.value)}
               style={{
@@ -415,7 +537,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             />
             <button
               type="submit"
-              disabled={!inputValue.trim() || isLoading}
+              disabled={(!inputValue.trim() && !selectedImage) || isLoading}
               style={{
                 backgroundColor: primaryColor,
                 color: '#ffffff',
@@ -426,8 +548,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: inputValue.trim() ? 'pointer' : 'default',
-                opacity: inputValue.trim() ? 1 : 0.5,
+                cursor: (inputValue.trim() || selectedImage) ? 'pointer' : 'default',
+                opacity: (inputValue.trim() || selectedImage) ? 1 : 0.5,
               }}
             >
               ➔

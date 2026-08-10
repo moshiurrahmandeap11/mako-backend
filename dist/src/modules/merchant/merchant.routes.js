@@ -9,4 +9,5 @@ router.post('/login', merchant_controller_1.login);
 router.post('/logout', merchant_controller_1.logout);
 router.get('/me', authenticateDashboard_1.authenticateDashboard, merchant_controller_1.me);
 router.patch('/domains', authenticateDashboard_1.authenticateDashboard, merchant_controller_1.updateDomains);
+router.post('/scrape', authenticateDashboard_1.authenticateDashboard, merchant_controller_1.scrapeUrl);
 exports.default = router;

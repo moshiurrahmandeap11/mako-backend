@@ -64,13 +64,13 @@ async function getWidgetConfigPublic(req, res) {
 async function chat(req, res) {
     try {
         const merchantId = req.merchant?.id;
-        const { sessionId, message, botMode, provider } = req.body;
-        if (!message || typeof message !== 'string') {
-            res.status(400).json({ error: 'Message field is required.' });
+        const { sessionId, message, botMode, provider, imageUrl } = req.body;
+        if ((!message || typeof message !== 'string') && !imageUrl) {
+            res.status(400).json({ error: 'Message or imageUrl field is required.' });
             return;
         }
         const effectiveSessionId = sessionId || `sess_${crypto_1.default.randomBytes(16).toString('hex')}`;
-        const response = await (0, chat_service_1.processChatMessage)(merchantId, effectiveSessionId, message.trim(), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template);
+        const response = await (0, chat_service_1.processChatMessage)(merchantId, effectiveSessionId, (message || '').trim(), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl);
         res.json(response);
     }
     catch (error) {
