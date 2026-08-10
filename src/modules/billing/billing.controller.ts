@@ -377,3 +377,54 @@ export async function getInvoices(
   }
 }
 
+export async function downloadInvoice(
+  req: DashboardAuthRequest,
+  res: Response
+): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+    const { invoiceId } = req.params;
+
+    if (!stripe) {
+      res.status(500).json({ error: 'Stripe is not configured.' });
+      return;
+    }
+
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+
+    const merchant = await prisma.user.findUnique({
+      where: { id: merchantId },
+    });
+
+    if (!merchant || merchant.stripeCustomerId !== invoice.customer) {
+      res.status(403).json({ error: 'Unauthorized to access this invoice.' });
+      return;
+    }
+
+    const pdfUrl = invoice.invoice_pdf;
+    if (!pdfUrl) {
+      res.status(404).json({ error: 'Invoice PDF url not available.' });
+      return;
+    }
+
+    const response = await fetch(pdfUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to stream PDF from Stripe: ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="invoice_${invoice.number || invoice.id}.pdf"`
+    );
+    res.send(buffer);
+  } catch (error: any) {
+    logger.error('Error downloading invoice:', error);
+    res.status(500).json({ error: error.message || 'Failed to download invoice PDF.' });
+  }
+}
+
+

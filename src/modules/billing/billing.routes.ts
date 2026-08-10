@@ -5,6 +5,7 @@ import {
   handleWebhook,
   verifyCheckout,
   getInvoices,
+  downloadInvoice,
 } from './billing.controller';
 import { authenticateDashboard } from '../../middleware/authenticateDashboard';
 
@@ -16,6 +17,7 @@ router.post('/portal', express.json(), authenticateDashboard, createPortalSessio
 
 router.get('/verify', authenticateDashboard, verifyCheckout);
 router.get('/invoices', authenticateDashboard, getInvoices);
+router.get('/invoices/:invoiceId/download', authenticateDashboard, downloadInvoice);
 
 // Webhook endpoint (requires raw body, so we use express.raw middleware specifically)
 router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
