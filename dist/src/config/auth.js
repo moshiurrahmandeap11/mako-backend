@@ -48,12 +48,20 @@ exports.auth = (0, better_auth_1.betterAuth)({
         },
     },
     advanced: {
+        crossSubdomainCookies: {
+            enabled: true,
+        },
         defaultCookieAttributes: {
-            sameSite: env_1.env.NODE_ENV === 'production' ? 'none' : 'lax',
-            secure: env_1.env.NODE_ENV === 'production',
+            sameSite: process.env.COOKIE_SAME_SITE || (env_1.env.NODE_ENV === 'production' ? 'none' : 'lax'),
+            secure: process.env.COOKIE_SECURE === 'false' ? false : env_1.env.NODE_ENV === 'production',
             httpOnly: true,
         },
     },
-    trustedOrigins: [env_1.env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+    trustedOrigins: [
+        env_1.env.FRONTEND_URL,
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://localhost:3000',
+    ].filter(Boolean),
     secret: env_1.env.JWT_SECRET || 'fallback_jwt_secret_dev_key_32chars_min',
 });
