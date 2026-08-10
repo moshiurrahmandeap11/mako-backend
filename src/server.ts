@@ -21,7 +21,7 @@ import billingRoutes from './modules/billing/billing.routes';
 const app = express();
 
 // CORS Policy
-const allowedOrigins = [env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'];
+const allowedOrigins = [env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000',  'https://mako-frontend.vercel.app'];
 
 app.use(
   cors({
