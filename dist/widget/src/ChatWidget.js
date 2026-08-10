@@ -70,6 +70,19 @@ function ChatWidget({ api }) {
                 catch { }
             }).catch(console.error);
         }
+        // 3. Persistent Visitor Tracking in localStorage & Ping Backend
+        let vid = '';
+        try {
+            vid = localStorage.getItem('aiw_visitor_id') || '';
+            if (!vid) {
+                vid = `vid_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
+                localStorage.setItem('aiw_visitor_id', vid);
+            }
+        }
+        catch {
+            vid = `vid_${Math.random().toString(36).substring(2, 11)}`;
+        }
+        api.pingVisitor(vid).catch(console.error);
     }, []);
     // Initialize initial greeting message once opened
     (0, hooks_1.useEffect)(() => {

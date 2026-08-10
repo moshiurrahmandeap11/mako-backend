@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createSession, getWidgetConfigPublic, chat } from './chat.controller';
+import { createSession, getWidgetConfigPublic, chat, pingVisitor } from './chat.controller';
 import { authenticateWidget } from '../../middleware/authenticateWidget';
 import { rateLimitWidget } from '../../middleware/rateLimitWidget';
 
@@ -10,5 +10,6 @@ router.use(authenticateWidget as any);
 router.post('/session', createSession as any);
 router.get('/config', getWidgetConfigPublic as any);
 router.post('/chat', rateLimitWidget as any, chat as any);
+router.post('/ping', pingVisitor as any);
 
 export default router;

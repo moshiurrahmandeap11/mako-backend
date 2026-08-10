@@ -7,7 +7,7 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
   try {
     const merchantId = req.merchant?.id!;
 
-    const [totalProducts, totalConversations, totalApiKeys, totalMessages] = await Promise.all([
+    const [totalProducts, totalConversations, totalApiKeys, totalMessages, totalUniqueVisitors, visitorCountriesRaw] = await Promise.all([
       prisma.product.count({ where: { merchantId } }),
       prisma.conversation.count({
         where: {
@@ -19,7 +19,21 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
       }),
       prisma.apiKey.count({ where: { merchantId, isActive: true } }),
       prisma.message.count({ where: { conversation: { merchantId } } }),
+      prisma.visitor.count({ where: { merchantId } }),
+      prisma.visitor.groupBy({
+        by: ['country', 'countryCode'],
+        where: { merchantId },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+        take: 6,
+      }),
     ]);
+
+    const visitorCountries = visitorCountriesRaw.map((v) => ({
+      country: v.country,
+      countryCode: v.countryCode,
+      count: v._count.id,
+    }));
 
     res.json({
       summary: {
@@ -27,6 +41,8 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
         totalConversations,
         totalApiKeys,
         totalMessages,
+        totalUniqueVisitors,
+        visitorCountries,
         planTier: req.merchant?.planTier,
       },
     });

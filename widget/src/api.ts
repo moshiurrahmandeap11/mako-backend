@@ -75,4 +75,11 @@ export class WidgetAPI {
       body: JSON.stringify({ sessionId, message, botMode, provider, imageUrl }),
     });
   }
+
+  async pingVisitor(visitorId: string): Promise<any> {
+    return this.fetch<any>('/api/widget/ping', {
+      method: 'POST',
+      body: JSON.stringify({ visitorId }),
+    });
+  }
 }

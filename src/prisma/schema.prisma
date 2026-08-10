@@ -31,6 +31,7 @@ model User {
   apiKeys       ApiKey[]
   products      Product[]
   conversations Conversation[]
+  visitors      Visitor[]
   widgetConfig  WidgetConfig?
 
   // Better Auth relations
@@ -161,4 +162,21 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verification")
+}
+
+model Visitor {
+  id          String   @id @default(cuid())
+  merchantId  String
+  merchant    User     @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  visitorId   String
+  ipAddress   String?
+  country     String   @default("Unknown")
+  countryCode String   @default("UN")
+  city        String?
+  pageViews   Int      @default(1)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([merchantId, visitorId])
+  @@index([merchantId])
 }

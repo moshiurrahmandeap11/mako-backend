@@ -7,7 +7,7 @@ const logger_1 = require("../../utils/logger");
 async function getSummary(req, res) {
     try {
         const merchantId = req.merchant?.id;
-        const [totalProducts, totalConversations, totalApiKeys, totalMessages] = await Promise.all([
+        const [totalProducts, totalConversations, totalApiKeys, totalMessages, totalUniqueVisitors, visitorCountriesRaw] = await Promise.all([
             db_1.prisma.product.count({ where: { merchantId } }),
             db_1.prisma.conversation.count({
                 where: {
@@ -19,13 +19,28 @@ async function getSummary(req, res) {
             }),
             db_1.prisma.apiKey.count({ where: { merchantId, isActive: true } }),
             db_1.prisma.message.count({ where: { conversation: { merchantId } } }),
+            db_1.prisma.visitor.count({ where: { merchantId } }),
+            db_1.prisma.visitor.groupBy({
+                by: ['country', 'countryCode'],
+                where: { merchantId },
+                _count: { id: true },
+                orderBy: { _count: { id: 'desc' } },
+                take: 6,
+            }),
         ]);
+        const visitorCountries = visitorCountriesRaw.map((v) => ({
+            country: v.country,
+            countryCode: v.countryCode,
+            count: v._count.id,
+        }));
         res.json({
             summary: {
                 totalProducts,
                 totalConversations,
                 totalApiKeys,
                 totalMessages,
+                totalUniqueVisitors,
+                visitorCountries,
                 planTier: req.merchant?.planTier,
             },
         });

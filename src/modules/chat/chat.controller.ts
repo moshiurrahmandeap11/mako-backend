@@ -90,3 +90,80 @@ export async function chat(req: WidgetAuthRequest, res: Response): Promise<void>
     res.status(500).json({ error: 'Failed to process chat message.' });
   }
 }
+
+export async function pingVisitor(req: WidgetAuthRequest, res: Response): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+    const { visitorId } = req.body;
+
+    if (!visitorId) {
+      res.status(400).json({ error: 'visitorId is required.' });
+      return;
+    }
+
+    const rawIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+    let country = 'United States';
+    let countryCode = 'US';
+    let city = 'New York';
+
+    // 1. Cloudflare IP country header
+    const cfCountry = req.headers['cf-ipcountry'] as string;
+    if (cfCountry && cfCountry.length === 2 && cfCountry !== 'XX') {
+      countryCode = cfCountry.toUpperCase();
+      country = countryCode === 'BD' ? 'Bangladesh' : countryCode === 'US' ? 'United States' : countryCode === 'GB' ? 'United Kingdom' : countryCode;
+    } else {
+      // 2. geoip-lite lookup
+      const geoip = await import('geoip-lite');
+      const geo = geoip.lookup(rawIp);
+      if (geo) {
+        countryCode = geo.country;
+        country = geo.country;
+        city = geo.city || city;
+      } else if (rawIp === '127.0.0.1' || rawIp === '::1' || rawIp.startsWith('192.168.') || rawIp.startsWith('10.')) {
+        // Localhost development default fallback
+        const lang = req.headers['accept-language'] || '';
+        if (lang.includes('bn') || lang.includes('BD')) {
+          country = 'Bangladesh';
+          countryCode = 'BD';
+          city = 'Dhaka';
+        } else {
+          country = 'United States';
+          countryCode = 'US';
+          city = 'San Francisco';
+        }
+      }
+    }
+
+    const visitor = await prisma.visitor.upsert({
+      where: {
+        merchantId_visitorId: {
+          merchantId,
+          visitorId,
+        },
+      },
+      create: {
+        merchantId,
+        visitorId,
+        ipAddress: rawIp,
+        country,
+        countryCode,
+        city,
+        pageViews: 1,
+        lastSeenAt: new Date(),
+      },
+      update: {
+        ipAddress: rawIp,
+        country,
+        countryCode,
+        city,
+        pageViews: { increment: 1 },
+        lastSeenAt: new Date(),
+      },
+    });
+
+    res.json({ success: true, visitor });
+  } catch (error) {
+    logger.error('Ping Visitor Error:', error);
+    res.status(500).json({ error: 'Failed to record visitor ping.' });
+  }
+}
