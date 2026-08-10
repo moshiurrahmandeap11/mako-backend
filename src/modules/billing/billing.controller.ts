@@ -290,3 +290,90 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     res.status(500).json({ error: 'Internal processing error.' });
   }
 }
+
+export async function verifyCheckout(
+  req: DashboardAuthRequest,
+  res: Response
+): Promise<void> {
+  try {
+    const { session_id } = req.query;
+
+    if (!session_id || typeof session_id !== 'string') {
+      res.status(400).json({ error: 'Missing session_id query parameter.' });
+      return;
+    }
+
+    if (!stripe) {
+      res.status(500).json({ error: 'Stripe is not configured.' });
+      return;
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    const merchantId = session.metadata?.merchantId;
+    const tier = session.metadata?.tier;
+
+    if (session.payment_status === 'paid' && merchantId && tier) {
+      await prisma.user.update({
+        where: { id: merchantId },
+        data: {
+          stripeSubscriptionId: session.subscription as string,
+          subscriptionStatus: 'active',
+          planTier: tier as PlanTier,
+        },
+      });
+
+      logger.info(`Verified checkout via API for merchant ${merchantId} -> Tier: ${tier}`);
+      res.json({ success: true, tier });
+      return;
+    }
+
+    res.json({ success: false, status: session.payment_status });
+  } catch (error: any) {
+    logger.error('Error verifying checkout:', error);
+    res.status(500).json({ error: error.message || 'Failed to verify checkout status.' });
+  }
+}
+
+export async function getInvoices(
+  req: DashboardAuthRequest,
+  res: Response
+): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+
+    if (!stripe) {
+      res.status(500).json({ error: 'Stripe is not configured.' });
+      return;
+    }
+
+    const merchant = await prisma.user.findUnique({
+      where: { id: merchantId },
+    });
+
+    if (!merchant || !merchant.stripeCustomerId) {
+      res.json({ invoices: [] });
+      return;
+    }
+
+    const invoices = await stripe.invoices.list({
+      customer: merchant.stripeCustomerId,
+      limit: 15,
+    });
+
+    const formatted = invoices.data.map((inv) => ({
+      id: inv.id,
+      number: inv.number || 'Draft Invoice',
+      amount: (inv.amount_paid / 100).toFixed(2),
+      currency: (inv.currency || 'USD').toUpperCase(),
+      status: inv.status || 'open',
+      created: new Date(inv.created * 1000).toLocaleDateString(),
+      pdf: inv.invoice_pdf || inv.hosted_invoice_url || '',
+    }));
+
+    res.json({ invoices: formatted });
+  } catch (error: any) {
+    logger.error('Error fetching invoices:', error);
+    res.status(500).json({ error: error.message || 'Failed to load invoices.' });
+  }
+}
+

@@ -9,7 +9,14 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
 
     const [totalProducts, totalConversations, totalApiKeys, totalMessages] = await Promise.all([
       prisma.product.count({ where: { merchantId } }),
-      prisma.conversation.count({ where: { merchantId } }),
+      prisma.conversation.count({
+        where: {
+          merchantId,
+          messages: {
+            some: {},
+          },
+        },
+      }),
       prisma.apiKey.count({ where: { merchantId, isActive: true } }),
       prisma.message.count({ where: { conversation: { merchantId } } }),
     ]);
@@ -38,7 +45,12 @@ export async function listConversations(req: DashboardAuthRequest, res: Response
 
     const [conversations, total] = await Promise.all([
       prisma.conversation.findMany({
-        where: { merchantId },
+        where: {
+          merchantId,
+          messages: {
+            some: {},
+          },
+        },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -48,7 +60,14 @@ export async function listConversations(req: DashboardAuthRequest, res: Response
           },
         },
       }),
-      prisma.conversation.count({ where: { merchantId } }),
+      prisma.conversation.count({
+        where: {
+          merchantId,
+          messages: {
+            some: {},
+          },
+        },
+      }),
     ]);
 
     res.json({

@@ -9,7 +9,14 @@ async function getSummary(req, res) {
         const merchantId = req.merchant?.id;
         const [totalProducts, totalConversations, totalApiKeys, totalMessages] = await Promise.all([
             db_1.prisma.product.count({ where: { merchantId } }),
-            db_1.prisma.conversation.count({ where: { merchantId } }),
+            db_1.prisma.conversation.count({
+                where: {
+                    merchantId,
+                    messages: {
+                        some: {},
+                    },
+                },
+            }),
             db_1.prisma.apiKey.count({ where: { merchantId, isActive: true } }),
             db_1.prisma.message.count({ where: { conversation: { merchantId } } }),
         ]);
@@ -36,7 +43,12 @@ async function listConversations(req, res) {
         const skip = (page - 1) * limit;
         const [conversations, total] = await Promise.all([
             db_1.prisma.conversation.findMany({
-                where: { merchantId },
+                where: {
+                    merchantId,
+                    messages: {
+                        some: {},
+                    },
+                },
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
@@ -46,7 +58,14 @@ async function listConversations(req, res) {
                     },
                 },
             }),
-            db_1.prisma.conversation.count({ where: { merchantId } }),
+            db_1.prisma.conversation.count({
+                where: {
+                    merchantId,
+                    messages: {
+                        some: {},
+                    },
+                },
+            }),
         ]);
         res.json({
             conversations,

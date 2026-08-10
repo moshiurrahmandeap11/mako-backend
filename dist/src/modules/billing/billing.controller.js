@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createCheckoutSession = createCheckoutSession;
 exports.createPortalSession = createPortalSession;
 exports.handleWebhook = handleWebhook;
+exports.verifyCheckout = verifyCheckout;
+exports.getInvoices = getInvoices;
 const db_1 = require("../../config/db");
 const stripe_1 = require("../../utils/stripe");
 const env_1 = require("../../config/env");
@@ -243,5 +245,73 @@ async function handleWebhook(req, res) {
     catch (error) {
         logger_1.logger.error('Webhook event processing error:', error);
         res.status(500).json({ error: 'Internal processing error.' });
+    }
+}
+async function verifyCheckout(req, res) {
+    try {
+        const { session_id } = req.query;
+        if (!session_id || typeof session_id !== 'string') {
+            res.status(400).json({ error: 'Missing session_id query parameter.' });
+            return;
+        }
+        if (!stripe_1.stripe) {
+            res.status(500).json({ error: 'Stripe is not configured.' });
+            return;
+        }
+        const session = await stripe_1.stripe.checkout.sessions.retrieve(session_id);
+        const merchantId = session.metadata?.merchantId;
+        const tier = session.metadata?.tier;
+        if (session.payment_status === 'paid' && merchantId && tier) {
+            await db_1.prisma.user.update({
+                where: { id: merchantId },
+                data: {
+                    stripeSubscriptionId: session.subscription,
+                    subscriptionStatus: 'active',
+                    planTier: tier,
+                },
+            });
+            logger_1.logger.info(`Verified checkout via API for merchant ${merchantId} -> Tier: ${tier}`);
+            res.json({ success: true, tier });
+            return;
+        }
+        res.json({ success: false, status: session.payment_status });
+    }
+    catch (error) {
+        logger_1.logger.error('Error verifying checkout:', error);
+        res.status(500).json({ error: error.message || 'Failed to verify checkout status.' });
+    }
+}
+async function getInvoices(req, res) {
+    try {
+        const merchantId = req.merchant?.id;
+        if (!stripe_1.stripe) {
+            res.status(500).json({ error: 'Stripe is not configured.' });
+            return;
+        }
+        const merchant = await db_1.prisma.user.findUnique({
+            where: { id: merchantId },
+        });
+        if (!merchant || !merchant.stripeCustomerId) {
+            res.json({ invoices: [] });
+            return;
+        }
+        const invoices = await stripe_1.stripe.invoices.list({
+            customer: merchant.stripeCustomerId,
+            limit: 15,
+        });
+        const formatted = invoices.data.map((inv) => ({
+            id: inv.id,
+            number: inv.number || 'Draft Invoice',
+            amount: (inv.amount_paid / 100).toFixed(2),
+            currency: (inv.currency || 'USD').toUpperCase(),
+            status: inv.status || 'open',
+            created: new Date(inv.created * 1000).toLocaleDateString(),
+            pdf: inv.invoice_pdf || inv.hosted_invoice_url || '',
+        }));
+        res.json({ invoices: formatted });
+    }
+    catch (error) {
+        logger_1.logger.error('Error fetching invoices:', error);
+        res.status(500).json({ error: error.message || 'Failed to load invoices.' });
     }
 }
