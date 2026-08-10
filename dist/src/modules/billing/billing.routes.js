@@ -12,6 +12,7 @@ router.post('/checkout', express_1.default.json(), authenticateDashboard_1.authe
 router.post('/portal', express_1.default.json(), authenticateDashboard_1.authenticateDashboard, billing_controller_1.createPortalSession);
 router.get('/verify', authenticateDashboard_1.authenticateDashboard, billing_controller_1.verifyCheckout);
 router.get('/invoices', authenticateDashboard_1.authenticateDashboard, billing_controller_1.getInvoices);
+router.get('/invoices/:invoiceId/download', authenticateDashboard_1.authenticateDashboard, billing_controller_1.downloadInvoice);
 // Webhook endpoint (requires raw body, so we use express.raw middleware specifically)
 router.post('/webhook', express_1.default.raw({ type: 'application/json' }), billing_controller_1.handleWebhook);
 exports.default = router;

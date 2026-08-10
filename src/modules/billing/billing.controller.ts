@@ -383,7 +383,7 @@ export async function downloadInvoice(
 ): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
-    const { invoiceId } = req.params;
+    const invoiceId = req.params.invoiceId as string;
 
     if (!stripe) {
       res.status(500).json({ error: 'Stripe is not configured.' });
