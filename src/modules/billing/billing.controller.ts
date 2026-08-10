@@ -364,9 +364,11 @@ export async function getInvoices(
       id: inv.id,
       number: inv.number || 'Draft Invoice',
       amount: (inv.amount_paid / 100).toFixed(2),
+      amount_paid: inv.amount_paid,
       currency: (inv.currency || 'USD').toUpperCase(),
       status: inv.status || 'open',
-      created: new Date(inv.created * 1000).toLocaleDateString(),
+      created: inv.created,
+      dateFormatted: new Date(inv.created * 1000).toLocaleDateString(),
       pdf: inv.invoice_pdf || inv.hosted_invoice_url || '',
     }));
 
