@@ -386,34 +386,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Powered by Branding */}
-          {!config.hideBranding && (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '5px 0',
-                fontSize: '10px',
-                color: '#9ca3af',
-                backgroundColor: '#ffffff',
-                borderTop: '1px solid #f3f4f6',
-              }}
-            >
-              Powered by{' '}
-              <a
-                href="https://labtoai.com"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  color: primaryColor,
-                  textDecoration: 'none',
-                  fontWeight: '700',
-                }}
-              >
-                Labto AI
-              </a>
-            </div>
-          )}
-
           {/* Footer Input */}
           <form
             onSubmit={handleSend}
@@ -435,6 +407,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 padding: '10px 14px',
                 borderRadius: '24px',
                 border: '1px solid #d1d5db',
+                backgroundColor: '#ffffff',
+                color: '#111827',
                 fontSize: '14px',
                 outline: 'none',
               }}

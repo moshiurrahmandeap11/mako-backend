@@ -21,8 +21,9 @@ const chat_routes_1 = __importDefault(require("./modules/chat/chat.routes"));
 const analytics_routes_1 = __importDefault(require("./modules/analytics/analytics.routes"));
 const billing_routes_1 = __importDefault(require("./modules/billing/billing.routes"));
 const app = (0, express_1.default)();
+app.set('trust proxy', 1);
 // CORS Policy
-const allowedOrigins = [env_1.env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'];
+const allowedOrigins = [env_1.env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000', 'https://mako-frontend.vercel.app'];
 app.use((0, cors_1.default)({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
@@ -60,7 +61,7 @@ app.use('/widget.js', (req, res, next) => {
 });
 app.use('/public', express_1.default.static(publicDir));
 // Health Check
-app.get('/health', (req, res) => {
+app.get('/', (req, res) => {
     res.json({ status: 'ok', service: 'AI Shopping Widget API', timestamp: new Date().toISOString() });
 });
 // Register API Routes
