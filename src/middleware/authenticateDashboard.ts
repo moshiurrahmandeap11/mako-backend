@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../config/auth';
+import { prisma } from '../config/db';
 import { logger } from '../utils/logger';
 
 export interface DashboardAuthRequest extends Request {
@@ -27,11 +28,16 @@ export async function authenticateDashboard(
       return;
     }
 
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { planTier: true },
+    });
+
     req.merchant = {
       id: session.user.id,
       email: session.user.email,
       name: session.user.name,
-      planTier: (session.user as any).planTier || 'FREE',
+      planTier: dbUser?.planTier || 'FREE',
     };
 
     next();

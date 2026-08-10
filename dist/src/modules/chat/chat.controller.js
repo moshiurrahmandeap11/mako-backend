@@ -47,11 +47,11 @@ async function getWidgetConfigPublic(req, res) {
             };
         }
         res.json({
-            primaryColor: isFree ? '#111111' : config.primaryColor,
-            greetingMessage: isFree ? 'Hi! How can I help you shop today?' : config.greetingMessage,
-            botName: isFree ? 'Shop Assistant' : config.botName,
-            position: isFree ? 'bottom-right' : config.position,
-            addToCartEnabled: isFree ? true : config.addToCartEnabled,
+            primaryColor: config.primaryColor || '#111111',
+            greetingMessage: config.greetingMessage || 'Hi! How can I help you shop today?',
+            botName: config.botName || 'Shop Assistant',
+            position: config.position || 'bottom-right',
+            addToCartEnabled: config.addToCartEnabled !== undefined ? config.addToCartEnabled : true,
             hideBranding: planTier === 'PRO' || planTier === 'ENTERPRISE',
             eventBridgeEnabled: planTier === 'PRO' || planTier === 'ENTERPRISE',
         });
