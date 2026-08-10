@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const merchant_controller_1 = require("./merchant.controller");
+const authenticateDashboard_1 = require("../../middleware/authenticateDashboard");
+const router = (0, express_1.Router)();
+router.post('/register', merchant_controller_1.register);
+router.post('/login', merchant_controller_1.login);
+router.post('/logout', merchant_controller_1.logout);
+router.get('/me', authenticateDashboard_1.authenticateDashboard, merchant_controller_1.me);
+router.patch('/domains', authenticateDashboard_1.authenticateDashboard, merchant_controller_1.updateDomains);
+exports.default = router;

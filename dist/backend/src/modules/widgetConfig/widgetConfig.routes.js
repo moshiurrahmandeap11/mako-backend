@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const widgetConfig_controller_1 = require("./widgetConfig.controller");
+const authenticateDashboard_1 = require("../../middleware/authenticateDashboard");
+const router = (0, express_1.Router)();
+router.use(authenticateDashboard_1.authenticateDashboard);
+router.get('/', widgetConfig_controller_1.getConfig);
+router.patch('/', widgetConfig_controller_1.updateConfig);
+exports.default = router;

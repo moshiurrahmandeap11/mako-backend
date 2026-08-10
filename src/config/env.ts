@@ -1,0 +1,28 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+export const env = {
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  PORT: parseInt(process.env.PORT || '4000', 10),
+  DATABASE_URL: process.env.DATABASE_URL || '',
+  JWT_SECRET: process.env.JWT_SECRET || 'fallback_jwt_secret_dev_key_32chars_min',
+  COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || 'localhost',
+  API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:4000',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+  WIDGET_CDN_URL: process.env.WIDGET_CDN_URL || 'http://localhost:4000/widget.js',
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+  GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || '',
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || '',
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || '',
+  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || 'http://localhost:4000/api/auth',
+};

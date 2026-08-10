@@ -1,0 +1,83 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
+const env_1 = require("./config/env");
+const db_1 = require("./config/db");
+const logger_1 = require("./utils/logger");
+const node_1 = require("better-auth/node");
+const auth_1 = require("./config/auth");
+const merchant_routes_1 = __importDefault(require("./modules/merchant/merchant.routes"));
+const apiKey_routes_1 = __importDefault(require("./modules/apiKey/apiKey.routes"));
+const product_routes_1 = __importDefault(require("./modules/product/product.routes"));
+const widgetConfig_routes_1 = __importDefault(require("./modules/widgetConfig/widgetConfig.routes"));
+const chat_routes_1 = __importDefault(require("./modules/chat/chat.routes"));
+const analytics_routes_1 = __importDefault(require("./modules/analytics/analytics.routes"));
+const app = (0, express_1.default)();
+// CORS Policy
+const allowedOrigins = [env_1.env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'];
+app.use((0, cors_1.default)({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+            callback(null, true);
+        }
+        else {
+            callback(null, true);
+        }
+    },
+    credentials: true,
+}));
+// Better Auth route handler (must be mounted before body parsers)
+app.use('/api/auth', (0, node_1.toNodeHandler)(auth_1.auth));
+app.use(express_1.default.json({ limit: '10mb' }));
+app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
+app.use((0, cookie_parser_1.default)());
+// Robust Static File Serving for widget.js
+const publicPaths = [
+    path_1.default.resolve(process.cwd(), 'public'),
+    path_1.default.resolve(__dirname, '../../public'),
+    path_1.default.resolve(__dirname, '../public'),
+];
+let publicDir = publicPaths.find((p) => fs_1.default.existsSync(p)) || publicPaths[0];
+app.use('/widget.js', (req, res, next) => {
+    const widgetFilePath = path_1.default.join(publicDir, 'widget.js');
+    if (fs_1.default.existsSync(widgetFilePath)) {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.sendFile(widgetFilePath);
+    }
+    else {
+        next();
+    }
+});
+app.use('/public', express_1.default.static(publicDir));
+// Health Check
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'AI Shopping Widget API', timestamp: new Date().toISOString() });
+});
+// Register API Routes
+app.use('/api/merchant', merchant_routes_1.default);
+app.use('/api/keys', apiKey_routes_1.default);
+app.use('/api/products', product_routes_1.default);
+app.use('/api/widget-config', widgetConfig_routes_1.default);
+app.use('/api/widget', chat_routes_1.default);
+app.use('/api/analytics', analytics_routes_1.default);
+// Global Error Handler
+app.use((err, req, res, next) => {
+    logger_1.logger.error('Unhandled Server Error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+});
+const PORT = env_1.env.PORT || 4000;
+async function startServer() {
+    await (0, db_1.connectDB)();
+    app.listen(PORT, () => {
+        logger_1.logger.info(`🚀 Backend Express API listening on port ${PORT}`);
+        logger_1.logger.info(`📦 Widget static bundle available at http://localhost:${PORT}/widget.js`);
+    });
+}
+startServer();

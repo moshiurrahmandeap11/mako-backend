@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const apiKey_controller_1 = require("./apiKey.controller");
+const authenticateDashboard_1 = require("../../middleware/authenticateDashboard");
+const router = (0, express_1.Router)();
+router.use(authenticateDashboard_1.authenticateDashboard);
+router.post('/', apiKey_controller_1.createKey);
+router.get('/', apiKey_controller_1.listKeys);
+router.delete('/:id', apiKey_controller_1.revokeKey);
+exports.default = router;
