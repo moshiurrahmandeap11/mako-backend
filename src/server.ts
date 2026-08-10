@@ -16,6 +16,7 @@ import productRoutes from './modules/product/product.routes';
 import widgetConfigRoutes from './modules/widgetConfig/widgetConfig.routes';
 import widgetChatRoutes from './modules/chat/chat.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
+import billingRoutes from './modules/billing/billing.routes';
 
 const app = express();
 
@@ -37,6 +38,9 @@ app.use(
 
 // Better Auth route handler (must be mounted before body parsers)
 app.use('/api/auth', toNodeHandler(auth));
+
+// Mount billing routes before express.json() to allow raw body verification for webhook
+app.use('/api/billing', billingRoutes);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

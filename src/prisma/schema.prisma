@@ -21,6 +21,12 @@ model User {
   allowedDomains String[]
   planTier       PlanTier      @default(FREE)
 
+  // Stripe Billing fields
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  subscriptionStatus   String?
+
   // Custom relations
   apiKeys       ApiKey[]
   products      Product[]

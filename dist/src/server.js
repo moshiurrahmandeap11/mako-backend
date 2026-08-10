@@ -19,6 +19,7 @@ const product_routes_1 = __importDefault(require("./modules/product/product.rout
 const widgetConfig_routes_1 = __importDefault(require("./modules/widgetConfig/widgetConfig.routes"));
 const chat_routes_1 = __importDefault(require("./modules/chat/chat.routes"));
 const analytics_routes_1 = __importDefault(require("./modules/analytics/analytics.routes"));
+const billing_routes_1 = __importDefault(require("./modules/billing/billing.routes"));
 const app = (0, express_1.default)();
 // CORS Policy
 const allowedOrigins = [env_1.env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'];
@@ -35,6 +36,8 @@ app.use((0, cors_1.default)({
 }));
 // Better Auth route handler (must be mounted before body parsers)
 app.use('/api/auth', (0, node_1.toNodeHandler)(auth_1.auth));
+// Mount billing routes before express.json() to allow raw body verification for webhook
+app.use('/api/billing', billing_routes_1.default);
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 app.use((0, cookie_parser_1.default)());

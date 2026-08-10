@@ -168,6 +168,7 @@ export async function me(req: DashboardAuthRequest, res: Response): Promise<void
 export async function updateDomains(req: DashboardAuthRequest, res: Response): Promise<void> {
   try {
     const merchantId = req.merchant?.id;
+    const planTier = req.merchant?.planTier || 'FREE';
     const { allowedDomains } = req.body;
 
     if (!Array.isArray(allowedDomains)) {
@@ -176,6 +177,21 @@ export async function updateDomains(req: DashboardAuthRequest, res: Response): P
     }
 
     const sanitizedDomains = allowedDomains.map((d) => d.trim().toLowerCase()).filter(Boolean);
+
+    const domainLimits: Record<string, number> = {
+      FREE: 1,
+      STARTER: 2,
+      PRO: 5,
+      ENTERPRISE: Infinity,
+    };
+    const limit = domainLimits[planTier] !== undefined ? domainLimits[planTier] : 1;
+
+    if (sanitizedDomains.length > limit) {
+      res.status(400).json({
+        error: `Your ${planTier} plan allows whitelisting up to ${limit} domains. Please upgrade to add more domains.`
+      });
+      return;
+    }
 
     const updatedMerchant = await prisma.user.update({
       where: { id: merchantId },

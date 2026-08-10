@@ -24,7 +24,7 @@ const openrouter = env_1.env.OPENROUTER_API_KEY
         baseURL: 'https://openrouter.ai/api/v1',
         defaultHeaders: {
             'HTTP-Referer': 'http://localhost:3000',
-            'X-Title': 'Mako AI Shopping Widget',
+            'X-Title': 'Labto AI Shopping Widget',
         },
     })
     : null;

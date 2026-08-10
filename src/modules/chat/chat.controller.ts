@@ -27,6 +27,8 @@ export async function createSession(req: WidgetAuthRequest, res: Response): Prom
 export async function getWidgetConfigPublic(req: WidgetAuthRequest, res: Response): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
+    const planTier = req.merchant?.planTier || 'FREE';
+    const isFree = planTier === 'FREE';
 
     let config = await prisma.widgetConfig.findUnique({
       where: { merchantId },
@@ -45,11 +47,13 @@ export async function getWidgetConfigPublic(req: WidgetAuthRequest, res: Respons
     }
 
     res.json({
-      primaryColor: config.primaryColor,
-      greetingMessage: config.greetingMessage,
-      botName: config.botName,
-      position: config.position,
-      addToCartEnabled: config.addToCartEnabled,
+      primaryColor: isFree ? '#111111' : config.primaryColor,
+      greetingMessage: isFree ? 'Hi! How can I help you shop today?' : config.greetingMessage,
+      botName: isFree ? 'Shop Assistant' : config.botName,
+      position: isFree ? 'bottom-right' : config.position,
+      addToCartEnabled: isFree ? true : config.addToCartEnabled,
+      hideBranding: planTier === 'PRO' || planTier === 'ENTERPRISE',
+      eventBridgeEnabled: planTier === 'PRO' || planTier === 'ENTERPRISE',
     });
   } catch (error) {
     logger.error('Get Public Widget Config Error:', error);

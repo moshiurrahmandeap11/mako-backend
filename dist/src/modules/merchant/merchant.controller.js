@@ -149,12 +149,26 @@ async function me(req, res) {
 async function updateDomains(req, res) {
     try {
         const merchantId = req.merchant?.id;
+        const planTier = req.merchant?.planTier || 'FREE';
         const { allowedDomains } = req.body;
         if (!Array.isArray(allowedDomains)) {
             res.status(400).json({ error: 'allowedDomains must be an array of domain strings.' });
             return;
         }
         const sanitizedDomains = allowedDomains.map((d) => d.trim().toLowerCase()).filter(Boolean);
+        const domainLimits = {
+            FREE: 1,
+            STARTER: 2,
+            PRO: 5,
+            ENTERPRISE: Infinity,
+        };
+        const limit = domainLimits[planTier] !== undefined ? domainLimits[planTier] : 1;
+        if (sanitizedDomains.length > limit) {
+            res.status(400).json({
+                error: `Your ${planTier} plan allows whitelisting up to ${limit} domains. Please upgrade to add more domains.`
+            });
+            return;
+        }
         const updatedMerchant = await db_1.prisma.user.update({
             where: { id: merchantId },
             data: { allowedDomains: sanitizedDomains },

@@ -24,6 +24,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     botName: 'Shop Assistant',
     position: 'bottom-right',
     addToCartEnabled: true,
+    hideBranding: false,
+    eventBridgeEnabled: false,
   });
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<MessageItem[]>([]);
@@ -91,7 +93,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       const res = await api.sendMessage(sessionId, text);
 
       // Handle AI returned cart action
-      if (res.cartAction) {
+      if (res.cartAction && config.eventBridgeEnabled) {
         requestAddToCart(res.cartAction.productId, res.cartAction.quantity);
       }
 
@@ -383,6 +385,34 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             )}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Powered by Branding */}
+          {!config.hideBranding && (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '5px 0',
+                fontSize: '10px',
+                color: '#9ca3af',
+                backgroundColor: '#ffffff',
+                borderTop: '1px solid #f3f4f6',
+              }}
+            >
+              Powered by{' '}
+              <a
+                href="https://labtoai.com"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  color: primaryColor,
+                  textDecoration: 'none',
+                  fontWeight: '700',
+                }}
+              >
+                Labto AI
+              </a>
+            </div>
+          )}
 
           {/* Footer Input */}
           <form

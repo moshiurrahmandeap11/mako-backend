@@ -30,6 +30,13 @@ async function getConfig(req, res) {
 async function updateConfig(req, res) {
     try {
         const merchantId = req.merchant?.id;
+        const planTier = req.merchant?.planTier || 'FREE';
+        if (planTier === 'FREE') {
+            res.status(403).json({
+                error: 'Customizing widget configurations and styling requires a STARTER or PRO plan. Please upgrade your subscription.'
+            });
+            return;
+        }
         const { primaryColor, greetingMessage, botName, position, addToCartEnabled } = req.body;
         const config = await db_1.prisma.widgetConfig.upsert({
             where: { merchantId },

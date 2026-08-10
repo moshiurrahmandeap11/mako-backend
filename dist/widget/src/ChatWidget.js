@@ -12,6 +12,8 @@ function ChatWidget({ api }) {
         botName: 'Shop Assistant',
         position: 'bottom-right',
         addToCartEnabled: true,
+        hideBranding: false,
+        eventBridgeEnabled: false,
     });
     const [sessionId, setSessionId] = (0, hooks_1.useState)('');
     const [messages, setMessages] = (0, hooks_1.useState)([]);
@@ -74,7 +76,7 @@ function ChatWidget({ api }) {
         try {
             const res = await api.sendMessage(sessionId, text);
             // Handle AI returned cart action
-            if (res.cartAction) {
+            if (res.cartAction && config.eventBridgeEnabled) {
                 (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity);
             }
             const botMsg = {
@@ -237,7 +239,18 @@ function ChatWidget({ api }) {
                                                                         color: '#ffffff',
                                                                         fontWeight: '600',
                                                                         cursor: 'pointer',
-                                                                    }, children: "+ Add to Cart" }))] })] })] }, prod.id))) })), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '10px', color: '#9ca3af', marginTop: '4px' }, children: msg.time })] }, msg.id))), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '12px' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '14px' }, children: "\uD83E\uDD16" }), " Thinking..."] })), (0, jsx_runtime_1.jsx)("div", { ref: messagesEndRef })] }), (0, jsx_runtime_1.jsxs)("form", { onSubmit: handleSend, style: {
+                                                                    }, children: "+ Add to Cart" }))] })] })] }, prod.id))) })), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '10px', color: '#9ca3af', marginTop: '4px' }, children: msg.time })] }, msg.id))), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '12px' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '14px' }, children: "\uD83E\uDD16" }), " Thinking..."] })), (0, jsx_runtime_1.jsx)("div", { ref: messagesEndRef })] }), !config.hideBranding && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                            textAlign: 'center',
+                            padding: '5px 0',
+                            fontSize: '10px',
+                            color: '#9ca3af',
+                            backgroundColor: '#ffffff',
+                            borderTop: '1px solid #f3f4f6',
+                        }, children: ["Powered by", ' ', (0, jsx_runtime_1.jsx)("a", { href: "https://labtoai.com", target: "_blank", rel: "noreferrer", style: {
+                                    color: primaryColor,
+                                    textDecoration: 'none',
+                                    fontWeight: '700',
+                                }, children: "Labto AI" })] })), (0, jsx_runtime_1.jsxs)("form", { onSubmit: handleSend, style: {
                             padding: '12px 16px',
                             backgroundColor: '#ffffff',
                             borderTop: '1px solid #e5e7eb',

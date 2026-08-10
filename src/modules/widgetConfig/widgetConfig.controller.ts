@@ -32,6 +32,15 @@ export async function getConfig(req: DashboardAuthRequest, res: Response): Promi
 export async function updateConfig(req: DashboardAuthRequest, res: Response): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
+    const planTier = req.merchant?.planTier || 'FREE';
+
+    if (planTier === 'FREE') {
+      res.status(403).json({
+        error: 'Customizing widget configurations and styling requires a STARTER or PRO plan. Please upgrade your subscription.'
+      });
+      return;
+    }
+
     const { primaryColor, greetingMessage, botName, position, addToCartEnabled } = req.body;
 
     const config = await prisma.widgetConfig.upsert({

@@ -4,6 +4,8 @@ export interface WidgetConfig {
   botName: string;
   position: 'bottom-right' | 'bottom-left';
   addToCartEnabled: boolean;
+  hideBranding?: boolean;
+  eventBridgeEnabled?: boolean;
 }
 
 export interface ProductCard {
