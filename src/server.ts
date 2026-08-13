@@ -69,7 +69,7 @@ app.use('/public', express.static(publicDir));
 
 // Health Check
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'AI Shopping Widget API', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', service: 'Labto AI Widget API', timestamp: new Date().toISOString() });
 });
 
 // Register API Routes

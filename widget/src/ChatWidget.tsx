@@ -286,7 +286,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               />
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>{config.botName}</h3>
-                <span style={{ fontSize: '11px', opacity: 0.85 }}>Online • Shopping Assistant</span>
+                <span style={{ fontSize: '11px', opacity: 0.85 }}>Online • Labto AI Assistant</span>
               </div>
             </div>
             <button

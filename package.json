@@ -1,7 +1,7 @@
 {
   "name": "ai-shopping-widget-backend",
   "version": "1.0.0",
-  "description": "Public API, Widget JS Bundle, and AI backend for AI Shopping Assistant Widget",
+  "description": "Public API, Widget JS Bundle, and AI backend for Labto AI Assistant Widget",
   "main": "dist/backend/src/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
