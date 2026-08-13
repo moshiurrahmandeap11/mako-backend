@@ -13,6 +13,9 @@ export interface DashboardAuthRequest extends Request {
   };
 }
 
+const planTierCache = new Map<string, { tier: string; expires: number }>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function authenticateDashboard(
   req: DashboardAuthRequest,
   res: Response,
@@ -28,16 +31,31 @@ export async function authenticateDashboard(
       return;
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { planTier: true },
-    });
+    const userId = session.user.id;
+    let planTier = 'FREE';
+    const now = Date.now();
+    const cached = planTierCache.get(userId);
+
+    if (cached && cached.expires > now) {
+      planTier = cached.tier;
+    } else {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { planTier: true },
+      });
+      planTier = dbUser?.planTier || 'FREE';
+      
+      // Cleanup to prevent memory leaks over time
+      if (planTierCache.size > 1000) planTierCache.clear();
+      
+      planTierCache.set(userId, { tier: planTier, expires: now + CACHE_TTL_MS });
+    }
 
     req.merchant = {
       id: session.user.id,
       email: session.user.email,
       name: session.user.name,
-      planTier: dbUser?.planTier || 'FREE',
+      planTier,
     };
 
     next();
