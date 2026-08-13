@@ -91,3 +91,29 @@ export async function revokeKey(req: DashboardAuthRequest, res: Response): Promi
     res.status(500).json({ error: 'Failed to revoke API Key.' });
   }
 }
+
+export async function deleteKey(req: DashboardAuthRequest, res: Response): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+    const keyId = req.params.id as string;
+
+    const existingKey = await prisma.apiKey.findFirst({
+      where: { id: keyId, merchantId },
+    });
+
+    if (!existingKey) {
+      res.status(404).json({ error: 'API key not found.' });
+      return;
+    }
+
+    await prisma.apiKey.delete({
+      where: { id: keyId },
+    });
+
+    res.json({ message: 'API key deleted successfully.' });
+  } catch (error) {
+    logger.error('Delete API Key Error:', error);
+    res.status(500).json({ error: 'Failed to delete API Key.' });
+  }
+}
+
