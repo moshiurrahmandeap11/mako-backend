@@ -23,8 +23,9 @@ export async function searchKnowledgeTool(
       );
 
       if (rawResults && rawResults.length > 0) {
-        // Filter out chunks with poor similarity (distance > 0.4 usually means it's irrelevant)
-        chunks = rawResults.filter((r: any) => r.distance < 0.35);
+        // Return the top most relevant chunks. We don't use a strict distance threshold
+        // because we always want to provide some context about the website to the AI.
+        chunks = rawResults;
       }
     } catch (e) {
       logger.error('Failed to search KnowledgeChunk vectors:', e);

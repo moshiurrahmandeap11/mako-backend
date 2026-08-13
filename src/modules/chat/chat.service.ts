@@ -154,9 +154,9 @@ export async function processChatMessage(
     }
 
     if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
-      // Store Context fallback when no data exists yet
-      ragContext = `\n\n### Website / Platform Context:
-This platform is Labto AI — an AI-powered Shopping & Customer Support Assistant platform for e-commerce websites. It provides merchants with automated AI chat widgets, vector product search, direct add-to-cart integration, and visitor analytics.`;
+      // Generic fallback context when no specific data is retrieved for this query
+      ragContext = `\n\n### Store Context:
+Currently, no specific products or knowledge base articles were found for this query. Continue assisting the user based on your primary persona and instructions.`;
     }
   } catch (err) {
     logger.error('RAG Search Error:', err);
