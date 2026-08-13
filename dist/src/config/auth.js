@@ -48,9 +48,6 @@ exports.auth = (0, better_auth_1.betterAuth)({
         },
     },
     advanced: {
-        crossSubdomainCookies: {
-            enabled: true,
-        },
         defaultCookieAttributes: {
             sameSite: process.env.COOKIE_SAME_SITE || (env_1.env.NODE_ENV === 'production' ? 'none' : 'lax'),
             secure: process.env.COOKIE_SECURE === 'false' ? false : env_1.env.NODE_ENV === 'production',

@@ -4,6 +4,18 @@ exports.authenticateWidget = authenticateWidget;
 const db_1 = require("../config/db");
 const apiKeyGenerator_1 = require("../utils/apiKeyGenerator");
 const logger_1 = require("../utils/logger");
+function normalizeDomain(input) {
+    if (!input)
+        return '';
+    let str = input.trim().toLowerCase();
+    // Strip protocol
+    str = str.replace(/^https?:\/\//, '');
+    // Strip path and query parameters
+    str = str.split('/')[0];
+    // Strip port if present (e.g. localhost:3000 -> localhost)
+    str = str.split(':')[0];
+    return str;
+}
 async function authenticateWidget(req, res, next) {
     try {
         const rawApiKey = (req.headers['x-api-key'] || req.query.apiKey);
@@ -35,13 +47,27 @@ async function authenticateWidget(req, res, next) {
                 reqDomain = '';
             }
         }
-        const allowedDomains = apiKeyRecord.allowedDomains || [];
+        // Combine domains from both the specific API Key and the Merchant's global widget settings
+        const combinedDomains = [
+            ...(apiKeyRecord.allowedDomains || []),
+            ...(apiKeyRecord.merchant?.allowedDomains || [])
+        ];
+        const allowedDomains = [...new Set(combinedDomains)];
         const isDomainAllowed = allowedDomains.length === 0 || // empty allowedDomains means all domains allowed (for initial setup/dev)
-            allowedDomains.some((domain) => {
-                if (domain === '*' || domain === reqDomain || domain === `http://${reqDomain}` || domain === `https://${reqDomain}`) {
+            allowedDomains.some((rawDomain) => {
+                const cleanDomain = normalizeDomain(rawDomain);
+                if (!cleanDomain || cleanDomain === '*')
+                    return true;
+                if (cleanDomain === reqDomain)
+                    return true;
+                // Localhost / 127.0.0.1 alias support
+                if ((cleanDomain === 'localhost' || cleanDomain === '127.0.0.1') &&
+                    (reqDomain === 'localhost' || reqDomain === '127.0.0.1')) {
                     return true;
                 }
-                return reqDomain.endsWith(domain.replace(/^\*?\./, ''));
+                // Subdomain / wildcard support (*.example.com or example.com matching sub.example.com)
+                const rootDomain = cleanDomain.replace(/^\*\./, '');
+                return reqDomain === rootDomain || reqDomain.endsWith(`.${rootDomain}`);
             });
         if (process.env.NODE_ENV === 'production' && !isDomainAllowed && reqDomain) {
             logger_1.logger.warn(`Widget API domain rejected. Request Domain: ${reqDomain}, Allowed: ${allowedDomains.join(',')}`);

@@ -62,7 +62,7 @@ app.use('/widget.js', (req, res, next) => {
 app.use('/public', express_1.default.static(publicDir));
 // Health Check
 app.get('/', (req, res) => {
-    res.json({ status: 'ok', service: 'AI Shopping Widget API', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', service: 'Labto AI Widget API', timestamp: new Date().toISOString() });
 });
 // Register API Routes
 app.use('/api/merchant', merchant_routes_1.default);

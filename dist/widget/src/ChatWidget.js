@@ -216,7 +216,7 @@ function ChatWidget({ api }) {
                                             height: '10px',
                                             borderRadius: '50%',
                                             backgroundColor: '#10b981',
-                                        } }), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: { margin: 0, fontSize: '16px', fontWeight: '600' }, children: config.botName }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', opacity: 0.85 }, children: "Online \u2022 Shopping Assistant" })] })] }), (0, jsx_runtime_1.jsx)("button", { onClick: () => setIsOpen(false), style: {
+                                        } }), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: { margin: 0, fontSize: '16px', fontWeight: '600' }, children: config.botName }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', opacity: 0.85 }, children: "Online \u2022 Labto AI Assistant" })] })] }), (0, jsx_runtime_1.jsx)("button", { onClick: () => setIsOpen(false), style: {
                                     background: 'transparent',
                                     border: 'none',
                                     color: '#ffffff',

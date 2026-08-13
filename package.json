@@ -2,12 +2,12 @@
   "name": "ai-shopping-widget-backend",
   "version": "1.0.0",
   "description": "Public API, Widget JS Bundle, and AI backend for Labto AI Assistant Widget",
-  "main": "dist/backend/src/server.js",
+  "main": "dist/src/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc && npm run build:widget",
     "build:widget": "ts-node widget/build.config.ts",
-    "start": "node dist/backend/src/server.js",
+    "start": "node dist/src/server.js",
     "prisma:generate": "prisma generate --schema=src/prisma/schema.prisma",
     "prisma:push": "prisma db push --schema=src/prisma/schema.prisma",
     "postinstall": "npm run prisma:generate"

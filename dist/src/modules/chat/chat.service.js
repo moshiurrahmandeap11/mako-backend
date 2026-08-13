@@ -27,7 +27,7 @@ const openrouter = env_1.env.OPENROUTER_API_KEY
         baseURL: 'https://openrouter.ai/api/v1',
         defaultHeaders: {
             'HTTP-Referer': 'http://localhost:3000',
-            'X-Title': 'Labto AI Shopping Widget',
+            'X-Title': 'Labto AI Widget',
         },
     })
     : null;
@@ -65,7 +65,7 @@ function getSystemPrompt(botMode, customPrompt) {
         personaPrompt = yamlConfig.system_instructions.personas[botMode];
     }
     else {
-        personaPrompt = yamlConfig?.system_instructions?.base_role || `You are a helpful AI Shopping Assistant for this storefront.`;
+        personaPrompt = yamlConfig?.system_instructions?.basePrompt || `You are a helpful, polite, and knowledgeable Labto AI Assistant for a storefront.`;
     }
     const rules = yamlConfig?.system_instructions?.strict_rules;
     const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message.`;
