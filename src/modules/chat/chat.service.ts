@@ -29,16 +29,22 @@ const openrouter = env.OPENROUTER_API_KEY
     })
   : null;
 
-// Helper to load YAML prompt configuration
-function loadAiPromptsYaml(): any {
+// Helper to load YAML prompt configuration based on chosen template
+function loadAiPromptsYaml(template?: string): any {
   try {
-    const yamlPath = path.resolve(process.cwd(), 'config/ai-prompts.yml');
+    let filename = 'customer_support_and_sales.yml'; // Default fallback
+    if (template === 'Customer Support') filename = 'customer_support.yml';
+    else if (template === 'FAQ / Knowledge Base') filename = 'faq_knowledge_base.yml';
+    else if (template === 'Booking & Scheduling') filename = 'booking_and_scheduling.yml';
+    else if (template === 'Customer Support & Sales') filename = 'customer_support_and_sales.yml';
+
+    const yamlPath = path.resolve(process.cwd(), `config/prompts/${filename}`);
     if (fs.existsSync(yamlPath)) {
       const content = fs.readFileSync(yamlPath, 'utf8');
       return yaml.load(content);
     }
   } catch (err) {
-    logger.error('Failed to load config/ai-prompts.yml:', err);
+    logger.error('Failed to load YAML prompt config:', err);
   }
   return null;
 }
@@ -54,33 +60,27 @@ function isSimpleGreeting(message: string): boolean {
   return commonGreetings.some(g => clean === g || clean.includes(g) && clean.length < 20);
 }
 
-function getSystemPrompt(botMode: string, customPrompt?: string): string {
-  const yamlConfig = loadAiPromptsYaml();
-  
+function getSystemPrompt(botMode: string, customPrompt?: string, template?: string): string {
   if (customPrompt) {
-    return customPrompt;
+    return customPrompt; // User provided custom prompt completely overrides YAML
   }
 
-  let personaPrompt = '';
-  if (yamlConfig?.system_instructions?.personas?.[botMode]) {
-    personaPrompt = yamlConfig.system_instructions.personas[botMode];
-  } else {
-    personaPrompt = yamlConfig?.system_instructions?.basePrompt || `You are a helpful, polite, and knowledgeable Labto AI Assistant for a storefront.`;
-  }
+  const yamlConfig = loadAiPromptsYaml(template);
+  const personaPrompt = yamlConfig?.system_instructions?.persona || `You are a helpful, polite, and knowledgeable Labto AI Assistant.`;
 
   const rules = yamlConfig?.system_instructions?.strict_rules;
   const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message.`;
   const formatRule = rules?.formatting?.instructions || `Use GitHub Flavored Markdown formatting.`;
-  const cartRule = rules?.cart_action?.instructions || `Append [ADD_TO_CART: productId] when user asks to buy item.`;
-  const scopeRule = rules?.scope_lock?.instructions || `Stick strictly to storefront queries.`;
+  const cartRule = rules?.cart_action?.instructions || ``;
+  const scopeRule = rules?.scope_lock?.instructions || ``;
 
   return `${personaPrompt}
 
-Strict Rules (Loaded from config/ai-prompts.yml):
+Strict Rules:
 1. LANGUAGE RULE: ${langRule}
 2. FORMATTING RULE: ${formatRule}
-3. CART ACTION RULE: ${cartRule}
-4. SCOPE LOCK RULE: ${scopeRule}`;
+${cartRule ? `3. CART ACTION RULE: ${cartRule}` : ''}
+${scopeRule ? `4. SCOPE LOCK RULE: ${scopeRule}` : ''}`.trim();
 }
 
 export async function processChatMessage(
@@ -156,7 +156,7 @@ This platform is Labto AI — an AI-powered Shopping & Customer Support Assistan
     else if (env.ANTHROPIC_API_KEY) selectedProvider = 'claude';
   }
 
-  const systemPrompt = getSystemPrompt(botMode, customPrompt);
+  const systemPrompt = getSystemPrompt(botMode, customPrompt, template);
 
   // Configure Client
   const openAiConfig =
