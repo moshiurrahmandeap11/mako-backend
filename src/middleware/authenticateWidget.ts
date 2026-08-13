@@ -19,8 +19,8 @@ function normalizeDomain(input: string): string {
   let str = input.trim().toLowerCase();
   // Strip protocol
   str = str.replace(/^https?:\/\//, '');
-  // Strip path and query parameters
-  str = str.split('/')[0];
+  // Strip path, query parameters, and hash
+  str = str.split('/')[0].split('?')[0].split('#')[0];
   // Strip port if present (e.g. localhost:3000 -> localhost)
   str = str.split(':')[0];
   return str;
