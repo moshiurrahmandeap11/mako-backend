@@ -17,6 +17,7 @@ import widgetConfigRoutes from './modules/widgetConfig/widgetConfig.routes';
 import widgetChatRoutes from './modules/chat/chat.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import billingRoutes from './modules/billing/billing.routes';
+import { initCronJobs } from './jobs/cron';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -90,6 +91,7 @@ const PORT = env.PORT || 4000;
 
 async function startServer() {
   await connectDB();
+  initCronJobs();
   app.listen(PORT, () => {
     logger.info(`🚀 Backend Express API listening on port ${PORT}`);
     logger.info(`📦 Widget static bundle available at http://localhost:${PORT}/widget.js`);

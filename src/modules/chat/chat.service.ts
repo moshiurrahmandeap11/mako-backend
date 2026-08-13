@@ -7,6 +7,7 @@ import { prisma } from '../../config/db';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { searchProductsTool } from './tools/searchProducts.tool';
+import { searchKnowledgeTool } from './tools/searchKnowledge.tool';
 import { addToCartTool } from './tools/addToCart.tool';
 
 const anthropic = env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }) : null;
@@ -121,9 +122,14 @@ export async function processChatMessage(
   let cartAction: any = null;
   let finalReply = '';
 
-  // Perform Catalog RAG Search
+  // Perform Catalog & Knowledge RAG Search
   try {
-    retrievedProducts = await searchProductsTool(merchantId, userMessage, undefined, 5);
+    const [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
+      searchProductsTool(merchantId, userMessage, undefined, 5),
+      searchKnowledgeTool(merchantId, userMessage, 3)
+    ]);
+
+    retrievedProducts = retrievedProductsRes;
 
     // Fallback: If query search returned 0 items, fetch top catalog items for context
     if (retrievedProducts.length === 0) {
@@ -134,18 +140,26 @@ export async function processChatMessage(
     }
 
     if (retrievedProducts.length > 0) {
-      ragContext = `\n\n### Store Catalog & Available Products:\n` +
+      ragContext += `\n\n### Store Catalog & Available Products:\n` +
         retrievedProducts.map(p =>
           `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`
         ).join('\n') +
-        `\n\nInstructions: Use the catalog items above to explain what this website provides or recommend items. Include product page links where appropriate.`;
-    } else {
-      // Store Context fallback when no products exist yet
+        `\n\nInstructions: Use the catalog items above to recommend items or provide details. Include product page links where appropriate.`;
+    } 
+
+    if (retrievedKnowledgeRes.length > 0) {
+      ragContext += `\n\n### Store Knowledge Base (Scraped from Website):\n` +
+        retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
+        `\n\nInstructions: Use the scraped knowledge above to answer the user's questions about policies, FAQs, or general website info.`;
+    }
+
+    if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
+      // Store Context fallback when no data exists yet
       ragContext = `\n\n### Website / Platform Context:
 This platform is Labto AI — an AI-powered Shopping & Customer Support Assistant platform for e-commerce websites. It provides merchants with automated AI chat widgets, vector product search, direct add-to-cart integration, and visitor analytics.`;
     }
   } catch (err) {
-    logger.error('RAG Product Search Error:', err);
+    logger.error('RAG Search Error:', err);
   }
 
   // Resolve LLM Provider

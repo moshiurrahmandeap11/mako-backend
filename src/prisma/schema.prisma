@@ -28,11 +28,12 @@ model User {
   subscriptionStatus   String?
 
   // Custom relations
-  apiKeys       ApiKey[]
-  products      Product[]
-  conversations Conversation[]
-  visitors      Visitor[]
-  widgetConfig  WidgetConfig?
+  apiKeys         ApiKey[]
+  products        Product[]
+  conversations   Conversation[]
+  visitors        Visitor[]
+  widgetConfig    WidgetConfig?
+  knowledgeChunks KnowledgeChunk[]
 
   // Better Auth relations
   sessions      Session[]
@@ -178,5 +179,17 @@ model Visitor {
   createdAt   DateTime @default(now())
 
   @@unique([merchantId, visitorId])
+  @@index([merchantId])
+}
+
+model KnowledgeChunk {
+  id          String    @id @default(cuid())
+  merchantId  String
+  merchant    User      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  url         String
+  content     String
+  embedding   Unsupported("vector(1536)")?
+  createdAt   DateTime  @default(now())
+
   @@index([merchantId])
 }
