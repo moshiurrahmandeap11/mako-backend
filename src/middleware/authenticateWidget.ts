@@ -54,7 +54,12 @@ export async function authenticateWidget(
       }
     }
 
-    const allowedDomains = apiKeyRecord.allowedDomains || [];
+    // Combine domains from both the specific API Key and the Merchant's global widget settings
+    const combinedDomains = [
+      ...(apiKeyRecord.allowedDomains || []),
+      ...(apiKeyRecord.merchant?.allowedDomains || [])
+    ];
+    const allowedDomains = [...new Set(combinedDomains)];
     const isDomainAllowed =
       allowedDomains.length === 0 || // empty allowedDomains means all domains allowed (for initial setup/dev)
       allowedDomains.some((domain) => {
