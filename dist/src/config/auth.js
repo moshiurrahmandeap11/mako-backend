@@ -16,6 +16,9 @@ exports.auth = (0, better_auth_1.betterAuth)({
         autoSignIn: true,
         requireEmailVerification: true,
     },
+    emailVerification: {
+        autoSignInAfterVerification: true,
+    },
     plugins: [
         (0, plugins_1.emailOTP)({
             async sendVerificationOTP({ email, otp, type }) {
