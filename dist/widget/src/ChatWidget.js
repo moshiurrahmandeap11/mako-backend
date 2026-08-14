@@ -33,6 +33,7 @@ function renderMarkdownText(text) {
 }
 function ChatWidget({ api }) {
     const [isOpen, setIsOpen] = (0, hooks_1.useState)(false);
+    const [isMobile, setIsMobile] = (0, hooks_1.useState)(typeof window !== 'undefined' ? window.innerWidth <= 640 : false);
     const [config, setConfig] = (0, hooks_1.useState)({
         primaryColor: '#111111',
         greetingMessage: 'Hi! How can I help you shop today?',
@@ -49,28 +50,44 @@ function ChatWidget({ api }) {
     const [isLoading, setIsLoading] = (0, hooks_1.useState)(false);
     const messagesEndRef = (0, hooks_1.useRef)(null);
     const fileInputRef = (0, hooks_1.useRef)(null);
+    // Resize listener for mobile viewport
+    (0, hooks_1.useEffect)(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 640);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
     (0, hooks_1.useEffect)(() => {
         // 1. Fetch Config
         api.getConfig().then(setConfig).catch(console.error);
-        // 2. Manage Visitor SessionId in sessionStorage
+        // 2. Manage Visitor SessionId & Restore History (localStorage for persistence across refresh)
         let storedSession = '';
         try {
-            storedSession = sessionStorage.getItem('aiw_session_id') || '';
+            storedSession = localStorage.getItem('aiw_session_id') || sessionStorage.getItem('aiw_session_id') || '';
         }
         catch { }
+        const initHistory = (sessId) => {
+            api.getHistory(sessId).then((data) => {
+                if (data.messages && data.messages.length > 0) {
+                    setMessages(data.messages);
+                }
+            }).catch(console.error);
+        };
         if (storedSession) {
             setSessionId(storedSession);
+            initHistory(storedSession);
         }
         else {
             api.createSession().then((newSess) => {
                 setSessionId(newSess);
                 try {
-                    sessionStorage.setItem('aiw_session_id', newSess);
+                    localStorage.setItem('aiw_session_id', newSess);
                 }
                 catch { }
             }).catch(console.error);
         }
-        // 3. Persistent Visitor Tracking in localStorage & Ping Backend
+        // 3. Persistent Visitor Tracking & Ping Backend
         let vid = '';
         try {
             vid = localStorage.getItem('aiw_visitor_id') || '';
@@ -84,7 +101,7 @@ function ChatWidget({ api }) {
         }
         api.pingVisitor(vid).catch(console.error);
     }, []);
-    // Initialize initial greeting message once opened
+    // Initialize initial greeting message once opened if no prior messages exist
     (0, hooks_1.useEffect)(() => {
         if (isOpen && messages.length === 0) {
             setMessages([
@@ -96,7 +113,7 @@ function ChatWidget({ api }) {
                 },
             ]);
         }
-    }, [isOpen, config]);
+    }, [isOpen, config, messages.length]);
     (0, hooks_1.useEffect)(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
@@ -193,17 +210,23 @@ function ChatWidget({ api }) {
                     gap: '10px',
                     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                 }, children: [(0, jsx_runtime_1.jsx)("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: (0, jsx_runtime_1.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }) }), (0, jsx_runtime_1.jsx)("span", { children: "Chat with AI" })] })), isOpen && ((0, jsx_runtime_1.jsxs)("div", { style: {
-                    width: '380px',
-                    maxWidth: 'calc(100vw - 32px)',
-                    height: '560px',
-                    maxHeight: 'calc(100vh - 48px)',
+                    position: isMobile ? 'fixed' : 'relative',
+                    top: isMobile ? '0' : 'auto',
+                    left: isMobile ? '0' : 'auto',
+                    right: isMobile ? '0' : 'auto',
+                    bottom: isMobile ? '0' : 'auto',
+                    zIndex: 999999,
+                    width: isMobile ? '100vw' : '380px',
+                    maxWidth: isMobile ? '100vw' : 'calc(100vw - 32px)',
+                    height: isMobile ? '100dvh' : '560px',
+                    maxHeight: isMobile ? '100dvh' : 'calc(100vh - 48px)',
                     backgroundColor: '#ffffff',
-                    borderRadius: '16px',
+                    borderRadius: isMobile ? '0px' : '16px',
                     boxShadow: '0 12px 40px rgba(0, 0, 0, 0.22)',
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
-                    border: '1px solid #e5e7eb',
+                    border: isMobile ? 'none' : '1px solid #e5e7eb',
                 }, children: [(0, jsx_runtime_1.jsxs)("div", { style: {
                             backgroundColor: primaryColor,
                             color: '#ffffff',
@@ -227,6 +250,9 @@ function ChatWidget({ api }) {
                             flex: 1,
                             padding: '16px',
                             overflowY: 'auto',
+                            WebkitOverflowScrolling: 'touch',
+                            overscrollBehaviorY: 'contain',
+                            touchAction: 'pan-y',
                             backgroundColor: '#f9fafb',
                             display: 'flex',
                             flexDirection: 'column',

@@ -167,3 +167,49 @@ export async function pingVisitor(req: WidgetAuthRequest, res: Response): Promis
     res.status(500).json({ error: 'Failed to record visitor ping.' });
   }
 }
+
+export async function getChatHistory(req: WidgetAuthRequest, res: Response): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+    const sessionId = (req.query.sessionId as string) || '';
+
+    if (!sessionId) {
+      res.json({ messages: [] });
+      return;
+    }
+
+    const conversation = await prisma.conversation.findFirst({
+      where: { merchantId, sessionId },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!conversation || !conversation.messages) {
+      res.json({ messages: [] });
+      return;
+    }
+
+    const formattedMessages = conversation.messages.map((m) => {
+      let products = undefined;
+      if (m.toolCalls && typeof m.toolCalls === 'object' && (m.toolCalls as any).recommendedProducts) {
+        products = (m.toolCalls as any).recommendedProducts;
+      }
+
+      return {
+        id: m.id,
+        sender: m.role === 'user' ? 'user' : 'bot',
+        text: m.content,
+        products,
+        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+    });
+
+    res.json({ messages: formattedMessages });
+  } catch (error) {
+    logger.error('Get Chat History Error:', error);
+    res.status(500).json({ error: 'Failed to fetch chat history.' });
+  }
+}

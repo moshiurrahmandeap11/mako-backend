@@ -8,6 +8,7 @@ const router = (0, express_1.Router)();
 router.use(authenticateWidget_1.authenticateWidget);
 router.post('/session', chat_controller_1.createSession);
 router.get('/config', chat_controller_1.getWidgetConfigPublic);
+router.get('/history', chat_controller_1.getChatHistory);
 router.post('/chat', rateLimitWidget_1.rateLimitWidget, chat_controller_1.chat);
 router.post('/ping', chat_controller_1.pingVisitor);
 exports.default = router;

@@ -60,6 +60,9 @@ function renderMarkdownText(text: string) {
 
 export function ChatWidget({ api }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(
+    typeof window !== 'undefined' ? window.innerWidth <= 640 : false
+  );
   const [config, setConfig] = useState<WidgetConfig>({
     primaryColor: '#111111',
     greetingMessage: 'Hi! How can I help you shop today?',
@@ -77,28 +80,46 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Resize listener for mobile viewport
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     // 1. Fetch Config
     api.getConfig().then(setConfig).catch(console.error);
 
-    // 2. Manage Visitor SessionId in sessionStorage
+    // 2. Manage Visitor SessionId & Restore History (localStorage for persistence across refresh)
     let storedSession = '';
     try {
-      storedSession = sessionStorage.getItem('aiw_session_id') || '';
+      storedSession = localStorage.getItem('aiw_session_id') || sessionStorage.getItem('aiw_session_id') || '';
     } catch {}
+
+    const initHistory = (sessId: string) => {
+      api.getHistory(sessId).then((data) => {
+        if (data.messages && data.messages.length > 0) {
+          setMessages(data.messages);
+        }
+      }).catch(console.error);
+    };
 
     if (storedSession) {
       setSessionId(storedSession);
+      initHistory(storedSession);
     } else {
       api.createSession().then((newSess) => {
         setSessionId(newSess);
         try {
-          sessionStorage.setItem('aiw_session_id', newSess);
+          localStorage.setItem('aiw_session_id', newSess);
         } catch {}
       }).catch(console.error);
     }
 
-    // 3. Persistent Visitor Tracking in localStorage & Ping Backend
+    // 3. Persistent Visitor Tracking & Ping Backend
     let vid = '';
     try {
       vid = localStorage.getItem('aiw_visitor_id') || '';
@@ -113,7 +134,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     api.pingVisitor(vid).catch(console.error);
   }, []);
 
-  // Initialize initial greeting message once opened
+  // Initialize initial greeting message once opened if no prior messages exist
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       setMessages([
@@ -125,7 +146,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         },
       ]);
     }
-  }, [isOpen, config]);
+  }, [isOpen, config, messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -251,17 +272,23 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       {isOpen && (
         <div
           style={{
-            width: '380px',
-            maxWidth: 'calc(100vw - 32px)',
-            height: '560px',
-            maxHeight: 'calc(100vh - 48px)',
+            position: isMobile ? 'fixed' : 'relative',
+            top: isMobile ? '0' : 'auto',
+            left: isMobile ? '0' : 'auto',
+            right: isMobile ? '0' : 'auto',
+            bottom: isMobile ? '0' : 'auto',
+            zIndex: 999999,
+            width: isMobile ? '100vw' : '380px',
+            maxWidth: isMobile ? '100vw' : 'calc(100vw - 32px)',
+            height: isMobile ? '100dvh' : '560px',
+            maxHeight: isMobile ? '100dvh' : 'calc(100vh - 48px)',
             backgroundColor: '#ffffff',
-            borderRadius: '16px',
+            borderRadius: isMobile ? '0px' : '16px',
             boxShadow: '0 12px 40px rgba(0, 0, 0, 0.22)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            border: '1px solid #e5e7eb',
+            border: isMobile ? 'none' : '1px solid #e5e7eb',
           }}
         >
           {/* Header */}
@@ -310,6 +337,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               flex: 1,
               padding: '16px',
               overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehaviorY: 'contain',
+              touchAction: 'pan-y',
               backgroundColor: '#f9fafb',
               display: 'flex',
               flexDirection: 'column',

@@ -30,6 +30,9 @@ class WidgetAPI {
     async getConfig() {
         return this.fetch('/api/widget/config', { method: 'GET' });
     }
+    async getHistory(sessionId) {
+        return this.fetch(`/api/widget/history?sessionId=${encodeURIComponent(sessionId)}`, { method: 'GET' });
+    }
     async sendMessage(sessionId, message, botMode, provider, imageUrl) {
         return this.fetch('/api/widget/chat', {
             method: 'POST',

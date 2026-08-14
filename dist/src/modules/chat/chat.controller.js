@@ -40,6 +40,7 @@ exports.createSession = createSession;
 exports.getWidgetConfigPublic = getWidgetConfigPublic;
 exports.chat = chat;
 exports.pingVisitor = pingVisitor;
+exports.getChatHistory = getChatHistory;
 const crypto_1 = __importDefault(require("crypto"));
 const db_1 = require("../../config/db");
 const chat_service_1 = require("./chat.service");
@@ -185,5 +186,45 @@ async function pingVisitor(req, res) {
     catch (error) {
         logger_1.logger.error('Ping Visitor Error:', error);
         res.status(500).json({ error: 'Failed to record visitor ping.' });
+    }
+}
+async function getChatHistory(req, res) {
+    try {
+        const merchantId = req.merchant?.id;
+        const sessionId = req.query.sessionId || '';
+        if (!sessionId) {
+            res.json({ messages: [] });
+            return;
+        }
+        const conversation = await db_1.prisma.conversation.findFirst({
+            where: { merchantId, sessionId },
+            include: {
+                messages: {
+                    orderBy: { createdAt: 'asc' },
+                },
+            },
+        });
+        if (!conversation || !conversation.messages) {
+            res.json({ messages: [] });
+            return;
+        }
+        const formattedMessages = conversation.messages.map((m) => {
+            let products = undefined;
+            if (m.toolCalls && typeof m.toolCalls === 'object' && m.toolCalls.recommendedProducts) {
+                products = m.toolCalls.recommendedProducts;
+            }
+            return {
+                id: m.id,
+                sender: m.role === 'user' ? 'user' : 'bot',
+                text: m.content,
+                products,
+                time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+        });
+        res.json({ messages: formattedMessages });
+    }
+    catch (error) {
+        logger_1.logger.error('Get Chat History Error:', error);
+        res.status(500).json({ error: 'Failed to fetch chat history.' });
     }
 }

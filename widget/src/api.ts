@@ -63,6 +63,10 @@ export class WidgetAPI {
     return this.fetch<WidgetConfig>('/api/widget/config', { method: 'GET' });
   }
 
+  async getHistory(sessionId: string): Promise<{ messages: any[] }> {
+    return this.fetch<{ messages: any[] }>(`/api/widget/history?sessionId=${encodeURIComponent(sessionId)}`, { method: 'GET' });
+  }
+
   async sendMessage(
     sessionId: string,
     message: string,
