@@ -16,13 +16,26 @@ async function searchKnowledgeTool(merchantId, query, maxResults = 3) {
          ORDER BY distance ASC
          LIMIT $3`, [queryVector, merchantId, maxResults]);
             if (rawResults && rawResults.length > 0) {
-                // Return the top most relevant chunks. We don't use a strict distance threshold
-                // because we always want to provide some context about the website to the AI.
                 chunks = rawResults;
             }
         }
         catch (e) {
             logger_1.logger.error('Failed to search KnowledgeChunk vectors:', e);
+        }
+        // Fallback: If vector search returns 0 chunks, fetch top scraped knowledge chunks
+        if (chunks.length === 0) {
+            try {
+                const fallbackChunks = await db_1.prisma.knowledgeChunk.findMany({
+                    where: { merchantId },
+                    take: maxResults,
+                });
+                if (fallbackChunks && fallbackChunks.length > 0) {
+                    chunks = fallbackChunks;
+                }
+            }
+            catch (err) {
+                logger_1.logger.error('Failed fallback knowledgeChunk query:', err);
+            }
         }
         return chunks.map((c) => ({
             url: c.url,

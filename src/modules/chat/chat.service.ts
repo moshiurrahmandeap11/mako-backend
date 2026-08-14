@@ -61,13 +61,21 @@ function isSimpleGreeting(message: string): boolean {
   return commonGreetings.some(g => clean === g || clean.includes(g) && clean.length < 20);
 }
 
-function getSystemPrompt(botMode: string, customPrompt?: string, template?: string): string {
+function getSystemPrompt(
+  merchantName: string,
+  primaryDomain: string,
+  botMode: string,
+  customPrompt?: string,
+  template?: string
+): string {
   if (customPrompt) {
-    return customPrompt; // User provided custom prompt completely overrides YAML
+    return `You are the official AI Assistant representing "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}.
+${customPrompt}`;
   }
 
   const yamlConfig = loadAiPromptsYaml(template);
-  const personaPrompt = yamlConfig?.system_instructions?.persona || `You are a helpful, polite, and knowledgeable Labto AI Assistant.`;
+  const basePersona = yamlConfig?.system_instructions?.persona || `You are a helpful, polite, and knowledgeable AI Assistant.`;
+  const personaPrompt = `You are the official AI Assistant for "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}. ${basePersona}`;
 
   const rules = yamlConfig?.system_instructions?.strict_rules;
   const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message.`;
@@ -78,10 +86,11 @@ function getSystemPrompt(botMode: string, customPrompt?: string, template?: stri
   return `${personaPrompt}
 
 Strict Rules:
-1. LANGUAGE RULE: ${langRule}
-2. FORMATTING RULE: ${formatRule}
-${cartRule ? `3. CART ACTION RULE: ${cartRule}` : ''}
-${scopeRule ? `4. SCOPE LOCK RULE: ${scopeRule}` : ''}`.trim();
+1. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
+2. LANGUAGE RULE: ${langRule}
+3. FORMATTING RULE: ${formatRule}
+${cartRule ? `4. CART ACTION RULE: ${cartRule}` : ''}
+${scopeRule ? `5. SCOPE LOCK RULE: ${scopeRule}` : ''}`.trim();
 }
 
 export async function processChatMessage(
@@ -94,6 +103,15 @@ export async function processChatMessage(
   template?: string,
   imageUrl?: string
 ) {
+  // Fetch merchant profile for branding & domain identity
+  const merchant = await prisma.user.findUnique({
+    where: { id: merchantId },
+    select: { name: true, allowedDomains: true, widgetConfig: true },
+  });
+
+  const merchantName = merchant?.name || 'our company';
+  const primaryDomain = merchant?.allowedDomains?.[0] || '';
+
   // 1. Get or create conversation record
   let conversation = await prisma.conversation.findFirst({
     where: { merchantId, sessionId },
@@ -148,15 +166,16 @@ export async function processChatMessage(
     } 
 
     if (retrievedKnowledgeRes.length > 0) {
-      ragContext += `\n\n### Store Knowledge Base (Scraped from Website):\n` +
+      ragContext += `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
-        `\n\nInstructions: Use the scraped knowledge above to answer the user's questions about policies, FAQs, or general website info.`;
+        `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
     }
 
     if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
       // Generic fallback context when no specific data is retrieved for this query
-      ragContext = `\n\n### Store Context:
-Currently, no specific products or knowledge base articles were found for this query. Continue assisting the user based on your primary persona and instructions.`;
+      ragContext = `\n\n### Website Context:
+Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ''}.
+Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
     }
   } catch (err) {
     logger.error('RAG Search Error:', err);
@@ -170,7 +189,7 @@ Currently, no specific products or knowledge base articles were found for this q
     else if (env.ANTHROPIC_API_KEY) selectedProvider = 'claude';
   }
 
-  const systemPrompt = getSystemPrompt(botMode, customPrompt, template);
+  const systemPrompt = getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, template);
 
   // Configure Client
   const openAiConfig =
