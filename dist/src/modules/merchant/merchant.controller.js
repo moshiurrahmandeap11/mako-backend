@@ -208,8 +208,18 @@ async function updateDomains(req, res) {
             data: { allowedDomains: sanitizedDomains },
             select: { id: true, allowedDomains: true },
         });
+        // Automatically trigger scraping for the updated domains in the background
+        const { scrapeWebsite } = await Promise.resolve().then(() => __importStar(require('../../services/scraper.service')));
+        if (merchantId) {
+            for (const domain of sanitizedDomains) {
+                // Run asynchronously without awaiting so it doesn't block the API response
+                scrapeWebsite(domain, merchantId).catch((err) => {
+                    logger_1.logger.error(`Background scrape failed for ${domain}:`, err);
+                });
+            }
+        }
         res.json({
-            message: 'Allowed domains updated successfully',
+            message: 'Allowed domains updated successfully and background scraping initiated',
             allowedDomains: updatedMerchant.allowedDomains,
         });
     }

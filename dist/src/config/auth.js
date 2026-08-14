@@ -3,8 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.auth = void 0;
 const better_auth_1 = require("better-auth");
 const prisma_1 = require("better-auth/adapters/prisma");
+const plugins_1 = require("better-auth/plugins");
 const db_1 = require("./db");
 const env_1 = require("./env");
+const email_1 = require("../utils/email");
 exports.auth = (0, better_auth_1.betterAuth)({
     database: (0, prisma_1.prismaAdapter)(db_1.prisma, {
         provider: 'postgresql',
@@ -12,7 +14,18 @@ exports.auth = (0, better_auth_1.betterAuth)({
     emailAndPassword: {
         enabled: true,
         autoSignIn: true,
+        requireEmailVerification: true,
     },
+    plugins: [
+        (0, plugins_1.emailOTP)({
+            async sendVerificationOTP({ email, otp, type }) {
+                await (0, email_1.sendOtpEmail)({ to: email, otp, type });
+            },
+            sendVerificationOnSignUp: true,
+            otpLength: 6,
+            expiresIn: 300, // 5 minutes
+        }),
+    ],
     socialProviders: {
         google: {
             clientId: env_1.env.GOOGLE_CLIENT_ID,

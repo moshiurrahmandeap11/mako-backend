@@ -147,7 +147,20 @@ async function setupSchema() {
     );
   `);
     console.log('✔ Message table created');
-    // 9. Indexes
+    // 9. Create KnowledgeChunk table
+    await executeQuery(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeChunk" (
+        "id" TEXT NOT NULL,
+        "merchantId" TEXT NOT NULL,
+        "url" TEXT NOT NULL,
+        "content" TEXT NOT NULL,
+        "embedding" vector(1536),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "KnowledgeChunk_pkey" PRIMARY KEY ("id")
+    );
+  `);
+    console.log('✔ KnowledgeChunk table created');
+    // 10. Indexes
     await executeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "Merchant_email_key" ON "Merchant"("email");');
     await executeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "ApiKey_hashedKey_key" ON "ApiKey"("hashedKey");');
     await executeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "Product_merchantId_externalId_key" ON "Product"("merchantId", "externalId");');
@@ -156,6 +169,7 @@ async function setupSchema() {
     await executeQuery('CREATE INDEX IF NOT EXISTS "Product_merchantId_idx" ON "Product"("merchantId");');
     await executeQuery('CREATE INDEX IF NOT EXISTS "Conversation_merchantId_sessionId_idx" ON "Conversation"("merchantId", "sessionId");');
     await executeQuery('CREATE INDEX IF NOT EXISTS "Message_conversationId_idx" ON "Message"("conversationId");');
+    await executeQuery('CREATE INDEX IF NOT EXISTS "KnowledgeChunk_merchantId_idx" ON "KnowledgeChunk"("merchantId");');
     console.log('✔ Indexes created');
     console.log('🚀 ALL TABLES PROVISIONED SUCCESSFULLY ON NEON DB!');
 }

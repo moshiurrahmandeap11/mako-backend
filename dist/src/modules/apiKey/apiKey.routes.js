@@ -8,4 +8,5 @@ router.use(authenticateDashboard_1.authenticateDashboard);
 router.post('/', apiKey_controller_1.createKey);
 router.get('/', apiKey_controller_1.listKeys);
 router.delete('/:id', apiKey_controller_1.revokeKey);
+router.delete('/:id/delete', apiKey_controller_1.deleteKey);
 exports.default = router;

@@ -20,6 +20,7 @@ const widgetConfig_routes_1 = __importDefault(require("./modules/widgetConfig/wi
 const chat_routes_1 = __importDefault(require("./modules/chat/chat.routes"));
 const analytics_routes_1 = __importDefault(require("./modules/analytics/analytics.routes"));
 const billing_routes_1 = __importDefault(require("./modules/billing/billing.routes"));
+const cron_1 = require("./jobs/cron");
 const app = (0, express_1.default)();
 app.set('trust proxy', 1);
 // CORS Policy
@@ -79,6 +80,7 @@ app.use((err, req, res, next) => {
 const PORT = env_1.env.PORT || 4000;
 async function startServer() {
     await (0, db_1.connectDB)();
+    (0, cron_1.initCronJobs)();
     app.listen(PORT, () => {
         logger_1.logger.info(`🚀 Backend Express API listening on port ${PORT}`);
         logger_1.logger.info(`📦 Widget static bundle available at http://localhost:${PORT}/widget.js`);

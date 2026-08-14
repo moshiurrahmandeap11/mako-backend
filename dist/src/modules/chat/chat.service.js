@@ -13,6 +13,7 @@ const db_1 = require("../../config/db");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
 const searchProducts_tool_1 = require("./tools/searchProducts.tool");
+const searchKnowledge_tool_1 = require("./tools/searchKnowledge.tool");
 const addToCart_tool_1 = require("./tools/addToCart.tool");
 const anthropic = env_1.env.ANTHROPIC_API_KEY ? new sdk_1.default({ apiKey: env_1.env.ANTHROPIC_API_KEY }) : null;
 const groq = env_1.env.GROQ_API_KEY
@@ -31,17 +32,26 @@ const openrouter = env_1.env.OPENROUTER_API_KEY
         },
     })
     : null;
-// Helper to load YAML prompt configuration
-function loadAiPromptsYaml() {
+// Helper to load YAML prompt configuration based on chosen template
+function loadAiPromptsYaml(template) {
     try {
-        const yamlPath = path_1.default.resolve(process.cwd(), 'config/ai-prompts.yml');
+        let filename = 'customer_support_and_sales.yml'; // Default fallback
+        if (template === 'Customer Support')
+            filename = 'customer_support.yml';
+        else if (template === 'FAQ / Knowledge Base')
+            filename = 'faq_knowledge_base.yml';
+        else if (template === 'Booking & Scheduling')
+            filename = 'booking_and_scheduling.yml';
+        else if (template === 'Customer Support & Sales')
+            filename = 'customer_support_and_sales.yml';
+        const yamlPath = path_1.default.resolve(process.cwd(), `config/prompts/${filename}`);
         if (fs_1.default.existsSync(yamlPath)) {
             const content = fs_1.default.readFileSync(yamlPath, 'utf8');
             return js_yaml_1.default.load(content);
         }
     }
     catch (err) {
-        logger_1.logger.error('Failed to load config/ai-prompts.yml:', err);
+        logger_1.logger.error('Failed to load YAML prompt config:', err);
     }
     return null;
 }
@@ -55,30 +65,24 @@ function isSimpleGreeting(message) {
     ];
     return commonGreetings.some(g => clean === g || clean.includes(g) && clean.length < 20);
 }
-function getSystemPrompt(botMode, customPrompt) {
-    const yamlConfig = loadAiPromptsYaml();
+function getSystemPrompt(botMode, customPrompt, template) {
     if (customPrompt) {
-        return customPrompt;
+        return customPrompt; // User provided custom prompt completely overrides YAML
     }
-    let personaPrompt = '';
-    if (yamlConfig?.system_instructions?.personas?.[botMode]) {
-        personaPrompt = yamlConfig.system_instructions.personas[botMode];
-    }
-    else {
-        personaPrompt = yamlConfig?.system_instructions?.basePrompt || `You are a helpful, polite, and knowledgeable Labto AI Assistant for a storefront.`;
-    }
+    const yamlConfig = loadAiPromptsYaml(template);
+    const personaPrompt = yamlConfig?.system_instructions?.persona || `You are a helpful, polite, and knowledgeable Labto AI Assistant.`;
     const rules = yamlConfig?.system_instructions?.strict_rules;
     const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message.`;
     const formatRule = rules?.formatting?.instructions || `Use GitHub Flavored Markdown formatting.`;
-    const cartRule = rules?.cart_action?.instructions || `Append [ADD_TO_CART: productId] when user asks to buy item.`;
-    const scopeRule = rules?.scope_lock?.instructions || `Stick strictly to storefront queries.`;
+    const cartRule = rules?.cart_action?.instructions || ``;
+    const scopeRule = rules?.scope_lock?.instructions || ``;
     return `${personaPrompt}
 
-Strict Rules (Loaded from config/ai-prompts.yml):
+Strict Rules:
 1. LANGUAGE RULE: ${langRule}
 2. FORMATTING RULE: ${formatRule}
-3. CART ACTION RULE: ${cartRule}
-4. SCOPE LOCK RULE: ${scopeRule}`;
+${cartRule ? `3. CART ACTION RULE: ${cartRule}` : ''}
+${scopeRule ? `4. SCOPE LOCK RULE: ${scopeRule}` : ''}`.trim();
 }
 async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
     // 1. Get or create conversation record
@@ -105,9 +109,13 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
     let ragContext = '';
     let cartAction = null;
     let finalReply = '';
-    // Perform Catalog RAG Search
+    // Perform Catalog & Knowledge RAG Search
     try {
-        retrievedProducts = await (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage, undefined, 5);
+        const [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
+            (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage, undefined, 5),
+            (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage, 3)
+        ]);
+        retrievedProducts = retrievedProductsRes;
         // Fallback: If query search returned 0 items, fetch top catalog items for context
         if (retrievedProducts.length === 0) {
             retrievedProducts = await db_1.prisma.product.findMany({
@@ -116,18 +124,23 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
             });
         }
         if (retrievedProducts.length > 0) {
-            ragContext = `\n\n### Store Catalog & Available Products:\n` +
+            ragContext += `\n\n### Store Catalog & Available Products:\n` +
                 retrievedProducts.map(p => `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`).join('\n') +
-                `\n\nInstructions: Use the catalog items above to explain what this website provides or recommend items. Include product page links where appropriate.`;
+                `\n\nInstructions: Use the catalog items above to recommend items or provide details. Include product page links where appropriate.`;
         }
-        else {
-            // Store Context fallback when no products exist yet
-            ragContext = `\n\n### Website / Platform Context:
-This platform is Labto AI — an AI-powered Shopping & Customer Support Assistant platform for e-commerce websites. It provides merchants with automated AI chat widgets, vector product search, direct add-to-cart integration, and visitor analytics.`;
+        if (retrievedKnowledgeRes.length > 0) {
+            ragContext += `\n\n### Store Knowledge Base (Scraped from Website):\n` +
+                retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
+                `\n\nInstructions: Use the scraped knowledge above to answer the user's questions about policies, FAQs, or general website info.`;
+        }
+        if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
+            // Generic fallback context when no specific data is retrieved for this query
+            ragContext = `\n\n### Store Context:
+Currently, no specific products or knowledge base articles were found for this query. Continue assisting the user based on your primary persona and instructions.`;
         }
     }
     catch (err) {
-        logger_1.logger.error('RAG Product Search Error:', err);
+        logger_1.logger.error('RAG Search Error:', err);
     }
     // Resolve LLM Provider
     let selectedProvider = provider || '';
@@ -139,7 +152,7 @@ This platform is Labto AI — an AI-powered Shopping & Customer Support Assistan
         else if (env_1.env.ANTHROPIC_API_KEY)
             selectedProvider = 'claude';
     }
-    const systemPrompt = getSystemPrompt(botMode, customPrompt);
+    const systemPrompt = getSystemPrompt(botMode, customPrompt, template);
     // Configure Client
     const openAiConfig = selectedProvider === 'groq' && groq
         ? { client: groq, model: 'llama-3.3-70b-versatile' }

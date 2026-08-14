@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createKey = createKey;
 exports.listKeys = listKeys;
 exports.revokeKey = revokeKey;
+exports.deleteKey = deleteKey;
 const db_1 = require("../../config/db");
 const apiKeyGenerator_1 = require("../../utils/apiKeyGenerator");
 const logger_1 = require("../../utils/logger");
@@ -83,5 +84,26 @@ async function revokeKey(req, res) {
     catch (error) {
         logger_1.logger.error('Revoke API Key Error:', error);
         res.status(500).json({ error: 'Failed to revoke API Key.' });
+    }
+}
+async function deleteKey(req, res) {
+    try {
+        const merchantId = req.merchant?.id;
+        const keyId = req.params.id;
+        const existingKey = await db_1.prisma.apiKey.findFirst({
+            where: { id: keyId, merchantId },
+        });
+        if (!existingKey) {
+            res.status(404).json({ error: 'API key not found.' });
+            return;
+        }
+        await db_1.prisma.apiKey.delete({
+            where: { id: keyId },
+        });
+        res.json({ message: 'API key deleted successfully.' });
+    }
+    catch (error) {
+        logger_1.logger.error('Delete API Key Error:', error);
+        res.status(500).json({ error: 'Failed to delete API Key.' });
     }
 }
