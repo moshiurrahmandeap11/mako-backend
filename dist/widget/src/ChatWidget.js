@@ -247,7 +247,9 @@ function ChatWidget({ api }) {
                                     fontSize: '20px',
                                     lineHeight: 1,
                                 }, children: "\u2715" })] }), (0, jsx_runtime_1.jsxs)("div", { style: {
-                            flex: 1,
+                            flex: '1 1 0%',
+                            minHeight: 0,
+                            maxHeight: '100%',
                             padding: '16px',
                             overflowY: 'auto',
                             WebkitOverflowScrolling: 'touch',

@@ -146,9 +146,9 @@ export async function scrapeWebsite(targetUrl: string, merchantId: string): Prom
         });
       }
 
-      // 3. Extract Knowledge Markdown
+      // 3. Extract Knowledge Markdown & Page Links
       const headings: string[] = [];
-      $('h1, h2, h3').each((_, el) => {
+      $('h1, h2, h3, h4').each((_, el) => {
         const text = $(el).text().trim();
         if (text) headings.push(`### ${text}`);
       });
@@ -156,28 +156,44 @@ export async function scrapeWebsite(targetUrl: string, merchantId: string): Prom
       const paragraphs: string[] = [];
       $('p').each((_, el) => {
         const text = $(el).text().trim();
-        if (text && text.length > 20) paragraphs.push(text);
+        if (text && text.length > 10) paragraphs.push(text);
       });
 
-      const markdownContent = `# ${pageTitle}\n\nURL: ${currentUrlStr}\n${metaDescription ? `Description: ${metaDescription}\n\n` : ''}${headings.join('\n')}\n\n${paragraphs.join('\n\n')}`;
+      const pageLinksSet = new Set<string>();
+      $('a').each((_, el) => {
+        const linkText = $(el).text().trim().replace(/\s+/g, ' ');
+        const href = $(el).attr('href');
+        if (linkText && href && linkText.length > 1 && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          try {
+            const fullUrl = new URL(href, currentUrlStr).href;
+            pageLinksSet.add(`- [${linkText}](${fullUrl})`);
+          } catch {}
+        }
+      });
+      const pageLinks = Array.from(pageLinksSet);
+
+      const headerPrefix = `# Page Title: ${pageTitle}\nPage URL: ${currentUrlStr}\n${metaDescription ? `Description: ${metaDescription}\n` : ''}`;
+      const linksSection = pageLinks.length > 0 ? `\n\n### Page Links & Navigation:\n${pageLinks.join('\n')}` : '';
+
+      const markdownContent = `${headerPrefix}\n\n${headings.join('\n')}\n\n${paragraphs.join('\n\n')}${linksSection}`;
       if (currentUrlStr === parsedUrl.href) mainMarkdown = markdownContent;
 
-      // Split markdown into chunks (approx 500 chars) and save to KnowledgeChunk
-      let currentChunk = '';
-      const elementsToChunk = [...headings, ...paragraphs];
+      // Split markdown into chunks (approx 600 chars) and save to KnowledgeChunk with page header prefix
+      let currentChunk = `${headerPrefix}\n\n`;
+      const elementsToChunk = [...headings, ...paragraphs, ...pageLinks];
       for (const el of elementsToChunk) {
         currentChunk += el + '\n\n';
-        if (currentChunk.length >= 500) {
+        if (currentChunk.length >= 600) {
            const emb = await generateEmbedding(currentChunk);
            const kChunk = await (prisma as any).knowledgeChunk.create({
               data: { merchantId, url: currentUrlStr, content: currentChunk.trim() }
            });
            await prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
            totalKnowledgeChunks++;
-           currentChunk = '';
+           currentChunk = `${headerPrefix}\n\n`;
         }
       }
-      if (currentChunk.trim().length > 0) {
+      if (currentChunk.trim().length > headerPrefix.length + 10) {
          const emb = await generateEmbedding(currentChunk);
          const kChunk = await (prisma as any).knowledgeChunk.create({
             data: { merchantId, url: currentUrlStr, content: currentChunk.trim() }

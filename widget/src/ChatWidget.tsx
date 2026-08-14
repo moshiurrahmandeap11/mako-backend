@@ -334,7 +334,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           {/* Messages Body */}
           <div
             style={{
-              flex: 1,
+              flex: '1 1 0%',
+              minHeight: 0,
+              maxHeight: '100%',
               padding: '16px',
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',

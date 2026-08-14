@@ -87,10 +87,12 @@ ${customPrompt}`;
 
 Strict Rules:
 1. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
-2. LANGUAGE RULE: ${langRule}
-3. FORMATTING RULE: ${formatRule}
-${cartRule ? `4. CART ACTION RULE: ${cartRule}` : ''}
-${scopeRule ? `5. SCOPE LOCK RULE: ${scopeRule}` : ''}`.trim();
+2. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names (e.g., StudioX, Aura, Flow AI, etc.) or non-existent services.
+3. CLICKABLE LINKS RULE: When mentioning any project, portfolio item, service, or webpage from the Website Knowledge Base, ALWAYS include its clickable Markdown link format \`[Title](URL)\` as provided in the knowledge base or store context.
+4. LANGUAGE RULE: ${langRule}
+5. FORMATTING RULE: ${formatRule}
+${cartRule ? `6. CART ACTION RULE: ${cartRule}` : ''}
+${scopeRule ? `7. SCOPE LOCK RULE: ${scopeRule}` : ''}`.trim();
 }
 
 export async function processChatMessage(
