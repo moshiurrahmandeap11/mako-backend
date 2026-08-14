@@ -62,16 +62,18 @@ export const auth = betterAuth({
   },
   advanced: {
     defaultCookieAttributes: {
-      sameSite: process.env.COOKIE_SAME_SITE as any || (env.NODE_ENV === 'production' ? 'none' : 'lax'),
-      secure: process.env.COOKIE_SECURE === 'false' ? false : env.NODE_ENV === 'production',
+      sameSite: 'none',
+      secure: true,
       httpOnly: true,
     },
   },
   trustedOrigins: [
     env.FRONTEND_URL,
+    'https://mako-frontend.vercel.app',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'https://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
   ].filter(Boolean),
   secret: env.JWT_SECRET || 'fallback_jwt_secret_dev_key_32chars_min',
 });
