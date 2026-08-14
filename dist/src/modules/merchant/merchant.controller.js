@@ -47,6 +47,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = require("../../config/db");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
+const domain_1 = require("../../utils/domain");
 async function register(req, res) {
     try {
         const { name, email, password } = req.body;
@@ -189,7 +190,8 @@ async function updateDomains(req, res) {
             res.status(400).json({ error: 'allowedDomains must be an array of domain strings.' });
             return;
         }
-        const sanitizedDomains = allowedDomains.map((d) => d.trim().toLowerCase()).filter(Boolean);
+        const rawSanitized = allowedDomains.map((d) => (0, domain_1.normalizeDomain)(d)).filter(Boolean);
+        const sanitizedDomains = [...new Set(rawSanitized)];
         const domainLimits = {
             FREE: 1,
             STARTER: 2,

@@ -4,18 +4,7 @@ exports.authenticateWidget = authenticateWidget;
 const db_1 = require("../config/db");
 const apiKeyGenerator_1 = require("../utils/apiKeyGenerator");
 const logger_1 = require("../utils/logger");
-function normalizeDomain(input) {
-    if (!input)
-        return '';
-    let str = input.trim().toLowerCase();
-    // Strip protocol
-    str = str.replace(/^https?:\/\//, '');
-    // Strip path, query parameters, and hash
-    str = str.split('/')[0].split('?')[0].split('#')[0];
-    // Strip port if present (e.g. localhost:3000 -> localhost)
-    str = str.split(':')[0];
-    return str;
-}
+const domain_1 = require("../utils/domain");
 async function authenticateWidget(req, res, next) {
     try {
         const rawApiKey = (req.headers['x-api-key'] || req.query.apiKey);
@@ -55,7 +44,7 @@ async function authenticateWidget(req, res, next) {
         const allowedDomains = [...new Set(combinedDomains)];
         const isDomainAllowed = allowedDomains.length === 0 || // empty allowedDomains means all domains allowed (for initial setup/dev)
             allowedDomains.some((rawDomain) => {
-                const cleanDomain = normalizeDomain(rawDomain);
+                const cleanDomain = (0, domain_1.normalizeDomain)(rawDomain);
                 if (!cleanDomain || cleanDomain === '*')
                     return true;
                 if (cleanDomain === reqDomain)

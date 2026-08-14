@@ -5,6 +5,7 @@ import { prisma } from '../../config/db';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
+import { normalizeDomain } from '../../utils/domain';
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -176,7 +177,8 @@ export async function updateDomains(req: DashboardAuthRequest, res: Response): P
       return;
     }
 
-    const sanitizedDomains = allowedDomains.map((d) => d.trim().toLowerCase()).filter(Boolean);
+    const rawSanitized = allowedDomains.map((d) => normalizeDomain(d)).filter(Boolean);
+    const sanitizedDomains = [...new Set(rawSanitized)];
 
     const domainLimits: Record<string, number> = {
       FREE: 1,

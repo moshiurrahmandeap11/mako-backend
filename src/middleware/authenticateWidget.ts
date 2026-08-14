@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/db';
 import { hashApiKey } from '../utils/apiKeyGenerator';
 import { logger } from '../utils/logger';
+import { normalizeDomain } from '../utils/domain';
 
 export interface WidgetAuthRequest extends Request {
   merchant?: {
@@ -12,18 +13,6 @@ export interface WidgetAuthRequest extends Request {
   };
   apiKeyId?: string;
   apiKeyRecord?: any;
-}
-
-function normalizeDomain(input: string): string {
-  if (!input) return '';
-  let str = input.trim().toLowerCase();
-  // Strip protocol
-  str = str.replace(/^https?:\/\//, '');
-  // Strip path, query parameters, and hash
-  str = str.split('/')[0].split('?')[0].split('#')[0];
-  // Strip port if present (e.g. localhost:3000 -> localhost)
-  str = str.split(':')[0];
-  return str;
 }
 
 export async function authenticateWidget(
