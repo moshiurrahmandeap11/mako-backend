@@ -169,7 +169,13 @@ export async function me(req: DashboardAuthRequest, res: Response): Promise<void
 export async function updateDomains(req: DashboardAuthRequest, res: Response): Promise<void> {
   try {
     const merchantId = req.merchant?.id;
-    const planTier = req.merchant?.planTier || 'FREE';
+
+    // Fetch real-time planTier directly from DB to avoid any stale cache
+    const dbMerchant = await prisma.user.findUnique({
+      where: { id: merchantId },
+      select: { planTier: true },
+    });
+    const planTier = dbMerchant?.planTier || req.merchant?.planTier || 'FREE';
     const { allowedDomains } = req.body;
 
     if (!Array.isArray(allowedDomains)) {

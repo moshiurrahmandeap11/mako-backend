@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.clearPlanTierCache = clearPlanTierCache;
 exports.authenticateDashboard = authenticateDashboard;
 const node_1 = require("better-auth/node");
 const auth_1 = require("../config/auth");
@@ -7,6 +8,14 @@ const db_1 = require("../config/db");
 const logger_1 = require("../utils/logger");
 const planTierCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+function clearPlanTierCache(userId) {
+    if (userId) {
+        planTierCache.delete(userId);
+    }
+    else {
+        planTierCache.clear();
+    }
+}
 async function authenticateDashboard(req, res, next) {
     try {
         const session = await auth_1.auth.api.getSession({

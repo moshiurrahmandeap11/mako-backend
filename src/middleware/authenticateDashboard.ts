@@ -16,6 +16,14 @@ export interface DashboardAuthRequest extends Request {
 const planTierCache = new Map<string, { tier: string; expires: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+export function clearPlanTierCache(userId?: string) {
+  if (userId) {
+    planTierCache.delete(userId);
+  } else {
+    planTierCache.clear();
+  }
+}
+
 export async function authenticateDashboard(
   req: DashboardAuthRequest,
   res: Response,

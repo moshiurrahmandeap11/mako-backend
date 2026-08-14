@@ -3,7 +3,7 @@ import { prisma } from '../../config/db';
 import { stripe } from '../../utils/stripe';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
-import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
+import { DashboardAuthRequest, clearPlanTierCache } from '../../middleware/authenticateDashboard';
 import { PlanTier } from '@prisma/client';
 
 const PLAN_PRICES: Record<string, { amount: number; name: string }> = {
@@ -321,6 +321,8 @@ export async function verifyCheckout(
           planTier: tier as PlanTier,
         },
       });
+
+      clearPlanTierCache(merchantId);
 
       logger.info(`Verified checkout via API for merchant ${merchantId} -> Tier: ${tier}`);
       res.json({ success: true, tier });

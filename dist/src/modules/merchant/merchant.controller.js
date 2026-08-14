@@ -184,7 +184,12 @@ async function me(req, res) {
 async function updateDomains(req, res) {
     try {
         const merchantId = req.merchant?.id;
-        const planTier = req.merchant?.planTier || 'FREE';
+        // Fetch real-time planTier directly from DB to avoid any stale cache
+        const dbMerchant = await db_1.prisma.user.findUnique({
+            where: { id: merchantId },
+            select: { planTier: true },
+        });
+        const planTier = dbMerchant?.planTier || req.merchant?.planTier || 'FREE';
         const { allowedDomains } = req.body;
         if (!Array.isArray(allowedDomains)) {
             res.status(400).json({ error: 'allowedDomains must be an array of domain strings.' });

@@ -10,6 +10,7 @@ const db_1 = require("../../config/db");
 const stripe_1 = require("../../utils/stripe");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
+const authenticateDashboard_1 = require("../../middleware/authenticateDashboard");
 const PLAN_PRICES = {
     STARTER: { amount: 29, name: 'Starter Plan' },
     PRO: { amount: 79, name: 'Pro Plan' },
@@ -271,6 +272,7 @@ async function verifyCheckout(req, res) {
                     planTier: tier,
                 },
             });
+            (0, authenticateDashboard_1.clearPlanTierCache)(merchantId);
             logger_1.logger.info(`Verified checkout via API for merchant ${merchantId} -> Tier: ${tier}`);
             res.json({ success: true, tier });
             return;
