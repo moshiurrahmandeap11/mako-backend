@@ -360,18 +360,23 @@ async function indexPageContent(
     currentChunk += el + '\n\n';
     if (currentChunk.length >= 650) {
       try {
-        const emb = await generateEmbedding(currentChunk);
         const kChunk = await (prisma as any).knowledgeChunk.create({
           data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
         });
-        await prisma.$executeRawUnsafe(
-          `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
-          `[${emb.join(',')}]`,
-          kChunk.id
-        );
         chunksCreated++;
+
+        try {
+          const emb = await generateEmbedding(currentChunk);
+          if (emb && emb.some((v) => v !== 0)) {
+            await prisma.$executeRawUnsafe(
+              `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
+              `[${emb.join(',')}]`,
+              kChunk.id
+            );
+          }
+        } catch {}
       } catch (err) {
-        logger.error(`KnowledgeChunk embedding error on ${currentUrlStr}:`, err);
+        logger.error(`KnowledgeChunk creation error on ${currentUrlStr}:`, err);
       }
       currentChunk = `${headerPrefix}\n\n`;
     }
@@ -379,18 +384,23 @@ async function indexPageContent(
 
   if (currentChunk.trim().length > headerPrefix.length + 15) {
     try {
-      const emb = await generateEmbedding(currentChunk);
       const kChunk = await (prisma as any).knowledgeChunk.create({
         data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
       });
-      await prisma.$executeRawUnsafe(
-        `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
-        `[${emb.join(',')}]`,
-        kChunk.id
-      );
       chunksCreated++;
+
+      try {
+        const emb = await generateEmbedding(currentChunk);
+        if (emb && emb.some((v) => v !== 0)) {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
+            `[${emb.join(',')}]`,
+            kChunk.id
+          );
+        }
+      } catch {}
     } catch (err) {
-      logger.error(`KnowledgeChunk final chunk embedding error on ${currentUrlStr}:`, err);
+      logger.error(`KnowledgeChunk final chunk creation error on ${currentUrlStr}:`, err);
     }
   }
 
@@ -611,7 +621,6 @@ export async function addManualKnowledgeChunk(
   sourceUrl?: string
 ) {
   const formattedContent = `# ${title}\nSource: ${sourceUrl || 'Merchant Dashboard Note'}\n\n${content}`;
-  const emb = await generateEmbedding(formattedContent);
 
   const chunk = await (prisma as any).knowledgeChunk.create({
     data: {
@@ -621,11 +630,16 @@ export async function addManualKnowledgeChunk(
     },
   });
 
-  await prisma.$executeRawUnsafe(
-    `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
-    `[${emb.join(',')}]`,
-    chunk.id
-  );
+  try {
+    const emb = await generateEmbedding(formattedContent);
+    if (emb && emb.some((v) => v !== 0)) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
+        `[${emb.join(',')}]`,
+        chunk.id
+      );
+    }
+  } catch {}
 
   return chunk;
 }

@@ -344,30 +344,40 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
         currentChunk += el + '\n\n';
         if (currentChunk.length >= 650) {
             try {
-                const emb = await (0, embeddings_1.generateEmbedding)(currentChunk);
                 const kChunk = await db_1.prisma.knowledgeChunk.create({
                     data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
                 });
-                await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
                 chunksCreated++;
+                try {
+                    const emb = await (0, embeddings_1.generateEmbedding)(currentChunk);
+                    if (emb && emb.some((v) => v !== 0)) {
+                        await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
+                    }
+                }
+                catch { }
             }
             catch (err) {
-                logger_1.logger.error(`KnowledgeChunk embedding error on ${currentUrlStr}:`, err);
+                logger_1.logger.error(`KnowledgeChunk creation error on ${currentUrlStr}:`, err);
             }
             currentChunk = `${headerPrefix}\n\n`;
         }
     }
     if (currentChunk.trim().length > headerPrefix.length + 15) {
         try {
-            const emb = await (0, embeddings_1.generateEmbedding)(currentChunk);
             const kChunk = await db_1.prisma.knowledgeChunk.create({
                 data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
             });
-            await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
             chunksCreated++;
+            try {
+                const emb = await (0, embeddings_1.generateEmbedding)(currentChunk);
+                if (emb && emb.some((v) => v !== 0)) {
+                    await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
+                }
+            }
+            catch { }
         }
         catch (err) {
-            logger_1.logger.error(`KnowledgeChunk final chunk embedding error on ${currentUrlStr}:`, err);
+            logger_1.logger.error(`KnowledgeChunk final chunk creation error on ${currentUrlStr}:`, err);
         }
     }
     // 5. Upsert discovered products
@@ -548,7 +558,6 @@ async function scrapeSingleUrl(targetUrl, merchantId) {
  */
 async function addManualKnowledgeChunk(merchantId, title, content, sourceUrl) {
     const formattedContent = `# ${title}\nSource: ${sourceUrl || 'Merchant Dashboard Note'}\n\n${content}`;
-    const emb = await (0, embeddings_1.generateEmbedding)(formattedContent);
     const chunk = await db_1.prisma.knowledgeChunk.create({
         data: {
             merchantId,
@@ -556,6 +565,12 @@ async function addManualKnowledgeChunk(merchantId, title, content, sourceUrl) {
             content: formattedContent,
         },
     });
-    await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, chunk.id);
+    try {
+        const emb = await (0, embeddings_1.generateEmbedding)(formattedContent);
+        if (emb && emb.some((v) => v !== 0)) {
+            await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, chunk.id);
+        }
+    }
+    catch { }
     return chunk;
 }
