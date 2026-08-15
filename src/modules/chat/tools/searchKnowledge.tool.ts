@@ -5,53 +5,75 @@ import { logger } from '../../../utils/logger';
 export async function searchKnowledgeTool(
   merchantId: string,
   query: string,
-  maxResults: number = 4
+  maxResults: number = 6
 ) {
   try {
-    const queryVector = await generateEmbedding(query);
-    const vectorStr = `[${queryVector.join(',')}]`;
     let chunks: any[] = [];
 
+    // 1. Vector similarity search (only when embeddings exist)
     try {
-      const rawResults = await executeRawNeonQuery(
-        `SELECT id, url, content, 
-                (embedding <=> $1::vector) as distance
-         FROM "KnowledgeChunk"
-         WHERE "merchantId" = $2
-         ORDER BY distance ASC
-         LIMIT $3`,
-        [vectorStr, merchantId, maxResults]
-      );
+      const queryVector = await generateEmbedding(query);
+      const isRealVector = queryVector && queryVector.some((v) => v !== 0);
 
-      if (rawResults && rawResults.length > 0) {
-        chunks = rawResults;
+      if (isRealVector) {
+        const vectorStr = `[${queryVector.join(',')}]`;
+        const rawResults = await executeRawNeonQuery(
+          `SELECT id, url, content, 
+                  (embedding <=> $1::vector) as distance
+           FROM "KnowledgeChunk"
+           WHERE "merchantId" = $2 AND embedding IS NOT NULL
+           ORDER BY distance ASC
+           LIMIT $3`,
+          [vectorStr, merchantId, maxResults]
+        );
+
+        if (rawResults && rawResults.length > 0) {
+          chunks = rawResults;
+        }
       }
     } catch (e) {
-      logger.error('Failed to search KnowledgeChunk vectors:', e);
+      logger.error('Vector search error in searchKnowledgeTool:', e);
     }
 
-    // Fallback 1: Text search if vector search returns 0
+    // 2. Keyword token search (matches individual query words like 'project', 'pricing', 'portfolio', etc.)
     if (chunks.length === 0) {
       try {
-        const textResults = await prisma.knowledgeChunk.findMany({
-          where: {
-            merchantId,
-            content: { contains: query, mode: 'insensitive' },
-          },
-          take: maxResults,
-        });
-        if (textResults && textResults.length > 0) {
-          chunks = textResults;
+        const words = query
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, '')
+          .split(/\s+/)
+          .filter((w) => w.length >= 3);
+
+        const whereConditions: any[] = [{ merchantId }];
+        if (words.length > 0) {
+          const orList = words.map((w) => ({
+            content: { contains: w, mode: 'insensitive' as const },
+          }));
+          const textResults = await prisma.knowledgeChunk.findMany({
+            where: {
+              merchantId,
+              OR: orList,
+            },
+            take: maxResults,
+            orderBy: { createdAt: 'desc' },
+          });
+
+          if (textResults && textResults.length > 0) {
+            chunks = textResults;
+          }
         }
-      } catch {}
+      } catch (err) {
+        logger.error('Keyword search error in searchKnowledgeTool:', err);
+      }
     }
 
-    // Fallback 2: General top merchant chunks
+    // 3. Fallback: Fetch recent merchant knowledge chunks
     if (chunks.length === 0) {
       try {
         const fallbackChunks = await prisma.knowledgeChunk.findMany({
           where: { merchantId },
           take: maxResults,
+          orderBy: { createdAt: 'desc' },
         });
         if (fallbackChunks && fallbackChunks.length > 0) {
           chunks = fallbackChunks;
