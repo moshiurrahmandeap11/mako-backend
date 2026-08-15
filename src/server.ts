@@ -17,6 +17,7 @@ import widgetConfigRoutes from './modules/widgetConfig/widgetConfig.routes';
 import widgetChatRoutes from './modules/chat/chat.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import billingRoutes from './modules/billing/billing.routes';
+import knowledgeRoutes from './modules/knowledge/knowledge.routes';
 import { initCronJobs } from './jobs/cron';
 
 const app = express();
@@ -80,6 +81,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/widget-config', widgetConfigRoutes);
 app.use('/api/widget', widgetChatRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/knowledge', knowledgeRoutes);
 
 // Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

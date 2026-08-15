@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.env = void 0;
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
-dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../../.env') });
+dotenv_1.default.config({ path: path_1.default.resolve(process.cwd(), '.env') });
 exports.env = {
     NODE_ENV: process.env.NODE_ENV || 'development',
     PORT: parseInt(process.env.PORT || '4000', 10),
@@ -31,7 +31,7 @@ exports.env = {
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || 'http://localhost:4000/api/auth',
     SMTP_HOST: process.env.SMTP_HOST || 'smtp.gmail.com',
     SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10),
-    SMTP_USER: process.env.SMTP_USER || 'moshiurbhau@gmail.com',
-    SMTP_PASS: process.env.SMTP_PASS || 'vicp uvwv pcqj zehz',
-    SMTP_FROM: process.env.SMTP_FROM || 'Labto AI Assistant <moshiurbhau@gmail.com>',
+    SMTP_USER: process.env.SMTP_USER || '',
+    SMTP_PASS: process.env.SMTP_PASS || '',
+    SMTP_FROM: process.env.SMTP_FROM || 'Labto AI Assistant <no-reply@labto.ai>',
 };

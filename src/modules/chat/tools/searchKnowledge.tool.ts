@@ -5,10 +5,11 @@ import { logger } from '../../../utils/logger';
 export async function searchKnowledgeTool(
   merchantId: string,
   query: string,
-  maxResults: number = 3
+  maxResults: number = 4
 ) {
   try {
     const queryVector = await generateEmbedding(query);
+    const vectorStr = `[${queryVector.join(',')}]`;
     let chunks: any[] = [];
 
     try {
@@ -19,7 +20,7 @@ export async function searchKnowledgeTool(
          WHERE "merchantId" = $2
          ORDER BY distance ASC
          LIMIT $3`,
-        [queryVector, merchantId, maxResults]
+        [vectorStr, merchantId, maxResults]
       );
 
       if (rawResults && rawResults.length > 0) {
@@ -29,7 +30,23 @@ export async function searchKnowledgeTool(
       logger.error('Failed to search KnowledgeChunk vectors:', e);
     }
 
-    // Fallback: If vector search returns 0 chunks, fetch top scraped knowledge chunks
+    // Fallback 1: Text search if vector search returns 0
+    if (chunks.length === 0) {
+      try {
+        const textResults = await prisma.knowledgeChunk.findMany({
+          where: {
+            merchantId,
+            content: { contains: query, mode: 'insensitive' },
+          },
+          take: maxResults,
+        });
+        if (textResults && textResults.length > 0) {
+          chunks = textResults;
+        }
+      } catch {}
+    }
+
+    // Fallback 2: General top merchant chunks
     if (chunks.length === 0) {
       try {
         const fallbackChunks = await prisma.knowledgeChunk.findMany({

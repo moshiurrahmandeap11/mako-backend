@@ -12,14 +12,25 @@ if (!connectionString) {
     console.error('DATABASE_URL is not set!');
     process.exit(1);
 }
+function getNeonSqlEndpoint(connStr) {
+    try {
+        const sanitized = connStr.replace(/^postgres(ql)?:\/\//i, 'http://');
+        const parsed = new URL(sanitized);
+        return `https://${parsed.host}/sql`;
+    }
+    catch {
+        return 'https://ep-long-cell-ay5y8og7-pooler.c-5.us-east-2.aws.neon.tech/sql';
+    }
+}
 function executeQuery(query) {
     return new Promise((resolve, reject) => {
         const data = JSON.stringify({ query });
-        const req = https_1.default.request('https://ep-long-cell-ay5y8og7-pooler.c-5.us-east-2.aws.neon.tech/sql', {
+        const endpoint = getNeonSqlEndpoint(connectionString || '');
+        const req = https_1.default.request(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Neon-Connection-String': connectionString,
+                'Neon-Connection-String': connectionString || '',
                 'Content-Length': Buffer.byteLength(data),
             },
             family: 4, // Force IPv4

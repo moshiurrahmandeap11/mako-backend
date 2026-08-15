@@ -33,20 +33,394 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.isSafeUrl = isSafeUrl;
 exports.scrapeWebsite = scrapeWebsite;
+exports.scrapeSingleUrl = scrapeSingleUrl;
+exports.addManualKnowledgeChunk = addManualKnowledgeChunk;
 const cheerio = __importStar(require("cheerio"));
 const db_1 = require("../config/db");
 const embeddings_1 = require("../utils/embeddings");
 const logger_1 = require("../utils/logger");
-async function scrapeWebsite(targetUrl, merchantId) {
-    logger_1.logger.info(`Scraper: Starting deep web crawl for merchant ${merchantId} on ${targetUrl}`);
-    // Clear old knowledge chunks for this merchant to prevent duplicates and keep data fresh
+function isSafeUrl(url) {
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return false;
+    }
+    const hostname = url.hostname.toLowerCase();
+    // Reject local and private hostnames
+    if (hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname === '0.0.0.0' ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal') ||
+        hostname.endsWith('.lan')) {
+        return false;
+    }
+    // Reject private and link-local IPv4 ranges
+    if (/^127\.\d+\.\d+\.\d+$/.test(hostname))
+        return false;
+    if (/^10\.\d+\.\d+\.\d+$/.test(hostname))
+        return false;
+    if (/^192\.168\.\d+\.\d+$/.test(hostname))
+        return false;
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+$/.test(hostname))
+        return false;
+    if (/^169\.254\.\d+\.\d+$/.test(hostname))
+        return false; // Cloud metadata IP
+    return true;
+}
+/**
+ * Fetch and extract sitemap declarations from robots.txt
+ */
+async function fetchRobotsSitemaps(origin) {
+    const sitemapUrls = [];
     try {
-        await db_1.prisma.$executeRawUnsafe(`DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1`, merchantId);
+        const robotsUrl = `${origin}/robots.txt`;
+        const res = await fetch(robotsUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LabtoBot/2.0; +https://labto.ahsanul.dev)' },
+            signal: AbortSignal.timeout(5000),
+        });
+        if (res.ok) {
+            const text = await res.text();
+            const matches = text.matchAll(/Sitemap:\s*(https?:\/\/[^\s\r\n]+)/gi);
+            for (const m of matches) {
+                if (m[1])
+                    sitemapUrls.push(m[1].trim());
+            }
+        }
     }
-    catch (err) {
-        logger_1.logger.error('Failed to clear old knowledge chunks:', err);
+    catch {
+        // robots.txt optional
     }
+    return sitemapUrls;
+}
+/**
+ * Recursively parse sitemap XML or sitemap index files for page and product URLs
+ */
+async function fetchSitemapUrls(sitemapUrl, maxDepth = 2, visitedSitemaps = new Set()) {
+    if (maxDepth <= 0 || visitedSitemaps.has(sitemapUrl))
+        return [];
+    visitedSitemaps.add(sitemapUrl);
+    const discoveredUrls = [];
+    try {
+        const res = await fetch(sitemapUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; LabtoBot/2.0; +https://labto.ahsanul.dev)',
+                'Accept': 'application/xml,text/xml,*/*',
+            },
+            signal: AbortSignal.timeout(6000),
+        });
+        if (!res.ok)
+            return [];
+        const xml = await res.text();
+        const $ = cheerio.load(xml, { xmlMode: true });
+        // Check for nested sitemaps in <sitemapindex>
+        const subSitemaps = [];
+        $('sitemap > loc').each((_, el) => {
+            const loc = $(el).text().trim();
+            if (loc)
+                subSitemaps.push(loc);
+        });
+        for (const sub of subSitemaps.slice(0, 10)) {
+            const subUrls = await fetchSitemapUrls(sub, maxDepth - 1, visitedSitemaps);
+            discoveredUrls.push(...subUrls);
+        }
+        // Check for URLs in <urlset>
+        $('url > loc').each((_, el) => {
+            const loc = $(el).text().trim();
+            if (loc && (loc.startsWith('http://') || loc.startsWith('https://'))) {
+                discoveredUrls.push(loc);
+            }
+        });
+    }
+    catch (e) {
+        logger_1.logger.debug(`Optional sitemap check failed for ${sitemapUrl}`);
+    }
+    return discoveredUrls;
+}
+/**
+ * Discover all potential sitemaps from robots.txt and standard locations
+ */
+async function discoverAllSitemapUrls(origin) {
+    const candidateSitemaps = new Set();
+    // 1. Check robots.txt declared sitemaps
+    const robotsSitemaps = await fetchRobotsSitemaps(origin);
+    robotsSitemaps.forEach(s => candidateSitemaps.add(s));
+    // 2. Common framework and CMS sitemap locations
+    const standardLocations = [
+        `${origin}/sitemap.xml`,
+        `${origin}/sitemap_index.xml`,
+        `${origin}/wp-sitemap.xml`,
+        `${origin}/sitemap_products_1.xml`,
+        `${origin}/sitemap_pages_1.xml`,
+    ];
+    standardLocations.forEach(loc => candidateSitemaps.add(loc));
+    const allFoundUrls = [];
+    const visitedSitemaps = new Set();
+    for (const sitemap of candidateSitemaps) {
+        try {
+            const urls = await fetchSitemapUrls(sitemap, 2, visitedSitemaps);
+            allFoundUrls.push(...urls);
+        }
+        catch { }
+    }
+    return Array.from(new Set(allFoundUrls));
+}
+/**
+ * Extract dynamic SPA / Next.js / React / Vue internal route links from HTML and script tags
+ */
+function extractSpaRoutes(html, baseUrl) {
+    const discoveredRoutes = new Set();
+    const origin = baseUrl.origin;
+    // 1. Regular DOM anchors and interactive links
+    const $ = cheerio.load(html);
+    $('a[href], button[data-href], [data-url], link[rel="canonical"], meta[property="og:url"]').each((_, el) => {
+        const href = $(el).attr('href') || $(el).attr('data-href') || $(el).attr('data-url') || $(el).attr('content');
+        if (href && typeof href === 'string') {
+            const trimmed = href.trim();
+            if (!trimmed.startsWith('#') &&
+                !trimmed.startsWith('javascript:') &&
+                !trimmed.startsWith('mailto:') &&
+                !trimmed.startsWith('tel:')) {
+                try {
+                    const fullUrl = new URL(trimmed, origin);
+                    if (fullUrl.hostname === baseUrl.hostname) {
+                        fullUrl.hash = '';
+                        discoveredRoutes.add(fullUrl.href);
+                    }
+                }
+                catch { }
+            }
+        }
+    });
+    // 2. SPA Embedded Router & Script Payload Scanner
+    // Matches internal paths like /projects/slug, /products/item, /casestudies/case, /services/name, etc.
+    const pathRegex = /(?:"|'|`|\/)(?:projects|products|services|casestudies|case-studies|portfolio|pricing|about|contact|shop|collection|blogs?|work|features|solutions)\/([a-zA-Z0-9_\-\/]{2,60})(?:"|'|`)/g;
+    const matches = html.matchAll(pathRegex);
+    for (const m of matches) {
+        if (m[0]) {
+            const cleanPath = m[0].replace(/["'`]/g, '');
+            const formattedPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+            try {
+                const fullUrl = new URL(formattedPath, origin);
+                if (fullUrl.hostname === baseUrl.hostname) {
+                    discoveredRoutes.add(fullUrl.href);
+                }
+            }
+            catch { }
+        }
+    }
+    // 3. Next.js App Router Page Manifest & __NEXT_DATA__ scanning
+    $('script').each((_, el) => {
+        const scriptContent = $(el).html() || '';
+        if (scriptContent.includes('__NEXT_DATA__') || scriptContent.includes('self.__next_f') || scriptContent.includes('/_next/')) {
+            const routeMatches = scriptContent.matchAll(/"(\/(?:projects|products|casestudies|services|pricing|about|contact)[^"\\?#]+)"/g);
+            for (const rm of routeMatches) {
+                if (rm[1] && !rm[1].includes('.js') && !rm[1].includes('.css')) {
+                    try {
+                        const fullUrl = new URL(rm[1], origin);
+                        if (fullUrl.hostname === baseUrl.hostname) {
+                            discoveredRoutes.add(fullUrl.href);
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+    });
+    return Array.from(discoveredRoutes);
+}
+/**
+ * Indexes a single page's markdown and structured items into KnowledgeChunk and Product
+ */
+async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainDomain = false) {
+    const $ = cheerio.load(html);
+    const pageTitle = $('title').text().trim() ||
+        $('h1').first().text().trim() ||
+        $('meta[property="og:title"]').attr('content') ||
+        new URL(currentUrlStr).pathname;
+    const metaDescription = $('meta[name="description"]').attr('content') ||
+        $('meta[property="og:description"]').attr('content') ||
+        '';
+    const ogImage = $('meta[property="og:image"]').attr('content') ||
+        $('meta[name="twitter:image"]').attr('content') ||
+        '';
+    const productsFound = [];
+    // 1. JSON-LD structured product metadata
+    $('script[type="application/ld+json"]').each((_, element) => {
+        try {
+            const jsonText = $(element).html();
+            if (!jsonText)
+                return;
+            const data = JSON.parse(jsonText);
+            const items = Array.isArray(data) ? data : [data];
+            for (const item of items) {
+                if (item['@type'] === 'Product' || item['@type'] === 'http://schema.org/Product') {
+                    const title = item.name || pageTitle;
+                    const description = item.description || metaDescription || title;
+                    const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers || {};
+                    const price = parseFloat(offer.price || offer.lowPrice || '0') || 0;
+                    const currency = offer.priceCurrency || 'USD';
+                    const imageUrl = Array.isArray(item.image) ? item.image[0] : item.image || ogImage || '';
+                    const productUrl = item.url ? new URL(item.url, origin).href : currentUrlStr;
+                    const category = item.category || 'General';
+                    const sku = item.sku || item.mpn || `SCRAPE-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+                    productsFound.push({
+                        externalId: String(sku),
+                        title: String(title).trim(),
+                        description: String(description).trim(),
+                        price,
+                        currency,
+                        imageUrl: String(imageUrl),
+                        productUrl: String(productUrl),
+                        category: String(category),
+                        inStock: true,
+                    });
+                }
+            }
+        }
+        catch { }
+    });
+    // 2. DOM Product / Portfolio Card extraction
+    if (productsFound.length === 0) {
+        $('.product-card, .product-item, .grid-item, [itemtype*="Product"], .project-card, article').each((idx, el) => {
+            const card = $(el);
+            const title = card.find('.product-title, .title, h2, h3, h4, [itemprop="name"]').first().text().trim();
+            const link = card.find('a').first().attr('href');
+            const img = card.find('img').first().attr('src') || card.find('img').first().attr('data-src');
+            const priceText = card.find('.price, [itemprop="price"]').first().text().trim();
+            const numericPrice = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
+            if (title && title.length > 2 && (link || img)) {
+                const fullUrl = link ? new URL(link, origin).href : currentUrlStr;
+                const fullImg = img ? new URL(img, origin).href : ogImage;
+                productsFound.push({
+                    externalId: `DOM-${idx + 1}-${Buffer.from(title).toString('hex').slice(0, 10)}`,
+                    title,
+                    description: `${title} - Details available at ${fullUrl}`,
+                    price: numericPrice,
+                    currency: 'USD',
+                    imageUrl: fullImg,
+                    productUrl: fullUrl,
+                    category: 'Showcase & Products',
+                    inStock: true,
+                });
+            }
+        });
+    }
+    // 3. Extract Knowledge Headings, Paragraphs, and Clickable Links
+    const headings = [];
+    $('h1, h2, h3, h4').each((_, el) => {
+        const text = $(el).text().trim().replace(/\s+/g, ' ');
+        if (text && text.length > 2)
+            headings.push(`### ${text}`);
+    });
+    const paragraphs = [];
+    $('p, li, blockquote, [data-description]').each((_, el) => {
+        const text = $(el).text().trim().replace(/\s+/g, ' ');
+        if (text && text.length > 15)
+            paragraphs.push(text);
+    });
+    const pageLinksSet = new Set();
+    $('a').each((_, el) => {
+        const linkText = $(el).text().trim().replace(/\s+/g, ' ');
+        const href = $(el).attr('href');
+        if (linkText && href && linkText.length > 1 && !href.startsWith('#') && !href.startsWith('javascript:')) {
+            try {
+                const fullUrl = new URL(href, currentUrlStr).href;
+                pageLinksSet.add(`- [${linkText}](${fullUrl})`);
+            }
+            catch { }
+        }
+    });
+    const pageLinks = Array.from(pageLinksSet).slice(0, 35);
+    const headerPrefix = `# Page Title: ${pageTitle}\nPage URL: ${currentUrlStr}\n${metaDescription ? `Description: ${metaDescription}\n` : ''}`;
+    const linksSection = pageLinks.length > 0 ? `\n\n### Page Links & Navigation:\n${pageLinks.join('\n')}` : '';
+    const pageMarkdown = `${headerPrefix}\n\n${headings.join('\n')}\n\n${paragraphs.slice(0, 20).join('\n\n')}${linksSection}`;
+    // 4. Save structured chunks to KnowledgeChunk with vector embeddings
+    let chunksCreated = 0;
+    let currentChunk = `${headerPrefix}\n\n`;
+    const elementsToChunk = [...headings, ...paragraphs.slice(0, 25), ...pageLinks];
+    for (const el of elementsToChunk) {
+        currentChunk += el + '\n\n';
+        if (currentChunk.length >= 650) {
+            try {
+                const emb = await (0, embeddings_1.generateEmbedding)(currentChunk);
+                const kChunk = await db_1.prisma.knowledgeChunk.create({
+                    data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
+                });
+                await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
+                chunksCreated++;
+            }
+            catch (err) {
+                logger_1.logger.error(`KnowledgeChunk embedding error on ${currentUrlStr}:`, err);
+            }
+            currentChunk = `${headerPrefix}\n\n`;
+        }
+    }
+    if (currentChunk.trim().length > headerPrefix.length + 15) {
+        try {
+            const emb = await (0, embeddings_1.generateEmbedding)(currentChunk);
+            const kChunk = await db_1.prisma.knowledgeChunk.create({
+                data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
+            });
+            await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
+            chunksCreated++;
+        }
+        catch (err) {
+            logger_1.logger.error(`KnowledgeChunk final chunk embedding error on ${currentUrlStr}:`, err);
+        }
+    }
+    // 5. Upsert discovered products
+    for (const prod of productsFound) {
+        try {
+            const contentToEmbed = `Product/Project: ${prod.title}. Category: ${prod.category}. Price: $${prod.price} ${prod.currency}. Link: ${prod.productUrl}. Description: ${prod.description}`;
+            const embedding = await (0, embeddings_1.generateEmbedding)(contentToEmbed);
+            const savedProduct = await db_1.prisma.product.upsert({
+                where: {
+                    merchantId_externalId: { merchantId, externalId: prod.externalId },
+                },
+                create: {
+                    merchantId,
+                    externalId: prod.externalId,
+                    title: prod.title,
+                    description: prod.description,
+                    price: prod.price,
+                    currency: prod.currency,
+                    imageUrl: prod.imageUrl,
+                    productUrl: prod.productUrl,
+                    category: prod.category,
+                    inStock: prod.inStock,
+                },
+                update: {
+                    title: prod.title,
+                    description: prod.description,
+                    price: prod.price,
+                    currency: prod.currency,
+                    imageUrl: prod.imageUrl,
+                    productUrl: prod.productUrl,
+                    category: prod.category,
+                    inStock: prod.inStock,
+                },
+            });
+            const vectorStr = `[${embedding.join(',')}]`;
+            await db_1.prisma.$executeRawUnsafe(`UPDATE "Product" SET embedding = $1::vector WHERE id = $2`, vectorStr, savedProduct.id).catch(() => { });
+        }
+        catch (err) {
+            logger_1.logger.error(`Scraper: Failed to index product ${prod.title}:`, err);
+        }
+    }
+    return {
+        products: productsFound,
+        chunksCount: chunksCreated,
+        pageTitle,
+        pageMarkdown,
+    };
+}
+/**
+ * Main Full Hybrid Web Crawler
+ */
+async function scrapeWebsite(targetUrl, merchantId) {
+    logger_1.logger.info(`Scraper: Starting 4-tier hybrid web crawl for merchant ${merchantId} on ${targetUrl}`);
     let parsedUrl;
     try {
         parsedUrl = new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`);
@@ -54,210 +428,134 @@ async function scrapeWebsite(targetUrl, merchantId) {
     catch (err) {
         throw new Error(`Invalid target URL: ${targetUrl}`);
     }
+    if (!isSafeUrl(parsedUrl)) {
+        throw new Error(`Target URL '${targetUrl}' is invalid or resolves to a restricted/private network address.`);
+    }
+    // Clear old knowledge chunks for this merchant to maintain clean fresh data
+    try {
+        await db_1.prisma.$executeRawUnsafe(`DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1`, merchantId);
+    }
+    catch (err) {
+        logger_1.logger.error('Failed to clear old knowledge chunks:', err);
+    }
     const visitedUrls = new Set();
     const queue = [parsedUrl.href];
-    const maxPages = 50;
+    const maxPages = 40;
+    // ── Tier 1 & Tier 2: Opportunistic Sitemaps & robots.txt Discovery ──
+    try {
+        const sitemapUrls = await discoverAllSitemapUrls(parsedUrl.origin);
+        for (const url of sitemapUrls) {
+            try {
+                const u = new URL(url);
+                if (u.hostname === parsedUrl.hostname && !visitedUrls.has(u.href) && !queue.includes(u.href)) {
+                    queue.push(u.href);
+                }
+            }
+            catch { }
+        }
+        logger_1.logger.info(`Scraper: Sitemap/robots discovery found ${sitemapUrls.length} potential URLs`);
+    }
+    catch (err) {
+        logger_1.logger.debug('Sitemap discovery skipped or unavailable');
+    }
     const allProductsFound = [];
-    let totalIndexedProducts = 0;
     let totalKnowledgeChunks = 0;
     let mainPageTitle = parsedUrl.hostname;
     let mainMarkdown = '';
+    // ── Tier 3 & Tier 4: Recursive Deep DOM & SPA Route Crawler ──
     while (queue.length > 0 && visitedUrls.size < maxPages) {
         const currentUrlStr = queue.shift();
         if (visitedUrls.has(currentUrlStr))
             continue;
         visitedUrls.add(currentUrlStr);
         try {
+            const currentUrlObj = new URL(currentUrlStr);
+            if (!isSafeUrl(currentUrlObj))
+                continue;
             logger_1.logger.info(`Scraping page: ${currentUrlStr}`);
             const response = await fetch(currentUrlStr, {
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AI-Shopping-Scraper/1.0',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 LabtoBot/2.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 },
+                signal: AbortSignal.timeout(10000), // 10s timeout per page
             });
             if (!response.ok)
                 continue;
             const html = await response.text();
-            const $ = cheerio.load(html);
-            const pageTitle = $('title').text().trim() || $('h1').first().text().trim() || new URL(currentUrlStr).pathname;
-            const metaDescription = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || '';
-            const ogImage = $('meta[property="og:image"]').attr('content') || '';
+            // Index current page content
+            const { products, chunksCount, pageTitle, pageMarkdown } = await indexPageContent(currentUrlStr, html, merchantId, parsedUrl.origin, currentUrlStr === parsedUrl.href);
             if (currentUrlStr === parsedUrl.href) {
                 mainPageTitle = pageTitle;
+                mainMarkdown = pageMarkdown;
             }
-            const productsFound = [];
-            // 1. Check for JSON-LD structured product metadata
-            $('script[type="application/ld+json"]').each((_, element) => {
-                try {
-                    const jsonText = $(element).html();
-                    if (!jsonText)
-                        return;
-                    const data = JSON.parse(jsonText);
-                    const items = Array.isArray(data) ? data : [data];
-                    for (const item of items) {
-                        if (item['@type'] === 'Product' || item['@type'] === 'http://schema.org/Product') {
-                            const title = item.name || pageTitle;
-                            const description = item.description || metaDescription || title;
-                            const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers || {};
-                            const price = parseFloat(offer.price || offer.lowPrice || '0') || 0;
-                            const currency = offer.priceCurrency || 'USD';
-                            const imageUrl = Array.isArray(item.image) ? item.image[0] : item.image || ogImage || '';
-                            const productUrl = item.url ? new URL(item.url, parsedUrl.origin).href : currentUrlStr;
-                            const category = item.category || 'General';
-                            const sku = item.sku || item.mpn || `SCRAPE-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-                            productsFound.push({
-                                externalId: String(sku),
-                                title: String(title).trim(),
-                                description: String(description).trim(),
-                                price,
-                                currency,
-                                imageUrl: String(imageUrl),
-                                productUrl: String(productUrl),
-                                category: String(category),
-                                inStock: true,
-                            });
-                        }
-                    }
-                }
-                catch {
-                    // Ignore JSON parse errors
-                }
-            });
-            // 2. Fallback micro-data HTML extraction
-            if (productsFound.length === 0) {
-                $('.product-card, .product-item, .grid-item, [itemtype*="Product"]').each((idx, el) => {
-                    const card = $(el);
-                    const title = card.find('.product-title, .title, h2, h3, [itemprop="name"]').first().text().trim();
-                    const link = card.find('a').first().attr('href');
-                    const img = card.find('img').first().attr('src') || card.find('img').first().attr('data-src');
-                    const priceText = card.find('.price, [itemprop="price"]').first().text().trim();
-                    const numericPrice = parseFloat(priceText.replace(/[^0.0-9.]/g, '')) || 0;
-                    if (title && (link || img)) {
-                        const fullUrl = link ? new URL(link, parsedUrl.origin).href : currentUrlStr;
-                        const fullImg = img ? new URL(img, parsedUrl.origin).href : ogImage;
-                        productsFound.push({
-                            externalId: `DOM-PROD-${idx + 1}-${Date.now()}`,
-                            title,
-                            description: `${title} - Available on ${parsedUrl.hostname}`,
-                            price: numericPrice,
-                            currency: 'USD',
-                            imageUrl: fullImg,
-                            productUrl: fullUrl,
-                            category: 'Store Item',
-                            inStock: true,
-                        });
-                    }
-                });
-            }
-            // 3. Extract Knowledge Markdown & Page Links
-            const headings = [];
-            $('h1, h2, h3, h4').each((_, el) => {
-                const text = $(el).text().trim();
-                if (text)
-                    headings.push(`### ${text}`);
-            });
-            const paragraphs = [];
-            $('p').each((_, el) => {
-                const text = $(el).text().trim();
-                if (text && text.length > 10)
-                    paragraphs.push(text);
-            });
-            const pageLinksSet = new Set();
-            $('a').each((_, el) => {
-                const linkText = $(el).text().trim().replace(/\s+/g, ' ');
-                const href = $(el).attr('href');
-                if (linkText && href && linkText.length > 1 && !href.startsWith('#') && !href.startsWith('javascript:')) {
-                    try {
-                        const fullUrl = new URL(href, currentUrlStr).href;
-                        pageLinksSet.add(`- [${linkText}](${fullUrl})`);
-                    }
-                    catch { }
-                }
-            });
-            const pageLinks = Array.from(pageLinksSet);
-            const headerPrefix = `# Page Title: ${pageTitle}\nPage URL: ${currentUrlStr}\n${metaDescription ? `Description: ${metaDescription}\n` : ''}`;
-            const linksSection = pageLinks.length > 0 ? `\n\n### Page Links & Navigation:\n${pageLinks.join('\n')}` : '';
-            const markdownContent = `${headerPrefix}\n\n${headings.join('\n')}\n\n${paragraphs.join('\n\n')}${linksSection}`;
-            if (currentUrlStr === parsedUrl.href)
-                mainMarkdown = markdownContent;
-            // Split markdown into chunks (approx 600 chars) and save to KnowledgeChunk with page header prefix
-            let currentChunk = `${headerPrefix}\n\n`;
-            const elementsToChunk = [...headings, ...paragraphs, ...pageLinks];
-            for (const el of elementsToChunk) {
-                currentChunk += el + '\n\n';
-                if (currentChunk.length >= 600) {
-                    const emb = await (0, embeddings_1.generateEmbedding)(currentChunk);
-                    const kChunk = await db_1.prisma.knowledgeChunk.create({
-                        data: { merchantId, url: currentUrlStr, content: currentChunk.trim() }
-                    });
-                    await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
-                    totalKnowledgeChunks++;
-                    currentChunk = `${headerPrefix}\n\n`;
+            allProductsFound.push(...products);
+            totalKnowledgeChunks += chunksCount;
+            // Extract new internal routes & links dynamically
+            const newRoutes = extractSpaRoutes(html, parsedUrl);
+            for (const r of newRoutes) {
+                if (!visitedUrls.has(r) && !queue.includes(r) && queue.length < 100) {
+                    queue.push(r);
                 }
             }
-            if (currentChunk.trim().length > headerPrefix.length + 10) {
-                const emb = await (0, embeddings_1.generateEmbedding)(currentChunk);
-                const kChunk = await db_1.prisma.knowledgeChunk.create({
-                    data: { merchantId, url: currentUrlStr, content: currentChunk.trim() }
-                });
-                await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, kChunk.id);
-                totalKnowledgeChunks++;
-            }
-            // 4. Index Products
-            for (const prod of productsFound) {
-                allProductsFound.push(prod);
-                try {
-                    const contentToEmbed = `Product: ${prod.title}. Category: ${prod.category}. Price: $${prod.price} ${prod.currency}. Description: ${prod.description}`;
-                    const embedding = await (0, embeddings_1.generateEmbedding)(contentToEmbed);
-                    const savedProduct = await db_1.prisma.product.upsert({
-                        where: {
-                            merchantId_externalId: { merchantId, externalId: prod.externalId },
-                        },
-                        create: {
-                            merchantId, externalId: prod.externalId, title: prod.title,
-                            description: prod.description, price: prod.price, currency: prod.currency,
-                            imageUrl: prod.imageUrl, productUrl: prod.productUrl, category: prod.category, inStock: prod.inStock,
-                        },
-                        update: {
-                            title: prod.title, description: prod.description, price: prod.price, currency: prod.currency,
-                            imageUrl: prod.imageUrl, productUrl: prod.productUrl, category: prod.category, inStock: prod.inStock,
-                        },
-                    });
-                    const vectorStr = `[${embedding.join(',')}]`;
-                    await db_1.prisma.$executeRawUnsafe(`UPDATE "Product" SET embedding = $1::vector WHERE id = $2`, vectorStr, savedProduct.id).catch(() => { });
-                    totalIndexedProducts++;
-                }
-                catch (err) {
-                    logger_1.logger.error(`Scraper: Failed to index product ${prod.title}:`, err);
-                }
-            }
-            // 5. Extract links for deep crawling
-            $('a').each((_, el) => {
-                const href = $(el).attr('href');
-                if (href) {
-                    try {
-                        const newUrl = new URL(href, parsedUrl.origin);
-                        if (newUrl.hostname === parsedUrl.hostname) {
-                            newUrl.hash = ''; // strip hash for dedup
-                            if (!visitedUrls.has(newUrl.href) && !queue.includes(newUrl.href)) {
-                                queue.push(newUrl.href);
-                            }
-                        }
-                    }
-                    catch { /* ignore invalid URLs */ }
-                }
-            });
         }
         catch (err) {
             logger_1.logger.error(`Failed to process ${currentUrlStr}:`, err);
         }
     }
-    logger_1.logger.info(`Scraper: Deep crawl complete. Visited ${visitedUrls.size} pages. Indexed ${totalIndexedProducts} products and ${totalKnowledgeChunks} knowledge chunks.`);
+    logger_1.logger.info(`Scraper: Complete! Crawled ${visitedUrls.size} pages. Indexed ${allProductsFound.length} items and ${totalKnowledgeChunks} knowledge chunks.`);
     return {
         url: parsedUrl.href,
         pageTitle: mainPageTitle,
         productsFound: allProductsFound,
         markdownContent: mainMarkdown,
-        indexedCount: totalIndexedProducts,
+        indexedCount: allProductsFound.length,
+        pagesCrawledCount: visitedUrls.size,
+        knowledgeChunksCount: totalKnowledgeChunks,
     };
+}
+/**
+ * Scrapes and indexes a specific single URL on demand
+ */
+async function scrapeSingleUrl(targetUrl, merchantId) {
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`);
+    }
+    catch {
+        throw new Error(`Invalid URL: ${targetUrl}`);
+    }
+    if (!isSafeUrl(parsedUrl)) {
+        throw new Error('Target URL resolves to a restricted/private address.');
+    }
+    // Delete previous chunks from this specific URL
+    await db_1.prisma.$executeRawUnsafe(`DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1 AND "url" = $2`, merchantId, parsedUrl.href).catch(() => { });
+    const response = await fetch(parsedUrl.href, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LabtoBot/2.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch URL: HTTP ${response.status} ${response.statusText}`);
+    }
+    const html = await response.text();
+    return await indexPageContent(parsedUrl.href, html, merchantId, parsedUrl.origin);
+}
+/**
+ * Add a manual custom text/FAQ knowledge chunk
+ */
+async function addManualKnowledgeChunk(merchantId, title, content, sourceUrl) {
+    const formattedContent = `# ${title}\nSource: ${sourceUrl || 'Merchant Dashboard Note'}\n\n${content}`;
+    const emb = await (0, embeddings_1.generateEmbedding)(formattedContent);
+    const chunk = await db_1.prisma.knowledgeChunk.create({
+        data: {
+            merchantId,
+            url: sourceUrl || `custom-note-${Date.now()}`,
+            content: formattedContent,
+        },
+    });
+    await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, chunk.id);
+    return chunk;
 }
