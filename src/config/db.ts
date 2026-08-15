@@ -7,9 +7,24 @@ export const prisma = new PrismaClient();
 
 const connectionString = env.DATABASE_URL;
 
+function getNeonSqlEndpoint(connStr: string): string {
+  try {
+    const sanitized = connStr.replace(/^postgres(ql)?:\/\//i, 'http://');
+    const parsed = new URL(sanitized);
+    return `https://${parsed.host}/sql`;
+  } catch {
+    return 'https://ep-long-cell-ay5y8og7-pooler.c-5.us-east-2.aws.neon.tech/sql';
+  }
+}
+
 // Raw HTTPS query helper for pgvector cosine similarity search
 export function executeRawNeonQuery<T = any>(query: string, params: any[] = []): Promise<T[]> {
   return new Promise((resolve, reject) => {
+    if (!connectionString) {
+      resolve([]);
+      return;
+    }
+
     let formattedQuery = query;
     params.forEach((param, index) => {
       let valStr = '';
@@ -17,16 +32,19 @@ export function executeRawNeonQuery<T = any>(query: string, params: any[] = []):
         valStr = `'[${param.join(',')}]'::vector`;
       } else if (typeof param === 'string') {
         valStr = `'${param.replace(/'/g, "''")}'`;
+      } else if (param === null || param === undefined) {
+        valStr = 'NULL';
       } else {
         valStr = String(param);
       }
       formattedQuery = formattedQuery.replace(new RegExp(`\\$${index + 1}`, 'g'), valStr);
     });
 
+    const endpoint = getNeonSqlEndpoint(connectionString);
     const data = JSON.stringify({ query: formattedQuery });
 
     const req = https.request(
-      'https://ep-long-cell-ay5y8og7-pooler.c-5.us-east-2.aws.neon.tech/sql',
+      endpoint,
       {
         method: 'POST',
         headers: {
@@ -48,13 +66,17 @@ export function executeRawNeonQuery<T = any>(query: string, params: any[] = []):
               resolve([]);
             }
           } else {
-            reject(new Error(`HTTP ${res.statusCode}: ${body}`));
+            logger.warn(`Neon HTTP SQL returned status ${res.statusCode}: ${body}`);
+            resolve([]);
           }
         });
       }
     );
 
-    req.on('error', (err) => reject(err));
+    req.on('error', (err) => {
+      logger.warn('Neon HTTPS request failed:', err.message);
+      resolve([]);
+    });
     req.write(data);
     req.end();
   });

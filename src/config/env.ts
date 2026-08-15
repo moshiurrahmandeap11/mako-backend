@@ -27,7 +27,7 @@ export const env = {
   BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || 'http://localhost:4000/api/auth',
   SMTP_HOST: process.env.SMTP_HOST || 'smtp.gmail.com',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10),
-  SMTP_USER: process.env.SMTP_USER || 'moshiurbhau@gmail.com',
-  SMTP_PASS: process.env.SMTP_PASS || 'vicp uvwv pcqj zehz',
-  SMTP_FROM: process.env.SMTP_FROM || 'Labto AI Assistant <moshiurbhau@gmail.com>',
+  SMTP_USER: process.env.SMTP_USER || '',
+  SMTP_PASS: process.env.SMTP_PASS || '',
+  SMTP_FROM: process.env.SMTP_FROM || 'Labto AI Assistant <no-reply@labto.ai>',
 };

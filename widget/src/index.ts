@@ -3,6 +3,11 @@ import { ChatWidget } from './ChatWidget';
 import { WidgetAPI } from './api';
 
 function initWidget() {
+  // Prevent duplicate mounting
+  if (document.getElementById('ai-shopping-widget-host')) {
+    return;
+  }
+
   // Find current script tag to extract data-api-key attribute
   const currentScript =
     (document.currentScript as HTMLScriptElement) ||
@@ -28,10 +33,32 @@ function initWidget() {
 
   const api = new WidgetAPI(baseUrl, apiKey);
 
-  // Mount container
+  // Mount Host Element and Shadow Root for complete CSS isolation
+  const hostElement = document.createElement('div');
+  hostElement.id = 'ai-shopping-widget-host';
+  document.body.appendChild(hostElement);
+
+  const shadowRoot = hostElement.attachShadow({ mode: 'open' });
+
+  // CSS reset applied strictly inside the Shadow Root
+  const style = document.createElement('style');
+  style.textContent = `
+    :host {
+      all: initial;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    button, input, textarea {
+      font-family: inherit;
+    }
+  `;
+  shadowRoot.appendChild(style);
+
   const container = document.createElement('div');
-  container.id = 'ai-shopping-widget-root';
-  document.body.appendChild(container);
+  container.id = 'ai-shopping-widget-container';
+  shadowRoot.appendChild(container);
 
   render(h(ChatWidget, { api, apiKey }), container);
 }

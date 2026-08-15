@@ -23,21 +23,54 @@ export interface ScrapeResult {
   indexedCount: number;
 }
 
+function isSafeUrl(url: URL): boolean {
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return false;
+  }
+  const hostname = url.hostname.toLowerCase();
+
+  // Reject local and private hostnames
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname === '0.0.0.0' ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.lan')
+  ) {
+    return false;
+  }
+
+  // Reject private and link-local IPv4 ranges
+  if (/^127\.\d+\.\d+\.\d+$/.test(hostname)) return false;
+  if (/^10\.\d+\.\d+\.\d+$/.test(hostname)) return false;
+  if (/^192\.168\.\d+\.\d+$/.test(hostname)) return false;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+$/.test(hostname)) return false;
+  if (/^169\.254\.\d+\.\d+$/.test(hostname)) return false; // Cloud metadata IP
+
+  return true;
+}
+
 export async function scrapeWebsite(targetUrl: string, merchantId: string): Promise<ScrapeResult> {
   logger.info(`Scraper: Starting deep web crawl for merchant ${merchantId} on ${targetUrl}`);
-
-  // Clear old knowledge chunks for this merchant to prevent duplicates and keep data fresh
-  try {
-    await prisma.$executeRawUnsafe(`DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1`, merchantId);
-  } catch (err) {
-    logger.error('Failed to clear old knowledge chunks:', err);
-  }
 
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`);
   } catch (err) {
     throw new Error(`Invalid target URL: ${targetUrl}`);
+  }
+
+  if (!isSafeUrl(parsedUrl)) {
+    throw new Error(`Target URL '${targetUrl}' is invalid or resolves to a restricted/private network address.`);
+  }
+
+  // Clear old knowledge chunks for this merchant to prevent duplicates and keep data fresh
+  try {
+    await prisma.$executeRawUnsafe(`DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1`, merchantId);
+  } catch (err) {
+    logger.error('Failed to clear old knowledge chunks:', err);
   }
 
   const visitedUrls = new Set<string>();
@@ -56,12 +89,16 @@ export async function scrapeWebsite(targetUrl: string, merchantId: string): Prom
     visitedUrls.add(currentUrlStr);
 
     try {
+      const currentUrlObj = new URL(currentUrlStr);
+      if (!isSafeUrl(currentUrlObj)) continue;
+
       logger.info(`Scraping page: ${currentUrlStr}`);
       const response = await fetch(currentUrlStr, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AI-Shopping-Scraper/1.0',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
+        signal: AbortSignal.timeout(10000), // 10s timeout per page
       });
 
       if (!response.ok) continue;

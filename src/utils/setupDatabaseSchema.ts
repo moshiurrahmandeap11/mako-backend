@@ -11,17 +11,28 @@ if (!connectionString) {
   process.exit(1);
 }
 
+function getNeonSqlEndpoint(connStr: string): string {
+  try {
+    const sanitized = connStr.replace(/^postgres(ql)?:\/\//i, 'http://');
+    const parsed = new URL(sanitized);
+    return `https://${parsed.host}/sql`;
+  } catch {
+    return 'https://ep-long-cell-ay5y8og7-pooler.c-5.us-east-2.aws.neon.tech/sql';
+  }
+}
+
 function executeQuery(query: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({ query });
+    const endpoint = getNeonSqlEndpoint(connectionString || '');
 
     const req = https.request(
-      'https://ep-long-cell-ay5y8og7-pooler.c-5.us-east-2.aws.neon.tech/sql',
+      endpoint,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Neon-Connection-String': connectionString,
+          'Neon-Connection-String': connectionString || '',
           'Content-Length': Buffer.byteLength(data),
         },
         family: 4, // Force IPv4
