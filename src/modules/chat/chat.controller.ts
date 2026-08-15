@@ -194,14 +194,31 @@ export async function getChatHistory(req: WidgetAuthRequest, res: Response): Pro
 
     const formattedMessages = conversation.messages.map((m) => {
       let products = undefined;
-      if (m.toolCalls && typeof m.toolCalls === 'object' && (m.toolCalls as any).recommendedProducts) {
-        products = (m.toolCalls as any).recommendedProducts;
+      let imageUrl = undefined;
+      if (m.toolCalls && typeof m.toolCalls === 'object') {
+        if ((m.toolCalls as any).recommendedProducts) {
+          products = (m.toolCalls as any).recommendedProducts;
+        }
+        if ((m.toolCalls as any).imageUrl) {
+          imageUrl = (m.toolCalls as any).imageUrl;
+        }
+      }
+
+      let cleanText = m.content || '';
+      if (cleanText.includes('data:image/')) {
+        const imgMatch = cleanText.match(/!\[Uploaded Image\]\((data:image\/[^)]+)\)/);
+        if (imgMatch && imgMatch[1]) {
+          if (!imageUrl) imageUrl = imgMatch[1];
+          cleanText = cleanText.replace(/!\[Uploaded Image\]\(data:image\/[^)]+\)/g, '').trim();
+        }
+        cleanText = cleanText.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '').trim();
       }
 
       return {
         id: m.id,
         sender: m.role === 'user' ? 'user' : 'bot',
-        text: m.content,
+        text: cleanText,
+        imageUrl,
         products,
         time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };

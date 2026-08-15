@@ -20,15 +20,23 @@ interface MessageItem {
 function renderMarkdownText(text: string) {
   if (!text) return null;
 
+  // Strip accidental base64 data URIs or markdown image tags from text bubbles
+  let clean = text
+    .replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '')
+    .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '')
+    .trim();
+
+  if (!clean) return null;
+
   // Comprehensive Regex: Markdown Links [title](url) | Bold **text** | Raw URLs (https?://...)
   const parts = [];
   const regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*|(https?:\/\/[^\s<>)"]+)/g;
   let lastIndex = 0;
   let match;
 
-  while ((match = regex.exec(text)) !== null) {
+  while ((match = regex.exec(clean)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(text.substring(lastIndex, match.index));
+      parts.push(clean.substring(lastIndex, match.index));
     }
 
     if (match[1] && match[2]) {

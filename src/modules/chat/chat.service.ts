@@ -140,12 +140,14 @@ export async function processChatMessage(
     });
   }
 
-  // Save user message to database
+  // Save user message to database (keep content clean without raw 200KB base64 strings)
+  const cleanUserText = userMessage || (imageUrl ? 'Analyzing attached image.' : '');
   await prisma.message.create({
     data: {
       conversationId: conversation.id,
       role: 'user',
-      content: imageUrl ? `${userMessage}\n\n![Uploaded Image](${imageUrl})` : userMessage,
+      content: cleanUserText,
+      toolCalls: imageUrl ? { imageUrl } : undefined,
     },
   });
 
@@ -158,8 +160,8 @@ export async function processChatMessage(
   // Perform Catalog & Knowledge RAG Search
   try {
     const [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
-      searchProductsTool(merchantId, userMessage, undefined, 5),
-      searchKnowledgeTool(merchantId, userMessage, 3)
+      searchProductsTool(merchantId, userMessage || 'general', undefined, 5),
+      searchKnowledgeTool(merchantId, userMessage || 'general', 3)
     ]);
 
     retrievedProducts = retrievedProductsRes;
@@ -187,7 +189,6 @@ export async function processChatMessage(
     }
 
     if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
-      // Generic fallback context when no specific data is retrieved for this query
       ragContext = `\n\n### Website Context:
 Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ''}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
@@ -196,20 +197,20 @@ Currently, no specific catalog items or knowledge base articles matched this que
     logger.error('RAG Search Error:', err);
   }
 
-  // Resolve LLM Provider
+  // Resolve LLM Provider & Vision Support
   let selectedProvider = provider || '';
   if (!selectedProvider) {
-    if (env.GROQ_API_KEY && !imageUrl) selectedProvider = 'groq';
+    if (env.GROQ_API_KEY) selectedProvider = 'groq';
     else if (env.OPENROUTER_API_KEY) selectedProvider = 'openrouter';
     else if (env.ANTHROPIC_API_KEY) selectedProvider = 'claude';
   }
 
   const systemPrompt = getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, template);
 
-  // Configure Client
+  // Configure Client & Model (Groq supports llama-3.2-11b-vision-preview for images)
   const openAiConfig =
     selectedProvider === 'groq' && groq
-      ? { client: groq, model: 'llama-3.3-70b-versatile' }
+      ? { client: groq, model: imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile' }
       : selectedProvider === 'openrouter' && openrouter
       ? { client: openrouter, model: 'google/gemini-2.5-flash' }
       : null;
@@ -218,13 +219,20 @@ Currently, no specific catalog items or knowledge base articles matched this que
     try {
       const { client, model } = openAiConfig;
       
-      const messagesParam: any[] = conversation.messages.map((m) => ({
-        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-        content: m.content,
-      }));
+      // Sanitize historical messages so huge base64 strings never poison the context window
+      const messagesParam: any[] = conversation.messages.map((m) => {
+        let text = m.content || '';
+        if (text.includes('data:image/')) {
+          text = text.replace(/!\[Uploaded Image\]\(data:image\/[^)]+\)/g, '[Image Attached]').replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image Attached]');
+        }
+        return {
+          role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+          content: text,
+        };
+      });
 
       // Construct user content (Multimodal Vision array if imageUrl present)
-      const formattedUserText = `### User Input:\n${userMessage || 'Analyzing attached image.'}`;
+      const formattedUserText = userMessage ? `### User Input:\n${userMessage}` : `Please analyze this attached image in the context of ${merchantName}.`;
       const userContent = imageUrl
         ? [
             { type: 'text', text: formattedUserText },
