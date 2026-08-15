@@ -44,10 +44,17 @@ function loadAiPromptsYaml(template) {
             filename = 'booking_and_scheduling.yml';
         else if (template === 'Customer Support & Sales')
             filename = 'customer_support_and_sales.yml';
-        const yamlPath = path_1.default.resolve(process.cwd(), `config/prompts/${filename}`);
-        if (fs_1.default.existsSync(yamlPath)) {
-            const content = fs_1.default.readFileSync(yamlPath, 'utf8');
-            return js_yaml_1.default.load(content);
+        const candidatePaths = [
+            path_1.default.resolve(process.cwd(), `config/prompts/${filename}`),
+            path_1.default.resolve(__dirname, `../../config/prompts/${filename}`),
+            path_1.default.resolve(__dirname, `../../../config/prompts/${filename}`),
+            path_1.default.resolve(__dirname, `../../../../config/prompts/${filename}`),
+        ];
+        for (const yamlPath of candidatePaths) {
+            if (fs_1.default.existsSync(yamlPath)) {
+                const content = fs_1.default.readFileSync(yamlPath, 'utf8');
+                return js_yaml_1.default.load(content);
+            }
         }
     }
     catch (err) {
@@ -71,23 +78,27 @@ function getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, tem
 ${customPrompt}`;
     }
     const yamlConfig = loadAiPromptsYaml(template);
-    const basePersona = yamlConfig?.system_instructions?.persona || `You are a helpful, polite, and knowledgeable AI Assistant.`;
+    const basePersona = yamlConfig?.system_instructions?.persona || `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
     const personaPrompt = `You are the official AI Assistant for "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}. ${basePersona}`;
     const rules = yamlConfig?.system_instructions?.strict_rules;
-    const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message.`;
-    const formatRule = rules?.formatting?.instructions || `Use GitHub Flavored Markdown formatting.`;
+    const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message. If the user writes in English, reply in English. If Bengali or Banglish, reply in Bengali.`;
+    const formatRule = rules?.formatting?.instructions || `Use clean GitHub Flavored Markdown formatting with bold titles and clickable link badges.`;
     const cartRule = rules?.cart_action?.instructions || ``;
-    const scopeRule = rules?.scope_lock?.instructions || ``;
+    const scopeLockRule = `STRICT DOMAIN & SCOPE LOCK:
+- You are EXCLUSIVELY the customer assistant and sales representative for "${merchantName}" (${primaryDomain || 'this website'}).
+- You must ONLY assist with questions directly related to ${merchantName}'s services, projects, portfolio, store products, pricing, agency capabilities, contact details, or company information.
+- NEVER write general programming code (e.g. Python scripts, games, algorithmic solutions, C++/Java code), solve general academic homework, or act as a general AI/ChatGPT.
+- If a user asks an out-of-scope query (e.g. "give me a snake game in python", general programming, trivia, recipes, or unrelated topics), you MUST POLITELY DECLINE. State clearly: "I am the AI assistant dedicated to ${merchantName}. I can only help you with questions about our projects, services, and website." and invite them to explore ${merchantName}'s offerings.`;
     return `${personaPrompt}
 
 Strict Rules:
 1. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
-2. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names (e.g., StudioX, Aura, Flow AI, etc.) or non-existent services.
+2. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
 3. STRICT CLICKABLE LINKS RULE: When mentioning any project, portfolio item, service, product, or page from the Website Knowledge Base or Catalog, you MUST ALWAYS format it as a clickable Markdown link with the title: \`[Title of Item](Full_URL)\`. NEVER print raw unformatted URLs like "Name: https://...". Always write \`[Title](https://...)\` directly.
-4. LANGUAGE RULE: ${langRule}
-5. FORMATTING RULE: ${formatRule}
-${cartRule ? `6. CART ACTION RULE: ${cartRule}` : ''}
-${scopeRule ? `7. SCOPE LOCK RULE: ${scopeRule}` : ''}`.trim();
+4. ${scopeLockRule}
+5. LANGUAGE RULE: ${langRule}
+6. FORMATTING RULE: ${formatRule}
+${cartRule ? `7. CART ACTION RULE: ${cartRule}` : ''}`.trim();
 }
 async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
     // Fetch merchant profile for branding & domain identity
