@@ -7,9 +7,9 @@ const cartBridge_1 = require("./cartBridge");
 function renderMarkdownText(text) {
     if (!text)
         return null;
-    // Simple Markdown Parser for Links [text](url) and Bold **text**
+    // Comprehensive Regex: Markdown Links [title](url) | Bold **text** | Raw URLs (https?://...)
     const parts = [];
-    const regex = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*/g;
+    const regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*|(https?:\/\/[^\s<>)"]+)/g;
     let lastIndex = 0;
     let match;
     while ((match = regex.exec(text)) !== null) {
@@ -17,12 +17,53 @@ function renderMarkdownText(text) {
             parts.push(text.substring(lastIndex, match.index));
         }
         if (match[1] && match[2]) {
-            // Link [text](url)
-            parts.push((0, jsx_runtime_1.jsx)("a", { href: match[2], target: "_blank", rel: "noreferrer", style: { color: '#2563eb', textDecoration: 'underline', fontWeight: '600' }, children: match[1] }));
+            // Markdown Link [text](url)
+            const linkTitle = match[1];
+            const linkUrl = match[2];
+            parts.push((0, jsx_runtime_1.jsxs)("a", { href: linkUrl, target: "_blank", rel: "noopener noreferrer", style: {
+                    color: '#1d4ed8',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    margin: '2px 0',
+                    lineHeight: '1.4',
+                    transition: 'all 0.15s ease',
+                }, children: [linkTitle, " ", (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', opacity: 0.7 }, children: "\u2197" })] }));
         }
         else if (match[3]) {
             // Bold **text**
-            parts.push((0, jsx_runtime_1.jsx)("strong", { style: { fontWeight: '700' }, children: match[3] }));
+            parts.push((0, jsx_runtime_1.jsx)("strong", { style: { fontWeight: '700', color: '#111827' }, children: match[3] }));
+        }
+        else if (match[4]) {
+            // Auto-convert raw URLs
+            const rawUrl = match[4];
+            let displayLabel = rawUrl;
+            try {
+                const u = new URL(rawUrl);
+                displayLabel = u.pathname.length > 1 ? u.pathname.replace(/^\//, '') : u.hostname;
+            }
+            catch { }
+            parts.push((0, jsx_runtime_1.jsxs)("a", { href: rawUrl, target: "_blank", rel: "noopener noreferrer", style: {
+                    color: '#1d4ed8',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    margin: '2px 0',
+                    lineHeight: '1.4',
+                    wordBreak: 'break-all',
+                }, children: [displayLabel, " ", (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', opacity: 0.7 }, children: "\u2197" })] }));
         }
         lastIndex = regex.lastIndex;
     }

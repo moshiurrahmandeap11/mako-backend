@@ -20,9 +20,9 @@ interface MessageItem {
 function renderMarkdownText(text: string) {
   if (!text) return null;
 
-  // Simple Markdown Parser for Links [text](url) and Bold **text**
+  // Comprehensive Regex: Markdown Links [title](url) | Bold **text** | Raw URLs (https?://...)
   const parts = [];
-  const regex = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*/g;
+  const regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*|(https?:\/\/[^\s<>)"]+)/g;
   let lastIndex = 0;
   let match;
 
@@ -32,20 +32,69 @@ function renderMarkdownText(text: string) {
     }
 
     if (match[1] && match[2]) {
-      // Link [text](url)
+      // Markdown Link [text](url)
+      const linkTitle = match[1];
+      const linkUrl = match[2];
       parts.push(
         <a
-          href={match[2]}
+          href={linkUrl}
           target="_blank"
-          rel="noreferrer"
-          style={{ color: '#2563eb', textDecoration: 'underline', fontWeight: '600' }}
+          rel="noopener noreferrer"
+          style={{
+            color: '#1d4ed8',
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            padding: '2px 8px',
+            borderRadius: '6px',
+            textDecoration: 'none',
+            fontWeight: '600',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            margin: '2px 0',
+            lineHeight: '1.4',
+            transition: 'all 0.15s ease',
+          }}
         >
-          {match[1]}
+          {linkTitle} <span style={{ fontSize: '11px', opacity: 0.7 }}>↗</span>
         </a>
       );
     } else if (match[3]) {
       // Bold **text**
-      parts.push(<strong style={{ fontWeight: '700' }}>{match[3]}</strong>);
+      parts.push(<strong style={{ fontWeight: '700', color: '#111827' }}>{match[3]}</strong>);
+    } else if (match[4]) {
+      // Auto-convert raw URLs
+      const rawUrl = match[4];
+      let displayLabel = rawUrl;
+      try {
+        const u = new URL(rawUrl);
+        displayLabel = u.pathname.length > 1 ? u.pathname.replace(/^\//, '') : u.hostname;
+      } catch {}
+
+      parts.push(
+        <a
+          href={rawUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: '#1d4ed8',
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            padding: '2px 8px',
+            borderRadius: '6px',
+            textDecoration: 'none',
+            fontWeight: '600',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            margin: '2px 0',
+            lineHeight: '1.4',
+            wordBreak: 'break-all',
+          }}
+        >
+          {displayLabel} <span style={{ fontSize: '11px', opacity: 0.7 }}>↗</span>
+        </a>
+      );
     }
 
     lastIndex = regex.lastIndex;
