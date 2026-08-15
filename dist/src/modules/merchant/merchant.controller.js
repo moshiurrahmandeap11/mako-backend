@@ -164,6 +164,7 @@ async function me(req, res) {
                 id: true,
                 name: true,
                 email: true,
+                role: true,
                 allowedDomains: true,
                 planTier: true,
                 createdAt: true,
@@ -174,7 +175,14 @@ async function me(req, res) {
             res.status(404).json({ error: 'Merchant not found.' });
             return;
         }
-        res.json({ merchant });
+        const adminEmail = (env_1.env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
+        const isAdmin = merchant.role === 'ADMIN' || merchant.email.trim().toLowerCase() === adminEmail;
+        res.json({
+            merchant: {
+                ...merchant,
+                isAdmin,
+            },
+        });
     }
     catch (error) {
         logger_1.logger.error('Get Merchant Profile Error:', error);

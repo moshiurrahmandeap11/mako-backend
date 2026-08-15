@@ -78,12 +78,20 @@ export async function authenticateDashboard(
   }
 }
 
+import { env } from '../config/env';
+
 export function requireAdmin(
   req: DashboardAuthRequest,
   res: Response,
   next: NextFunction
 ): void {
-  if (!req.merchant || (req.merchant.role !== 'ADMIN' && req.merchant.email !== 'admin@ahsanul.dev')) {
+  const adminEmail = (env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
+  const userEmail = req.merchant?.email?.trim().toLowerCase();
+  const isMerchantAdmin = Boolean(
+    req.merchant && (req.merchant.role === 'ADMIN' || (userEmail && userEmail === adminEmail))
+  );
+
+  if (!isMerchantAdmin) {
     res.status(403).json({ error: 'Forbidden. Admin access required.' });
     return;
   }

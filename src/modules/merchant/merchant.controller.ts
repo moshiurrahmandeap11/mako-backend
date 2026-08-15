@@ -147,6 +147,7 @@ export async function me(req: DashboardAuthRequest, res: Response): Promise<void
         id: true,
         name: true,
         email: true,
+        role: true,
         allowedDomains: true,
         planTier: true,
         createdAt: true,
@@ -159,7 +160,15 @@ export async function me(req: DashboardAuthRequest, res: Response): Promise<void
       return;
     }
 
-    res.json({ merchant });
+    const adminEmail = (env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
+    const isAdmin = merchant.role === 'ADMIN' || merchant.email.trim().toLowerCase() === adminEmail;
+
+    res.json({
+      merchant: {
+        ...merchant,
+        isAdmin,
+      },
+    });
   } catch (error) {
     logger.error('Get Merchant Profile Error:', error);
     res.status(500).json({ error: 'Failed to fetch merchant profile.' });

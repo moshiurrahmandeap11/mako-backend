@@ -30,4 +30,5 @@ export const env = {
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
   SMTP_FROM: process.env.SMTP_FROM || 'Labto AI Assistant <no-reply@labto.ai>',
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@ahsanul.dev',
 };

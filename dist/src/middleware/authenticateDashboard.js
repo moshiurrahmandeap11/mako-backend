@@ -61,8 +61,12 @@ async function authenticateDashboard(req, res, next) {
         res.status(401).json({ error: 'Unauthorized. Invalid or expired session.' });
     }
 }
+const env_1 = require("../config/env");
 function requireAdmin(req, res, next) {
-    if (!req.merchant || (req.merchant.role !== 'ADMIN' && req.merchant.email !== 'admin@ahsanul.dev')) {
+    const adminEmail = (env_1.env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
+    const userEmail = req.merchant?.email?.trim().toLowerCase();
+    const isMerchantAdmin = Boolean(req.merchant && (req.merchant.role === 'ADMIN' || (userEmail && userEmail === adminEmail)));
+    if (!isMerchantAdmin) {
         res.status(403).json({ error: 'Forbidden. Admin access required.' });
         return;
     }

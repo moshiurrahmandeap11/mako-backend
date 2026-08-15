@@ -1,9 +1,10 @@
 import { auth } from '../config/auth';
 import { prisma } from '../config/db';
 import { logger } from '../utils/logger';
+import { env } from '../config/env';
 
 export async function seedAdmin() {
-  const adminEmail = 'admin@ahsanul.dev';
+  const adminEmail = (env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim();
   const adminPassword = 'labtobit@#01';
   const adminName = 'Labto Admin';
 
