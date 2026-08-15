@@ -129,6 +129,72 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [windowOffset, setWindowOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [launcherOffset, setLauncherOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragStartRef = useRef<{ clientX: number; clientY: number; startX: number; startY: number; target: 'window' | 'launcher' } | null>(null);
+  const didDragRef = useRef<boolean>(false);
+
+  // Dragging event listeners for window & launcher
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const dx = e.clientX - dragStartRef.current.clientX;
+      const dy = e.clientY - dragStartRef.current.clientY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        didDragRef.current = true;
+      }
+      if (dragStartRef.current.target === 'window') {
+        setWindowOffset({
+          x: dragStartRef.current.startX + dx,
+          y: dragStartRef.current.startY + dy,
+        });
+      } else {
+        setLauncherOffset({
+          x: dragStartRef.current.startX + dx,
+          y: dragStartRef.current.startY + dy,
+        });
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragStartRef.current || !e.touches[0]) return;
+      const dx = e.touches[0].clientX - dragStartRef.current.clientX;
+      const dy = e.touches[0].clientY - dragStartRef.current.clientY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        didDragRef.current = true;
+      }
+      if (dragStartRef.current.target === 'window') {
+        setWindowOffset({
+          x: dragStartRef.current.startX + dx,
+          y: dragStartRef.current.startY + dy,
+        });
+      } else {
+        setLauncherOffset({
+          x: dragStartRef.current.startX + dx,
+          y: dragStartRef.current.startY + dy,
+        });
+      }
+    };
+
+    const onEnd = () => {
+      dragStartRef.current = null;
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+  }, []);
+
   // Resize listener for mobile viewport
   useEffect(() => {
     const handleResize = () => {
@@ -288,12 +354,46 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         left: isLeft ? '24px' : 'auto',
         zIndex: 999999,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        transform: isMobile
+          ? 'none'
+          : isOpen
+          ? (windowOffset.x !== 0 || windowOffset.y !== 0 ? `translate3d(${windowOffset.x}px, ${windowOffset.y}px, 0)` : 'none')
+          : (launcherOffset.x !== 0 || launcherOffset.y !== 0 ? `translate3d(${launcherOffset.x}px, ${launcherOffset.y}px, 0)` : 'none'),
+        touchAction: isMobile ? 'auto' : 'none',
+        userSelect: isDragging ? 'none' : 'auto',
       }}
     >
-      {/* Floating Chat Launcher Button */}
+      {/* Floating Chat Launcher Button (Draggable) */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onMouseDown={(e: MouseEvent) => {
+            dragStartRef.current = {
+              clientX: e.clientX,
+              clientY: e.clientY,
+              startX: launcherOffset.x,
+              startY: launcherOffset.y,
+              target: 'launcher',
+            };
+            didDragRef.current = false;
+            setIsDragging(true);
+          }}
+          onTouchStart={(e: TouchEvent) => {
+            if (!e.touches[0]) return;
+            dragStartRef.current = {
+              clientX: e.touches[0].clientX,
+              clientY: e.touches[0].clientY,
+              startX: launcherOffset.x,
+              startY: launcherOffset.y,
+              target: 'launcher',
+            };
+            didDragRef.current = false;
+            setIsDragging(true);
+          }}
+          onClick={() => {
+            if (!didDragRef.current) {
+              setIsOpen(true);
+            }
+          }}
           style={{
             backgroundColor: primaryColor,
             color: '#ffffff',
@@ -302,14 +402,16 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             padding: '14px 22px',
             fontSize: '15px',
             fontWeight: '600',
-            cursor: 'pointer',
+            cursor: isDragging ? 'grabbing' : 'grab',
             boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+            userSelect: 'none',
+            transition: isDragging ? 'none' : 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
         >
+          <span style={{ opacity: 0.6, fontSize: '13px', letterSpacing: '-1px' }}>⠿</span>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
@@ -317,7 +419,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         </button>
       )}
 
-      {/* Expandable Chat Window */}
+      {/* Expandable Chat Window (Draggable Header) */}
       {isOpen && (
         <div
           style={{
@@ -340,8 +442,34 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             border: isMobile ? 'none' : '1px solid #e5e7eb',
           }}
         >
-          {/* Header */}
+          {/* Header (Drag Handle) */}
           <div
+            onMouseDown={(e: MouseEvent) => {
+              if ((e.target as HTMLElement)?.closest('button')) return;
+              if (isMobile) return;
+              dragStartRef.current = {
+                clientX: e.clientX,
+                clientY: e.clientY,
+                startX: windowOffset.x,
+                startY: windowOffset.y,
+                target: 'window',
+              };
+              didDragRef.current = false;
+              setIsDragging(true);
+            }}
+            onTouchStart={(e: TouchEvent) => {
+              if ((e.target as HTMLElement)?.closest('button')) return;
+              if (isMobile || !e.touches[0]) return;
+              dragStartRef.current = {
+                clientX: e.touches[0].clientX,
+                clientY: e.touches[0].clientY,
+                startX: windowOffset.x,
+                startY: windowOffset.y,
+                target: 'window',
+              };
+              didDragRef.current = false;
+              setIsDragging(true);
+            }}
             style={{
               backgroundColor: primaryColor,
               color: '#ffffff',
@@ -349,20 +477,29 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              cursor: isMobile ? 'default' : isDragging ? 'grabbing' : 'grab',
+              userSelect: 'none',
             }}
+            title="Click and drag to move chat window"
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ opacity: 0.5, fontSize: '14px', letterSpacing: '-1px' }}>⠿</span>
               <div
                 style={{
                   width: '10px',
                   height: '10px',
                   borderRadius: '50%',
                   backgroundColor: '#10b981',
+                  boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.25)',
                 }}
               />
               <div>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>{config.botName}</h3>
-                <span style={{ fontSize: '11px', opacity: 0.85 }}>Online • Labto AI Assistant</span>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#ffffff' }}>
+                  {config.botName || 'Shop Assistant'}
+                </h3>
+                <span style={{ fontSize: '11px', opacity: 0.8, color: '#e5e7eb' }}>
+                  Online • Labto AI Assistant
+                </span>
               </div>
             </div>
             <button

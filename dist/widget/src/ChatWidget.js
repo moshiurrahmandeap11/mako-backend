@@ -91,6 +91,70 @@ function ChatWidget({ api }) {
     const [isLoading, setIsLoading] = (0, hooks_1.useState)(false);
     const messagesEndRef = (0, hooks_1.useRef)(null);
     const fileInputRef = (0, hooks_1.useRef)(null);
+    const [windowOffset, setWindowOffset] = (0, hooks_1.useState)({ x: 0, y: 0 });
+    const [launcherOffset, setLauncherOffset] = (0, hooks_1.useState)({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = (0, hooks_1.useState)(false);
+    const dragStartRef = (0, hooks_1.useRef)(null);
+    const didDragRef = (0, hooks_1.useRef)(false);
+    // Dragging event listeners for window & launcher
+    (0, hooks_1.useEffect)(() => {
+        const onMouseMove = (e) => {
+            if (!dragStartRef.current)
+                return;
+            const dx = e.clientX - dragStartRef.current.clientX;
+            const dy = e.clientY - dragStartRef.current.clientY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                didDragRef.current = true;
+            }
+            if (dragStartRef.current.target === 'window') {
+                setWindowOffset({
+                    x: dragStartRef.current.startX + dx,
+                    y: dragStartRef.current.startY + dy,
+                });
+            }
+            else {
+                setLauncherOffset({
+                    x: dragStartRef.current.startX + dx,
+                    y: dragStartRef.current.startY + dy,
+                });
+            }
+        };
+        const onTouchMove = (e) => {
+            if (!dragStartRef.current || !e.touches[0])
+                return;
+            const dx = e.touches[0].clientX - dragStartRef.current.clientX;
+            const dy = e.touches[0].clientY - dragStartRef.current.clientY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                didDragRef.current = true;
+            }
+            if (dragStartRef.current.target === 'window') {
+                setWindowOffset({
+                    x: dragStartRef.current.startX + dx,
+                    y: dragStartRef.current.startY + dy,
+                });
+            }
+            else {
+                setLauncherOffset({
+                    x: dragStartRef.current.startX + dx,
+                    y: dragStartRef.current.startY + dy,
+                });
+            }
+        };
+        const onEnd = () => {
+            dragStartRef.current = null;
+            setIsDragging(false);
+        };
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+        window.addEventListener('touchend', onEnd);
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onEnd);
+            window.removeEventListener('touchmove', onTouchMove);
+            window.removeEventListener('touchend', onEnd);
+        };
+    }, []);
     // Resize listener for mobile viewport
     (0, hooks_1.useEffect)(() => {
         const handleResize = () => {
@@ -236,7 +300,40 @@ function ChatWidget({ api }) {
             left: isLeft ? '24px' : 'auto',
             zIndex: 999999,
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        }, children: [!isOpen && ((0, jsx_runtime_1.jsxs)("button", { onClick: () => setIsOpen(true), style: {
+            transform: isMobile
+                ? 'none'
+                : isOpen
+                    ? (windowOffset.x !== 0 || windowOffset.y !== 0 ? `translate3d(${windowOffset.x}px, ${windowOffset.y}px, 0)` : 'none')
+                    : (launcherOffset.x !== 0 || launcherOffset.y !== 0 ? `translate3d(${launcherOffset.x}px, ${launcherOffset.y}px, 0)` : 'none'),
+            touchAction: isMobile ? 'auto' : 'none',
+            userSelect: isDragging ? 'none' : 'auto',
+        }, children: [!isOpen && ((0, jsx_runtime_1.jsxs)("button", { onMouseDown: (e) => {
+                    dragStartRef.current = {
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        startX: launcherOffset.x,
+                        startY: launcherOffset.y,
+                        target: 'launcher',
+                    };
+                    didDragRef.current = false;
+                    setIsDragging(true);
+                }, onTouchStart: (e) => {
+                    if (!e.touches[0])
+                        return;
+                    dragStartRef.current = {
+                        clientX: e.touches[0].clientX,
+                        clientY: e.touches[0].clientY,
+                        startX: launcherOffset.x,
+                        startY: launcherOffset.y,
+                        target: 'launcher',
+                    };
+                    didDragRef.current = false;
+                    setIsDragging(true);
+                }, onClick: () => {
+                    if (!didDragRef.current) {
+                        setIsOpen(true);
+                    }
+                }, style: {
                     backgroundColor: primaryColor,
                     color: '#ffffff',
                     border: 'none',
@@ -244,13 +341,14 @@ function ChatWidget({ api }) {
                     padding: '14px 22px',
                     fontSize: '15px',
                     fontWeight: '600',
-                    cursor: 'pointer',
+                    cursor: isDragging ? 'grabbing' : 'grab',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                }, children: [(0, jsx_runtime_1.jsx)("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: (0, jsx_runtime_1.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }) }), (0, jsx_runtime_1.jsx)("span", { children: "Chat with AI" })] })), isOpen && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                    userSelect: 'none',
+                    transition: isDragging ? 'none' : 'transform 0.2s ease, box-shadow 0.2s ease',
+                }, children: [(0, jsx_runtime_1.jsx)("span", { style: { opacity: 0.6, fontSize: '13px', letterSpacing: '-1px' }, children: "\u283F" }), (0, jsx_runtime_1.jsx)("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: (0, jsx_runtime_1.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }) }), (0, jsx_runtime_1.jsx)("span", { children: "Chat with AI" })] })), isOpen && ((0, jsx_runtime_1.jsxs)("div", { style: {
                     position: isMobile ? 'fixed' : 'relative',
                     top: isMobile ? '0' : 'auto',
                     left: isMobile ? '0' : 'auto',
@@ -268,19 +366,50 @@ function ChatWidget({ api }) {
                     flexDirection: 'column',
                     overflow: 'hidden',
                     border: isMobile ? 'none' : '1px solid #e5e7eb',
-                }, children: [(0, jsx_runtime_1.jsxs)("div", { style: {
+                }, children: [(0, jsx_runtime_1.jsxs)("div", { onMouseDown: (e) => {
+                            if (e.target?.closest('button'))
+                                return;
+                            if (isMobile)
+                                return;
+                            dragStartRef.current = {
+                                clientX: e.clientX,
+                                clientY: e.clientY,
+                                startX: windowOffset.x,
+                                startY: windowOffset.y,
+                                target: 'window',
+                            };
+                            didDragRef.current = false;
+                            setIsDragging(true);
+                        }, onTouchStart: (e) => {
+                            if (e.target?.closest('button'))
+                                return;
+                            if (isMobile || !e.touches[0])
+                                return;
+                            dragStartRef.current = {
+                                clientX: e.touches[0].clientX,
+                                clientY: e.touches[0].clientY,
+                                startX: windowOffset.x,
+                                startY: windowOffset.y,
+                                target: 'window',
+                            };
+                            didDragRef.current = false;
+                            setIsDragging(true);
+                        }, style: {
                             backgroundColor: primaryColor,
                             color: '#ffffff',
                             padding: '16px 20px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                        }, children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' }, children: [(0, jsx_runtime_1.jsx)("div", { style: {
+                            cursor: isMobile ? 'default' : isDragging ? 'grabbing' : 'grab',
+                            userSelect: 'none',
+                        }, title: "Click and drag to move chat window", children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { opacity: 0.5, fontSize: '14px', letterSpacing: '-1px' }, children: "\u283F" }), (0, jsx_runtime_1.jsx)("div", { style: {
                                             width: '10px',
                                             height: '10px',
                                             borderRadius: '50%',
                                             backgroundColor: '#10b981',
-                                        } }), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: { margin: 0, fontSize: '16px', fontWeight: '600' }, children: config.botName }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', opacity: 0.85 }, children: "Online \u2022 Labto AI Assistant" })] })] }), (0, jsx_runtime_1.jsx)("button", { onClick: () => setIsOpen(false), style: {
+                                            boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.25)',
+                                        } }), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: { margin: 0, fontSize: '15px', fontWeight: '600', color: '#ffffff' }, children: config.botName || 'Shop Assistant' }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', opacity: 0.8, color: '#e5e7eb' }, children: "Online \u2022 Labto AI Assistant" })] })] }), (0, jsx_runtime_1.jsx)("button", { onClick: () => setIsOpen(false), style: {
                                     background: 'transparent',
                                     border: 'none',
                                     color: '#ffffff',
