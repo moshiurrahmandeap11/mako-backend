@@ -10,17 +10,18 @@ export interface DashboardAuthRequest extends Request {
     email: string;
     name: string;
     planTier: string;
+    role: string;
   };
 }
 
-const planTierCache = new Map<string, { tier: string; expires: number }>();
+const userMetaCache = new Map<string, { tier: string; role: string; expires: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function clearPlanTierCache(userId?: string) {
   if (userId) {
-    planTierCache.delete(userId);
+    userMetaCache.delete(userId);
   } else {
-    planTierCache.clear();
+    userMetaCache.clear();
   }
 }
 
@@ -41,22 +42,25 @@ export async function authenticateDashboard(
 
     const userId = session.user.id;
     let planTier = 'FREE';
+    let role = 'MERCHANT';
     const now = Date.now();
-    const cached = planTierCache.get(userId);
+    const cached = userMetaCache.get(userId);
 
     if (cached && cached.expires > now) {
       planTier = cached.tier;
+      role = cached.role;
     } else {
       const dbUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { planTier: true },
+        select: { planTier: true, role: true, email: true },
       });
       planTier = dbUser?.planTier || 'FREE';
+      role = dbUser?.role || (dbUser?.email === 'admin@ahsanul.dev' ? 'ADMIN' : 'MERCHANT');
       
       // Cleanup to prevent memory leaks over time
-      if (planTierCache.size > 1000) planTierCache.clear();
+      if (userMetaCache.size > 1000) userMetaCache.clear();
       
-      planTierCache.set(userId, { tier: planTier, expires: now + CACHE_TTL_MS });
+      userMetaCache.set(userId, { tier: planTier, role, expires: now + CACHE_TTL_MS });
     }
 
     req.merchant = {
@@ -64,6 +68,7 @@ export async function authenticateDashboard(
       email: session.user.email,
       name: session.user.name,
       planTier,
+      role,
     };
 
     next();
@@ -71,4 +76,16 @@ export async function authenticateDashboard(
     logger.warn('Dashboard Auth Failed:', error);
     res.status(401).json({ error: 'Unauthorized. Invalid or expired session.' });
   }
+}
+
+export function requireAdmin(
+  req: DashboardAuthRequest,
+  res: Response,
+  next: NextFunction
+): void {
+  if (!req.merchant || (req.merchant.role !== 'ADMIN' && req.merchant.email !== 'admin@ahsanul.dev')) {
+    res.status(403).json({ error: 'Forbidden. Admin access required.' });
+    return;
+  }
+  next();
 }

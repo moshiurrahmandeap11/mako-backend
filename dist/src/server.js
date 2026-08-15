@@ -21,6 +21,7 @@ const chat_routes_1 = __importDefault(require("./modules/chat/chat.routes"));
 const analytics_routes_1 = __importDefault(require("./modules/analytics/analytics.routes"));
 const billing_routes_1 = __importDefault(require("./modules/billing/billing.routes"));
 const knowledge_routes_1 = __importDefault(require("./modules/knowledge/knowledge.routes"));
+const admin_routes_1 = require("./modules/admin/admin.routes");
 const cron_1 = require("./jobs/cron");
 const app = (0, express_1.default)();
 app.set('trust proxy', 1);
@@ -74,6 +75,7 @@ app.use('/api/widget-config', widgetConfig_routes_1.default);
 app.use('/api/widget', chat_routes_1.default);
 app.use('/api/analytics', analytics_routes_1.default);
 app.use('/api/knowledge', knowledge_routes_1.default);
+app.use('/api/admin', admin_routes_1.adminRouter);
 // Global Error Handler
 app.use((err, req, res, next) => {
     logger_1.logger.error('Unhandled Server Error:', err);

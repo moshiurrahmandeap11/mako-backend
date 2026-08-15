@@ -89,16 +89,22 @@ ${customPrompt}`;
 - You must ONLY assist with questions directly related to ${merchantName}'s services, projects, portfolio, store products, pricing, agency capabilities, contact details, or company information.
 - NEVER write general programming code (e.g. Python scripts, games, algorithmic solutions, C++/Java code), solve general academic homework, or act as a general AI/ChatGPT.
 - If a user asks an out-of-scope query (e.g. "give me a snake game in python", general programming, trivia, recipes, or unrelated topics), you MUST POLITELY DECLINE. State clearly: "I am the AI assistant dedicated to ${merchantName}. I can only help you with questions about our projects, services, and website." and invite them to explore ${merchantName}'s offerings.`;
+    const tokenEfficiencyRule = `TOKEN EFFICIENCY & DIRECTNESS (CRITICAL):
+- Answer DIRECTLY and concisely. Answer ONLY what the user asked.
+- NEVER add introductory filler (e.g. "Certainly!", "I would be happy to help!", "Here is what you requested:").
+- NEVER add repetitive conversational filler or closing pleasantries (e.g. "Please let me know if you need anything else!").
+- Keep paragraphs brief, high-density, and structured with bold keywords and bullet points.`;
     return `${personaPrompt}
 
 Strict Rules:
 1. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
 2. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
 3. STRICT CLICKABLE LINKS RULE: When mentioning any project, portfolio item, service, product, or page from the Website Knowledge Base or Catalog, you MUST ALWAYS format it as a clickable Markdown link with the title: \`[Title of Item](Full_URL)\`. NEVER print raw unformatted URLs like "Name: https://...". Always write \`[Title](https://...)\` directly.
-4. ${scopeLockRule}
-5. LANGUAGE RULE: ${langRule}
-6. FORMATTING RULE: ${formatRule}
-${cartRule ? `7. CART ACTION RULE: ${cartRule}` : ''}`.trim();
+4. ${tokenEfficiencyRule}
+5. ${scopeLockRule}
+6. LANGUAGE RULE: ${langRule}
+7. FORMATTING RULE: ${formatRule}
+${cartRule ? `8. CART ACTION RULE: ${cartRule}` : ''}`.trim();
 }
 async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
     // Fetch merchant profile for branding & domain identity
@@ -207,14 +213,20 @@ Currently, no specific catalog items or knowledge base articles matched this que
                 ]
                 : formattedUserText;
             messagesParam.push({ role: 'user', content: userContent });
+            let totalTokensUsed = 0;
             const completion = await client.chat.completions.create({
                 model: model,
+                max_tokens: 380,
+                temperature: 0.3,
                 messages: [
                     { role: 'system', content: systemPrompt + ragContext },
                     ...messagesParam,
                 ],
             });
             finalReply = completion.choices[0].message.content || '';
+            if (completion.usage) {
+                totalTokensUsed = completion.usage.total_tokens || 0;
+            }
         }
         catch (error) {
             logger_1.logger.error(`OpenAI provider (${selectedProvider}) call error, falling back to local:`, error);
@@ -230,7 +242,8 @@ Currently, no specific catalog items or knowledge base articles matched this que
             messagesParam.push({ role: 'user', content: userMessage });
             const response = await anthropic.messages.create({
                 model: 'claude-3-5-sonnet-20241022',
-                max_tokens: 1024,
+                max_tokens: 380,
+                temperature: 0.3,
                 system: systemPrompt + ragContext,
                 messages: messagesParam,
             });
@@ -251,13 +264,13 @@ Currently, no specific catalog items or knowledge base articles matched this que
         }
         else {
             if (botMode === 'support' || template === 'Customer Support') {
-                finalReply = `I am here to support you! Let me know if you need help with orders, shipping, or returns.`;
+                finalReply = `I am here to assist with questions about our company, services, and projects.`;
             }
             else if (botMode === 'sales') {
-                finalReply = `Welcome to our store! We have the best deals waiting for you. What are you looking to buy today?`;
+                finalReply = `Welcome! How can I assist you with our services and projects today?`;
             }
             else {
-                finalReply = `Welcome! How can I help you find items in our store today?`;
+                finalReply = `Welcome! How can I help you explore our website today?`;
             }
         }
     }
@@ -282,12 +295,15 @@ Currently, no specific catalog items or knowledge base articles matched this que
     if (recommendedProducts.length === 0 && retrievedProducts.length > 0) {
         recommendedProducts = retrievedProducts;
     }
+    // Calculate estimated tokens if not provided by API
+    const estimatedTokens = Math.max(15, Math.ceil(((userMessage || '').length + (finalReply || '').length) / 3.6));
     // Save assistant reply to database
     await db_1.prisma.message.create({
         data: {
             conversationId: conversation.id,
             role: 'assistant',
             content: finalReply,
+            tokensUsed: estimatedTokens,
             toolCalls: recommendedProducts.length > 0 || cartAction ? { recommendedProducts, cartAction } : undefined,
         },
     });

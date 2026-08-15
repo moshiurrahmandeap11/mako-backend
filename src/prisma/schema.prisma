@@ -20,6 +20,7 @@ model User {
   // Custom merchant fields
   allowedDomains String[]
   planTier       PlanTier      @default(FREE)
+  role           String        @default("MERCHANT")
 
   // Stripe Billing fields
   stripeCustomerId     String?   @unique
@@ -116,6 +117,7 @@ model Message {
   role           String
   content        String
   toolCalls      Json?
+  tokensUsed     Int?         @default(0)
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
