@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createSession, getWidgetConfigPublic, chat, pingVisitor, getChatHistory } from './chat.controller';
 import { authenticateWidget } from '../../middleware/authenticateWidget';
 import { rateLimitWidget } from '../../middleware/rateLimitWidget';
+import { rateLimitBurst } from '../../middleware/rateLimitBurst';
 
 const router = Router();
 
@@ -10,7 +11,7 @@ router.use(authenticateWidget as any);
 router.post('/session', createSession as any);
 router.get('/config', getWidgetConfigPublic as any);
 router.get('/history', getChatHistory as any);
-router.post('/chat', rateLimitWidget as any, chat as any);
+router.post('/chat', rateLimitBurst as any, rateLimitWidget as any, chat as any);
 router.post('/ping', pingVisitor as any);
 
 export default router;

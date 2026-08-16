@@ -6,6 +6,7 @@ import path from 'path';
 import { prisma } from '../../config/db';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
+import { keyRotator } from '../../utils/keyRotator';
 import { searchProductsTool } from './tools/searchProducts.tool';
 import { searchKnowledgeTool } from './tools/searchKnowledge.tool';
 import { addToCartTool } from './tools/addToCart.tool';
@@ -207,87 +208,115 @@ Currently, no specific catalog items or knowledge base articles matched this que
   // Resolve LLM Provider & Vision Support
   let selectedProvider = provider || '';
   if (!selectedProvider) {
-    if (env.GROQ_API_KEY) selectedProvider = 'groq';
-    else if (env.OPENROUTER_API_KEY) selectedProvider = 'openrouter';
-    else if (env.ANTHROPIC_API_KEY) selectedProvider = 'claude';
+    if (keyRotator.hasGroqKeys()) selectedProvider = 'groq';
+    else if (keyRotator.hasOpenRouterKeys()) selectedProvider = 'openrouter';
+    else if (keyRotator.hasAnthropicKeys()) selectedProvider = 'claude';
   }
 
   const systemPrompt = getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, template);
 
-  // Configure Client & Model (Groq supports llama-3.2-11b-vision-preview for images)
-  const openAiConfig =
-    selectedProvider === 'groq' && groq
-      ? { client: groq, model: imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile' }
-      : selectedProvider === 'openrouter' && openrouter
-      ? { client: openrouter, model: 'google/gemini-2.5-flash' }
-      : null;
-
-  if (openAiConfig) {
-    try {
-      const { client, model } = openAiConfig;
-      
-      // Sanitize historical messages so huge base64 strings never poison the context window
-      const messagesParam: any[] = conversation.messages.map((m) => {
-        let text = m.content || '';
-        if (text.includes('data:image/')) {
-          text = text.replace(/!\[Uploaded Image\]\(data:image\/[^)]+\)/g, '[Image Attached]').replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image Attached]');
-        }
-        return {
-          role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-          content: text,
-        };
-      });
-
-      // Construct user content (Multimodal Vision array if imageUrl present)
-      const formattedUserText = userMessage ? `### User Input:\n${userMessage}` : `Please analyze this attached image in the context of ${merchantName}.`;
-      const userContent = imageUrl
-        ? [
-            { type: 'text', text: formattedUserText },
-            { type: 'image_url', image_url: { url: imageUrl } },
-          ]
-        : formattedUserText;
-
-      messagesParam.push({ role: 'user', content: userContent as any });
-
-      let totalTokensUsed = 0;
-      const completion = await client.chat.completions.create({
-        model: model,
-        max_tokens: 380,
-        temperature: 0.3,
-        messages: [
-          { role: 'system', content: systemPrompt + ragContext },
-          ...messagesParam,
-        ],
-      });
-
-      finalReply = completion.choices[0].message.content || '';
-      if (completion.usage) {
-        totalTokensUsed = completion.usage.total_tokens || 0;
-      }
-    } catch (error) {
-      logger.error(`OpenAI provider (${selectedProvider}) call error, falling back to local:`, error);
-      selectedProvider = 'fallback';
+  // Construct historical messages
+  const messagesParam: any[] = conversation.messages.map((m) => {
+    let text = m.content || '';
+    if (text.includes('data:image/')) {
+      text = text
+        .replace(/!\[Uploaded Image\]\(data:image\/[^)]+\)/g, '[Image Attached]')
+        .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image Attached]');
     }
-  } else if (selectedProvider === 'claude' && anthropic) {
+    return {
+      role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+      content: text,
+    };
+  });
+
+  // Construct user content (Multimodal Vision array if imageUrl present)
+  const formattedUserText = userMessage
+    ? `### User Input:\n${userMessage}`
+    : `Please analyze this attached image in the context of ${merchantName}.`;
+  const userContent = imageUrl
+    ? [
+        { type: 'text', text: formattedUserText },
+        { type: 'image_url', image_url: { url: imageUrl } },
+      ]
+    : formattedUserText;
+
+  messagesParam.push({ role: 'user', content: userContent as any });
+
+  let executionSuccess = false;
+  let estimatedTokens = 0;
+
+  // Attempt 1: Primary Provider (Groq)
+  if (selectedProvider === 'groq' && keyRotator.hasGroqKeys()) {
     try {
-      const messagesParam = conversation.messages.map((m) => ({
-        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-        content: m.content,
-      }));
-      messagesParam.push({ role: 'user' as const, content: userMessage });
-
-      const response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 380,
-        temperature: 0.3,
-        system: systemPrompt + ragContext,
-        messages: messagesParam,
-      });
-
-      const textBlock = response.content.find((c) => c.type === 'text');
-      finalReply = textBlock && 'text' in textBlock ? textBlock.text : '';
+      const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+      const result = await keyRotator.executeGroqCompletion(
+        model,
+        [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
+        380
+      );
+      finalReply = result.content;
+      estimatedTokens = result.tokensUsed;
+      executionSuccess = true;
     } catch (error) {
-      logger.error('Anthropic API Call Error, falling back to local:', error);
+      logger.error('Groq provider pool failed, falling back to Gemini pool:', error);
+      selectedProvider = 'gemini';
+    }
+  }
+
+  // Attempt 2: Direct Google Gemini AI Studio Pool
+  if (!executionSuccess && (selectedProvider === 'gemini' || keyRotator.hasGeminiKeys())) {
+    try {
+      const result = await keyRotator.executeGeminiCompletion(
+        'gemini-3.6-flash',
+        [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
+        380
+      );
+      finalReply = result.content;
+      estimatedTokens = result.tokensUsed;
+      executionSuccess = true;
+    } catch (error) {
+      logger.error('Gemini provider pool failed, falling back to OpenRouter pool:', error);
+      selectedProvider = 'openrouter';
+    }
+  }
+
+  // Attempt 3: Fallback to OpenRouter
+  if (!executionSuccess && (selectedProvider === 'openrouter' || keyRotator.hasOpenRouterKeys())) {
+    try {
+      const result = await keyRotator.executeOpenRouterCompletion(
+        'google/gemini-2.5-flash',
+        [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
+        380
+      );
+      finalReply = result.content;
+      estimatedTokens = result.tokensUsed;
+      executionSuccess = true;
+    } catch (error) {
+      logger.error('OpenRouter provider pool failed, falling back to Anthropic:', error);
+      selectedProvider = 'claude';
+    }
+  }
+
+  // Attempt 3: Fallback to Anthropic
+  if (!executionSuccess && (selectedProvider === 'claude' || keyRotator.hasAnthropicKeys())) {
+    try {
+      const anthropicMessages = conversation.messages.map((m) => ({
+        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+        content: m.content || '',
+      }));
+      anthropicMessages.push({ role: 'user' as const, content: userMessage });
+
+      const result = await keyRotator.executeAnthropicCompletion(
+        'claude-3-5-sonnet-20241022',
+        systemPrompt + ragContext,
+        anthropicMessages,
+        380
+      );
+      finalReply = result.content;
+      estimatedTokens = result.tokensUsed;
+      executionSuccess = true;
+    } catch (error) {
+      logger.error('Anthropic provider pool failed:', error);
       selectedProvider = 'fallback';
     }
   }
@@ -330,10 +359,12 @@ Currently, no specific catalog items or knowledge base articles matched this que
   }
 
   // Calculate estimated tokens if not provided by API
-  const estimatedTokens = Math.max(
-    15,
-    Math.ceil(((userMessage || '').length + (finalReply || '').length) / 3.6)
-  );
+  if (!estimatedTokens) {
+    estimatedTokens = Math.max(
+      15,
+      Math.ceil(((userMessage || '').length + (finalReply || '').length) / 3.6)
+    );
+  }
 
   // Save assistant reply to database
   await prisma.message.create({
