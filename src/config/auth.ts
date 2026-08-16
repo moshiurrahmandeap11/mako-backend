@@ -6,6 +6,7 @@ import { env } from './env';
 import { sendOtpEmail } from '../utils/email';
 
 export const auth = betterAuth({
+  baseURL: env.BETTER_AUTH_URL || 'https://labto.ahsanul.dev/api/auth',
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
@@ -75,5 +76,5 @@ export const auth = betterAuth({
     'http://localhost:3001',
     'http://127.0.0.1:3001',
   ].filter(Boolean),
-  secret: env.JWT_SECRET || 'fallback_jwt_secret_dev_key_32chars_min',
+  secret: env.BETTER_AUTH_SECRET || env.JWT_SECRET || 'fallback_jwt_secret_dev_key_32chars_min',
 });
