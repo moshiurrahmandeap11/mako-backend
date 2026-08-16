@@ -129,6 +129,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     hideBranding: false,
     eventBridgeEnabled: false,
   });
+  const isLeft = config.position === 'bottom-left';
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -185,7 +186,39 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       }
     };
 
+    const calculateSnap = (target: 'window' | 'launcher', currentX: number, currentY: number) => {
+      if (typeof window === 'undefined') return { x: currentX, y: currentY };
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+
+      const elemWidth = target === 'window' ? (windowWidth <= 640 ? windowWidth : 380) : 180;
+      const elemHeight = target === 'window' ? (windowHeight <= 640 ? windowHeight : 560) : 52;
+
+      const baseLeft = isLeft ? 24 : windowWidth - 24 - elemWidth;
+      const baseTop = windowHeight - 24 - elemHeight;
+
+      const absLeft = baseLeft + currentX;
+      const absTop = baseTop + currentY;
+
+      // Nearest corner calculation
+      const snapLeft = absLeft < (windowWidth - elemWidth) / 2 ? 24 : windowWidth - 24 - elemWidth;
+      const snapTop = absTop < (windowHeight - elemHeight) / 2 ? 24 : windowHeight - 24 - elemHeight;
+
+      return {
+        x: snapLeft - baseLeft,
+        y: snapTop - baseTop,
+      };
+    };
+
     const onEnd = () => {
+      if (dragStartRef.current && didDragRef.current) {
+        const target = dragStartRef.current.target;
+        if (target === 'window') {
+          setWindowOffset((prev) => calculateSnap('window', prev.x, prev.y));
+        } else {
+          setLauncherOffset((prev) => calculateSnap('launcher', prev.x, prev.y));
+        }
+      }
       dragStartRef.current = null;
       setIsDragging(false);
     };
@@ -201,7 +234,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onEnd);
     };
-  }, []);
+  }, [isLeft]);
 
   // Resize listener for mobile viewport
   useEffect(() => {
@@ -350,7 +383,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     }
   };
 
-  const isLeft = config.position === 'bottom-left';
   const primaryColor = config.primaryColor || '#111111';
 
   return (
@@ -369,6 +401,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           : (launcherOffset.x !== 0 || launcherOffset.y !== 0 ? `translate3d(${launcherOffset.x}px, ${launcherOffset.y}px, 0)` : 'none'),
         touchAction: isMobile ? 'auto' : 'none',
         userSelect: isDragging ? 'none' : 'auto',
+        transition: isMobile ? 'none' : isDragging ? 'none' : 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
       }}
     >
       {/* Floating Chat Launcher Button (Draggable) */}

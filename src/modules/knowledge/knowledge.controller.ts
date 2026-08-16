@@ -159,25 +159,41 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
       select: { allowedDomains: true },
     });
 
-    // Filter out localhost and 127.0.0.1 from allowedDomains to find the public domain
+    // Filter out localhost and 127.0.0.1 from allowedDomains to find public domains
     const publicDomains = (user?.allowedDomains || []).filter((d: string) => {
       const clean = d.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
       return clean && clean !== 'localhost' && clean !== '127.0.0.1' && clean !== '0.0.0.0';
     });
 
-    const targetDomain = req.body.domain || publicDomains[0] || user?.allowedDomains?.[0];
-    if (!targetDomain) {
-      return res.status(400).json({ error: 'No valid public domain configured for this merchant' });
+    const domainsToCrawl = req.body.domain ? [req.body.domain] : publicDomains;
+
+    if (domainsToCrawl.length === 0) {
+      return res.status(400).json({ error: 'No valid public domains configured for this merchant' });
     }
 
-    logger.info(`Merchant ${merchantId} triggered full rescrape of domain ${targetDomain}`);
-    const result = await scrapeWebsite(targetDomain, merchantId);
+    logger.info(`Merchant ${merchantId} triggered rescrape for domains: ${domainsToCrawl.join(', ')}`);
+
+    let totalPagesCrawled = 0;
+    let totalChunksCreated = 0;
+    let totalProductsIndexed = 0;
+
+    for (const domain of domainsToCrawl) {
+      try {
+        const result = await scrapeWebsite(domain, merchantId);
+        totalPagesCrawled += result.pagesCrawledCount || 0;
+        totalChunksCreated += result.knowledgeChunksCount || 0;
+        totalProductsIndexed += result.indexedCount || 0;
+      } catch (err) {
+        logger.error(`Error crawling domain ${domain}:`, err);
+      }
+    }
 
     return res.json({
-      message: 'Full domain crawl completed successfully',
-      pagesCrawled: result.pagesCrawledCount,
-      chunksCreated: result.knowledgeChunksCount,
-      productsIndexed: result.indexedCount,
+      message: 'Domain crawl completed successfully',
+      domainsCrawled: domainsToCrawl.length,
+      pagesCrawled: totalPagesCrawled,
+      chunksCreated: totalChunksCreated,
+      productsIndexed: totalProductsIndexed,
     });
   } catch (error: any) {
     logger.error('Error in full rescrape:', error);
