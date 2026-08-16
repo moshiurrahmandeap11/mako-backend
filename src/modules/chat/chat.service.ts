@@ -11,6 +11,7 @@ import { autoLearnFromConversation } from '../../services/autoLearning.service';
 import { searchProductsTool } from './tools/searchProducts.tool';
 import { searchKnowledgeTool } from './tools/searchKnowledge.tool';
 import { addToCartTool } from './tools/addToCart.tool';
+import { webSearchTool } from './tools/webSearch.tool';
 
 const anthropic = env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }) : null;
 
@@ -203,9 +204,17 @@ export async function processChatMessage(
       ragContext += `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
+    } else if (userMessage && userMessage.trim().length > 3 && !isSimpleGreeting(userMessage)) {
+      // Trigger Live Web Search when store knowledge is insufficient
+      const webResults = await webSearchTool(userMessage, 3);
+      if (webResults.length > 0) {
+        ragContext += `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
+          webResults.map(w => `[Source: ${w.title}](${w.url})\n${w.snippet}`).join('\n\n') +
+          `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
+      }
     }
 
-    if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
+    if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0 && !ragContext.includes('Live Web Search Results')) {
       ragContext = `\n\n### Website Context:
 Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ''}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
