@@ -61,6 +61,12 @@ const SendSvg = () => (
   </svg>
 );
 
+const ChevronDownSvg = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
 function renderMarkdownText(text: string) {
   if (!text) return null;
 
@@ -163,6 +169,7 @@ function renderMarkdownText(text: string) {
 
 export function ChatWidget({ api }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [isOpeningSkeleton, setIsOpeningSkeleton] = useState(false);
   const [isMobile, setIsMobile] = useState<boolean>(
     typeof window !== 'undefined' ? window.innerWidth <= 640 : false
@@ -199,16 +206,22 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Trigger smooth skeleton shimmer on open
-  useEffect(() => {
-    if (isOpen) {
-      setIsOpeningSkeleton(true);
-      const timer = setTimeout(() => {
-        setIsOpeningSkeleton(false);
-      }, 380);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
+  const handleOpen = () => {
+    setIsClosing(false);
+    setIsOpen(true);
+    setIsOpeningSkeleton(true);
+    setTimeout(() => {
+      setIsOpeningSkeleton(false);
+    }, 380);
+  };
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsClosing(false);
+    }, 220);
+  };
 
   // Cycle thinking phases
   useEffect(() => {
@@ -272,17 +285,17 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       const windowHeight = window.innerHeight;
 
       const elemWidth = target === 'window' ? (windowWidth <= 640 ? windowWidth : 390) : 60;
-      const elemHeight = target === 'window' ? (windowHeight <= 640 ? windowHeight : 600) : 60;
+      const elemHeight = target === 'window' ? (windowHeight <= 640 ? windowHeight : 580) : 60;
 
       const baseLeft = isLeft ? 24 : windowWidth - 24 - elemWidth;
-      const baseTop = windowHeight - 24 - elemHeight;
+      const baseTop = target === 'window' ? (windowHeight - 96 - elemHeight) : (windowHeight - 24 - elemHeight);
 
       const absLeft = baseLeft + currentX;
       const absTop = baseTop + currentY;
 
       // Nearest corner calculation
       const snapLeft = absLeft < (windowWidth - elemWidth) / 2 ? 24 : windowWidth - 24 - elemWidth;
-      const snapTop = absTop < (windowHeight - elemHeight) / 2 ? 24 : windowHeight - 24 - elemHeight;
+      const snapTop = absTop < (windowHeight - elemHeight) / 2 ? 24 : windowHeight - (target === 'window' ? 96 : 24) - elemHeight;
 
       return {
         x: snapLeft - baseLeft,
@@ -460,29 +473,36 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         left: isLeft ? '24px' : 'auto',
         zIndex: 999999,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-        transform: isMobile
-          ? 'none'
-          : isOpen
-          ? (windowOffset.x !== 0 || windowOffset.y !== 0 ? `translate3d(${windowOffset.x}px, ${windowOffset.y}px, 0)` : 'none')
-          : (launcherOffset.x !== 0 || launcherOffset.y !== 0 ? `translate3d(${launcherOffset.x}px, ${launcherOffset.y}px, 0)` : 'none'),
-        touchAction: isMobile ? 'auto' : 'none',
         userSelect: isDragging ? 'none' : 'auto',
-        transition: isMobile ? 'none' : isDragging ? 'none' : 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
       }}
     >
       <style>{`
         @keyframes mbot-open-smooth {
           0% {
             opacity: 0;
-            transform: scale(0.9) translateY(24px);
+            transform: scale(0.88) translateY(24px);
           }
           100% {
             opacity: 1;
             transform: scale(1) translateY(0);
           }
         }
+        @keyframes mbot-close-smooth {
+          0% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(0.88) translateY(24px);
+          }
+        }
         .mbot-window-enter {
-          animation: mbot-open-smooth 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: mbot-open-smooth 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transform-origin: bottom right;
+        }
+        .mbot-window-exit {
+          animation: mbot-close-smooth 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           transform-origin: bottom right;
         }
         @keyframes mbot-shimmer {
@@ -497,98 +517,32 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         }
       `}</style>
 
-      {/* Floating Circular Launcher FAB */}
-      {!isOpen && (
-        <button
-          onMouseDown={(e: MouseEvent) => {
-            dragStartRef.current = {
-              clientX: e.clientX,
-              clientY: e.clientY,
-              startX: launcherOffset.x,
-              startY: launcherOffset.y,
-              target: 'launcher',
-            };
-            didDragRef.current = false;
-            setIsDragging(true);
-          }}
-          onTouchStart={(e: TouchEvent) => {
-            if (!e.touches[0]) return;
-            dragStartRef.current = {
-              clientX: e.touches[0].clientX,
-              clientY: e.touches[0].clientY,
-              startX: launcherOffset.x,
-              startY: launcherOffset.y,
-              target: 'launcher',
-            };
-            didDragRef.current = false;
-            setIsDragging(true);
-          }}
-          onClick={() => {
-            if (!didDragRef.current) {
-              setIsOpen(true);
-            }
-          }}
-          title="Open AI Assistant"
-          style={{
-            width: '60px',
-            height: '60px',
-            borderRadius: '50%',
-            backgroundColor: primaryColor,
-            color: '#ffffff',
-            border: '2px solid rgba(255, 255, 255, 0.25)',
-            cursor: isDragging ? 'grabbing' : 'pointer',
-            boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.38), 0 6px 16px -2px rgba(0, 0, 0, 0.22)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            userSelect: 'none',
-            transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease',
-          }}
-        >
-          {/* Glowing Active Status Beacon */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '2px',
-              right: '2px',
-              width: '14px',
-              height: '14px',
-              backgroundColor: '#10b981',
-              borderRadius: '50%',
-              border: '2.5px solid #ffffff',
-              boxShadow: '0 0 8px rgba(16, 185, 129, 0.85)',
-            }}
-          />
-
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-          </svg>
-        </button>
-      )}
-
-      {/* Heavy, Ultra-Premium Enterprise Chat Window with Spring Opening Animation */}
+      {/* Heavy, Ultra-Premium Enterprise Chat Window Above Launcher FAB */}
       {isOpen && (
         <div
-          className={!isDragging ? 'mbot-window-enter' : ''}
+          className={!isDragging ? (isClosing ? 'mbot-window-exit' : 'mbot-window-enter') : ''}
           style={{
-            position: isMobile ? 'fixed' : 'relative',
+            position: isMobile ? 'fixed' : 'absolute',
             top: isMobile ? '0' : 'auto',
-            left: isMobile ? '0' : 'auto',
-            right: isMobile ? '0' : 'auto',
-            bottom: isMobile ? '0' : 'auto',
+            left: isMobile ? '0' : isLeft ? '0' : 'auto',
+            right: isMobile ? '0' : isLeft ? 'auto' : '0',
+            bottom: isMobile ? '0' : '72px',
             zIndex: 999999,
             width: isMobile ? '100vw' : '390px',
             maxWidth: isMobile ? '100vw' : 'calc(100vw - 32px)',
-            height: isMobile ? '100dvh' : '600px',
-            maxHeight: isMobile ? '100dvh' : 'calc(100vh - 48px)',
+            height: isMobile ? '100dvh' : '580px',
+            maxHeight: isMobile ? '100dvh' : 'calc(100vh - 120px)',
             backgroundColor: '#ffffff',
             borderRadius: isMobile ? '0px' : '24px',
-            boxShadow: '0 28px 65px -12px rgba(15, 23, 42, 0.32), 0 12px 28px -6px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.08)',
+            boxShadow: '0 30px 65px -12px rgba(15, 23, 42, 0.35), 0 14px 28px -6px rgba(15, 23, 42, 0.2), 0 0 0 1.5px rgba(15, 23, 42, 0.08)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            border: isMobile ? 'none' : '1px solid #cbd5e1',
+            border: isMobile ? 'none' : '1.5px solid #cbd5e1',
+            transform: isMobile
+              ? 'none'
+              : (windowOffset.x !== 0 || windowOffset.y !== 0 ? `translate3d(${windowOffset.x}px, ${windowOffset.y}px, 0)` : 'none'),
+            transition: isMobile ? 'none' : isDragging ? 'none' : 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
           }}
         >
           {/* Header (Clean, Heavy, Enterprise-Grade Header) */}
@@ -669,7 +623,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               </button>
 
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
                 title="Close chat"
                 style={{
                   background: '#f8fafc',
@@ -895,7 +849,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 disabled={!inputValue.trim() || isLoading}
                 title="Send message"
                 style={{
-                  backgroundColor: inputValue.trim() ? primaryColor : '#cbd5e1',
+                  backgroundColor: inputValue.trim() ? '#00684a' : '#cbd5e1',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '50%',
@@ -930,6 +884,85 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           </div>
         </div>
       )}
+
+      {/* Floating Circular Launcher FAB (Always visible, morphs to Down Arrow when open) */}
+      <button
+        onMouseDown={(e: MouseEvent) => {
+          dragStartRef.current = {
+            clientX: e.clientX,
+            clientY: e.clientY,
+            startX: launcherOffset.x,
+            startY: launcherOffset.y,
+            target: 'launcher',
+          };
+          didDragRef.current = false;
+          setIsDragging(true);
+        }}
+        onTouchStart={(e: TouchEvent) => {
+          if (!e.touches[0]) return;
+          dragStartRef.current = {
+            clientX: e.touches[0].clientX,
+            clientY: e.touches[0].clientY,
+            startX: launcherOffset.x,
+            startY: launcherOffset.y,
+            target: 'launcher',
+          };
+          didDragRef.current = false;
+          setIsDragging(true);
+        }}
+        onClick={() => {
+          if (!didDragRef.current) {
+            if (isOpen) {
+              handleClose();
+            } else {
+              handleOpen();
+            }
+          }
+        }}
+        title={isOpen ? 'Close chat' : 'Open AI Assistant'}
+        style={{
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          backgroundColor: isOpen ? '#00684a' : primaryColor,
+          color: '#ffffff',
+          border: '2px solid rgba(255, 255, 255, 0.25)',
+          cursor: isDragging ? 'grabbing' : 'pointer',
+          boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.38), 0 6px 16px -2px rgba(0, 0, 0, 0.22)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          userSelect: 'none',
+          transform: (launcherOffset.x !== 0 || launcherOffset.y !== 0 ? `translate3d(${launcherOffset.x}px, ${launcherOffset.y}px, 0)` : 'none'),
+          transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, box-shadow 0.2s ease',
+        }}
+      >
+        {/* Glowing Active Status Beacon (When closed) */}
+        {!isOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '2px',
+              right: '2px',
+              width: '14px',
+              height: '14px',
+              backgroundColor: '#10b981',
+              borderRadius: '50%',
+              border: '2.5px solid #ffffff',
+              boxShadow: '0 0 8px rgba(16, 185, 129, 0.85)',
+            }}
+          />
+        )}
+
+        {isOpen ? (
+          <ChevronDownSvg />
+        ) : (
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+          </svg>
+        )}
+      </button>
     </div>
   );
 }

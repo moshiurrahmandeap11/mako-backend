@@ -122,10 +122,20 @@ ${customPrompt}`;
 - NEVER write general programming code (e.g. Python scripts, games, algorithmic solutions, C++/Java code), solve general academic homework, or act as a general AI/ChatGPT.
 - If a user asks an out-of-scope query (e.g. "give me a snake game in python", general programming, trivia, recipes, or unrelated topics), you MUST POLITELY DECLINE. State clearly: "I am the AI assistant dedicated to ${merchantName}. I can only help you with questions about our projects, services, and website." and invite them to explore ${merchantName}'s offerings.`;
 
+  const casualGreetingRule = `CASUAL GREETINGS & SHORT CHATS (CRITICAL):
+- When the user sends a greeting or casual phrase (e.g. "kire bro", "hi", "hello", "hey", "kemon acho", "ki khobor", "bro"):
+  - DO NOT output an essay or list multiple questions.
+  - DO NOT say "It seems like you've reached out to us at Moshiur Bhau (Labtobit Studio)..."
+  - Reply in EXACTLY ONE SHORT SENTENCE (under 10 words) in the user's matching script.
+  - Examples:
+    - User: "kire bro" -> Reply: "Hello bro! Bolun, kivabe help korte pari?"
+    - User: "hi" / "hello" -> Reply: "Hello! How can I help you today?"
+    - User: "kemon আছেন" -> Reply: "ভালো আছি, ধন্যবাদ! কীভাবে সাহায্য করতে পারি?"`;
+
   const tokenEfficiencyRule = `MAXIMUM CONCISENESS & ZERO REPETITION (STRICT RULE):
-- ALWAYS answer in ONLY 1 to 2 SHORT sentences (MAXIMUM 25-30 WORDS TOTAL).
+- ALWAYS answer in ONLY 1 to 2 SHORT sentences (MAXIMUM 20 WORDS TOTAL).
 - Provide ONLY the direct, exact answer requested.
-- NEVER argue, challenge, or ask why the user said something (e.g. NEVER say "Ami bujhlam na keno bolchen").
+- NEVER argue, challenge, or ask why the user said something.
 - DO NOT create multiple paragraphs or repeating clauses.
 - Example (Banglish query "amar direct project link lagbe"):
   - GOOD: "Amader project link: [Echo Platform](https://labtobit-frontend.vercel.app/casestudies/echo-platform) ebong [Lusion Studio](https://labtobit-frontend.vercel.app/casestudies/lusion-studio)।"`;
@@ -133,15 +143,16 @@ ${customPrompt}`;
   return `${personaPrompt}
 
 Strict Rules:
-1. FIRST-PERSON PERSPECTIVE: ${firstPersonPerspectiveRule}
-2. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
-3. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
-4. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
-5. ${tokenEfficiencyRule}
-6. ${scopeLockRule}
-7. LANGUAGE & SCRIPT MATCHING: ${langRule}
-8. FORMATTING RULE: ${formatRule}
-${cartRule ? `9. CART ACTION RULE: ${cartRule}` : ''}`.trim();
+1. CASUAL GREETINGS & SHORT CHATS: ${casualGreetingRule}
+2. FIRST-PERSON PERSPECTIVE: ${firstPersonPerspectiveRule}
+3. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
+4. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
+5. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
+6. ${tokenEfficiencyRule}
+7. ${scopeLockRule}
+8. LANGUAGE & SCRIPT MATCHING: ${langRule}
+9. FORMATTING RULE: ${formatRule}
+${cartRule ? `10. CART ACTION RULE: ${cartRule}` : ''}`.trim();
 }
 
 export async function processChatMessage(
@@ -331,7 +342,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeGeminiCompletion(
         'gemini-2.0-flash',
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        380
+        160
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -350,7 +361,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeGroqCompletion(
         model,
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        380
+        160
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -368,7 +379,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeOpenRouterCompletion(
         'meta-llama/llama-3.3-70b-instruct',
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        380
+        160
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -393,7 +404,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
         'claude-3-5-sonnet-20241022',
         systemPrompt + ragContext,
         anthropicMessages,
-        380
+        160
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
