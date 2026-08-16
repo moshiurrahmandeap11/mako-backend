@@ -4,17 +4,21 @@ exports.ChatWidget = ChatWidget;
 const jsx_runtime_1 = require("preact/jsx-runtime");
 const hooks_1 = require("preact/hooks");
 const cartBridge_1 = require("./cartBridge");
+// Crisp Vector SVGs (No Emojis)
+const BotMascotSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "30", height: "30", viewBox: "0 0 32 32", fill: "none", style: { flexShrink: 0 }, children: [(0, jsx_runtime_1.jsx)("rect", { width: "32", height: "32", rx: "10", fill: "#f0fdf4" }), (0, jsx_runtime_1.jsx)("path", { d: "M16 5V8", stroke: "#10b981", strokeWidth: "2", strokeLinecap: "round" }), (0, jsx_runtime_1.jsx)("circle", { cx: "16", cy: "4", r: "1.5", fill: "#10b981" }), (0, jsx_runtime_1.jsx)("rect", { x: "7", y: "8", width: "18", height: "15", rx: "5", fill: "#0f172a" }), (0, jsx_runtime_1.jsx)("circle", { cx: "12", cy: "15", r: "2", fill: "#10b981" }), (0, jsx_runtime_1.jsx)("circle", { cx: "20", cy: "15", r: "2", fill: "#10b981" }), (0, jsx_runtime_1.jsx)("path", { d: "M13.5 19C14.2 19.8 15 20.2 16 20.2C17 20.2 17.8 19.8 18.5 19", stroke: "#ffffff", strokeWidth: "1.5", strokeLinecap: "round" }), (0, jsx_runtime_1.jsx)("path", { d: "M5 14C5 13 5.8 12.2 6.8 12.2V17.8C5.8 17.8 5 17 5 16V14Z", fill: "#0f172a" }), (0, jsx_runtime_1.jsx)("path", { d: "M27 14C27 13 26.2 12.2 25.2 12.2V17.8C26.2 17.8 27 17 27 16V14Z", fill: "#0f172a" })] }));
+const BrainSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("path", { d: "M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z" }), (0, jsx_runtime_1.jsx)("path", { d: "M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z" })] }));
+const CloseSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), (0, jsx_runtime_1.jsx)("line", { x1: "6", y1: "6", x2: "18", y2: "18" })] }));
+const RefreshSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("polyline", { points: "23 4 23 10 17 10" }), (0, jsx_runtime_1.jsx)("polyline", { points: "1 20 1 14 7 14" }), (0, jsx_runtime_1.jsx)("path", { d: "M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" })] }));
+const SendSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("line", { x1: "22", y1: "2", x2: "11", y2: "13" }), (0, jsx_runtime_1.jsx)("polygon", { points: "22 2 15 22 11 13 2 9 22 2", fill: "currentColor", fillOpacity: "0.25" })] }));
 function renderMarkdownText(text) {
     if (!text)
         return null;
-    // Clean text from accidental tags
     let clean = text
         .replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '')
         .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '')
         .trim();
     if (!clean)
         return null;
-    // Comprehensive Regex: Markdown Links [title](url) | Bold **text** | Raw URLs (https?://...)
     const parts = [];
     const regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*|(https?:\/\/[^\s<>)"]+)/g;
     let lastIndex = 0;
@@ -24,13 +28,12 @@ function renderMarkdownText(text) {
             parts.push(clean.substring(lastIndex, match.index));
         }
         if (match[1] && match[2]) {
-            // Markdown Link [text](url)
             const linkTitle = match[1];
             const linkUrl = match[2];
             parts.push((0, jsx_runtime_1.jsxs)("a", { href: linkUrl, target: "_blank", rel: "noopener noreferrer", style: {
-                    color: '#2563eb',
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #dbeafe',
+                    color: '#0284c7',
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #bae6fd',
                     padding: '2px 9px',
                     borderRadius: '6px',
                     textDecoration: 'none',
@@ -44,11 +47,9 @@ function renderMarkdownText(text) {
                 }, children: [linkTitle, " ", (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', opacity: 0.8 }, children: "\u2197" })] }));
         }
         else if (match[3]) {
-            // Bold **text**
             parts.push((0, jsx_runtime_1.jsx)("strong", { style: { fontWeight: '700', color: '#0f172a' }, children: match[3] }));
         }
         else if (match[4]) {
-            // Auto-convert raw URLs to clean title badges
             const rawUrl = match[4];
             let displayLabel = rawUrl;
             try {
@@ -65,9 +66,9 @@ function renderMarkdownText(text) {
             }
             catch { }
             parts.push((0, jsx_runtime_1.jsxs)("a", { href: rawUrl, target: "_blank", rel: "noopener noreferrer", style: {
-                    color: '#2563eb',
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #dbeafe',
+                    color: '#0284c7',
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #bae6fd',
                     padding: '2px 9px',
                     borderRadius: '6px',
                     textDecoration: 'none',
@@ -89,10 +90,11 @@ function renderMarkdownText(text) {
 }
 function ChatWidget({ api }) {
     const [isOpen, setIsOpen] = (0, hooks_1.useState)(false);
+    const [isOpeningSkeleton, setIsOpeningSkeleton] = (0, hooks_1.useState)(false);
     const [isMobile, setIsMobile] = (0, hooks_1.useState)(typeof window !== 'undefined' ? window.innerWidth <= 640 : false);
     const [config, setConfig] = (0, hooks_1.useState)({
         primaryColor: '#0f172a',
-        greetingMessage: 'Hi there! How can I help you today?',
+        greetingMessage: 'Hi there! How can I help today?',
         botName: 'AI Assistant',
         position: 'bottom-right',
         addToCartEnabled: true,
@@ -111,7 +113,7 @@ function ChatWidget({ api }) {
     const [isDragging, setIsDragging] = (0, hooks_1.useState)(false);
     const dragStartRef = (0, hooks_1.useRef)(null);
     const didDragRef = (0, hooks_1.useRef)(false);
-    // Resize listener for mobile viewport
+    // Resize listener
     (0, hooks_1.useEffect)(() => {
         const handleResize = () => {
             setIsMobile(window.innerWidth <= 640);
@@ -119,7 +121,17 @@ function ChatWidget({ api }) {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
-    // Cycle thinking phases during loading
+    // Trigger smooth skeleton shimmer on open
+    (0, hooks_1.useEffect)(() => {
+        if (isOpen) {
+            setIsOpeningSkeleton(true);
+            const timer = setTimeout(() => {
+                setIsOpeningSkeleton(false);
+            }, 400);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen]);
+    // Cycle thinking phases
     (0, hooks_1.useEffect)(() => {
         let interval;
         if (isLoading) {
@@ -133,7 +145,7 @@ function ChatWidget({ api }) {
                 clearInterval(interval);
         };
     }, [isLoading]);
-    // Dragging event listeners for window & launcher
+    // Dragging event listeners
     (0, hooks_1.useEffect)(() => {
         const onMouseMove = (e) => {
             if (!dragStartRef.current)
@@ -183,12 +195,11 @@ function ChatWidget({ api }) {
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
             const elemWidth = target === 'window' ? (windowWidth <= 640 ? windowWidth : 390) : 60;
-            const elemHeight = target === 'window' ? (windowHeight <= 640 ? windowHeight : 590) : 60;
+            const elemHeight = target === 'window' ? (windowHeight <= 640 ? windowHeight : 600) : 60;
             const baseLeft = isLeft ? 24 : windowWidth - 24 - elemWidth;
             const baseTop = windowHeight - 24 - elemHeight;
             const absLeft = baseLeft + currentX;
             const absTop = baseTop + currentY;
-            // Nearest corner calculation
             const snapLeft = absLeft < (windowWidth - elemWidth) / 2 ? 24 : windowWidth - 24 - elemWidth;
             const snapTop = absTop < (windowHeight - elemHeight) / 2 ? 24 : windowHeight - 24 - elemHeight;
             return {
@@ -223,7 +234,7 @@ function ChatWidget({ api }) {
     (0, hooks_1.useEffect)(() => {
         // 1. Fetch Config
         api.getConfig().then(setConfig).catch(console.error);
-        // 2. Manage Visitor SessionId & Restore History
+        // 2. Manage Session
         let storedSession = '';
         try {
             storedSession = localStorage.getItem('aiw_session_id') || sessionStorage.getItem('aiw_session_id') || '';
@@ -249,7 +260,7 @@ function ChatWidget({ api }) {
                 catch { }
             }).catch(console.error);
         }
-        // 3. Persistent Visitor Tracking & Ping Backend
+        // 3. Visitor Tracking
         let vid = '';
         try {
             vid = localStorage.getItem('aiw_visitor_id') || '';
@@ -263,22 +274,21 @@ function ChatWidget({ api }) {
         }
         api.pingVisitor(vid).catch(console.error);
     }, []);
-    // Initialize initial greeting message once opened if no prior messages exist
     (0, hooks_1.useEffect)(() => {
         if (isOpen && messages.length === 0) {
             setMessages([
                 {
                     id: 'msg_welcome',
                     sender: 'bot',
-                    text: config.greetingMessage || 'Hi there! How can I help you today?',
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    text: config.greetingMessage || 'Hi there! How can I help today?',
+                    time: 'Just now',
                 },
             ]);
         }
     }, [isOpen, config, messages.length]);
     (0, hooks_1.useEffect)(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isLoading]);
+    }, [messages, isLoading, isOpeningSkeleton]);
     const handleSend = async (queryText) => {
         const text = (typeof queryText === 'string' ? queryText : inputValue).trim();
         if (!text || isLoading)
@@ -287,14 +297,13 @@ function ChatWidget({ api }) {
             id: `user_${Date.now()}`,
             sender: 'user',
             text,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            time: 'Just now',
         };
         setMessages((prev) => [...prev, userMsg]);
         setInputValue('');
         setIsLoading(true);
         try {
             const res = await api.sendMessage(sessionId, text);
-            // Handle AI returned cart action
             if (res.cartAction && config.eventBridgeEnabled) {
                 (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity);
             }
@@ -304,14 +313,14 @@ function ChatWidget({ api }) {
                 text: res.reply,
                 products: res.products,
                 thoughts: res.thoughts,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                time: 'Just now',
             };
             setMessages((prev) => [...prev, botMsg]);
         }
         catch (err) {
             let errorMsg = 'Sorry, I ran into an error. Please try again.';
             if (err?.message?.includes('revoked') || err?.message?.includes('Invalid') || err?.message?.includes('Unauthorized')) {
-                errorMsg = 'This chatbot is currently offline or its API key has been revoked. Please contact the website administrator.';
+                errorMsg = 'This chatbot is currently offline. Please contact the website administrator.';
             }
             else if (err?.message) {
                 errorMsg = err.message;
@@ -322,7 +331,7 @@ function ChatWidget({ api }) {
                     id: `err_${Date.now()}`,
                     sender: 'bot',
                     text: errorMsg,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    time: 'Just now',
                 },
             ]);
         }
@@ -331,29 +340,28 @@ function ChatWidget({ api }) {
         }
     };
     const handleResetSession = () => {
-        if (window.confirm('Start a fresh new chat session?')) {
-            api.createSession().then((newSess) => {
-                setSessionId(newSess);
-                try {
-                    localStorage.setItem('aiw_session_id', newSess);
-                }
-                catch { }
-                setMessages([
-                    {
-                        id: `msg_welcome_${Date.now()}`,
-                        sender: 'bot',
-                        text: config.greetingMessage || 'Hi there! How can I help you today?',
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    },
-                ]);
-            }).catch(console.error);
-        }
+        api.createSession().then((newSess) => {
+            setSessionId(newSess);
+            try {
+                localStorage.setItem('aiw_session_id', newSess);
+            }
+            catch { }
+            setMessages([
+                {
+                    id: `msg_welcome_${Date.now()}`,
+                    sender: 'bot',
+                    text: config.greetingMessage || 'Hi there! How can I help today?',
+                    time: 'Just now',
+                },
+            ]);
+        }).catch(console.error);
     };
     const primaryColor = config.primaryColor || '#0f172a';
-    const quickPrompts = [
-        { label: '✨ Explore Projects', query: 'apnader portfolio te ki ki project ache' },
-        { label: '💼 Agency Services', query: 'What services do you offer?' },
-        { label: '📩 Contact Team', query: 'How can I contact your team?' },
+    // MongoDB Style Starter Action Chips
+    const actionChips = [
+        { label: 'Explore our projects', query: 'apnader portfolio te ki ki project ache' },
+        { label: 'Discuss pricing for a new project', query: 'What services and pricing do you offer?' },
+        { label: 'Contact our team', query: 'How can I contact your team directly?' },
     ];
     return ((0, jsx_runtime_1.jsxs)("div", { style: {
             position: 'fixed',
@@ -370,7 +378,18 @@ function ChatWidget({ api }) {
             touchAction: isMobile ? 'auto' : 'none',
             userSelect: isDragging ? 'none' : 'auto',
             transition: isMobile ? 'none' : isDragging ? 'none' : 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
-        }, children: [!isOpen && ((0, jsx_runtime_1.jsxs)("button", { onMouseDown: (e) => {
+        }, children: [(0, jsx_runtime_1.jsx)("style", { children: `
+        @keyframes mbot-shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .mbot-skeleton {
+          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+          background-size: 200% 100%;
+          animation: mbot-shimmer 1.4s infinite linear;
+          border-radius: 8px;
+        }
+      ` }), !isOpen && ((0, jsx_runtime_1.jsxs)("button", { onMouseDown: (e) => {
                     dragStartRef.current = {
                         clientX: e.clientX,
                         clientY: e.clientY,
@@ -402,9 +421,9 @@ function ChatWidget({ api }) {
                     borderRadius: '50%',
                     backgroundColor: primaryColor,
                     color: '#ffffff',
-                    border: '2px solid rgba(255, 255, 255, 0.2)',
+                    border: '2px solid rgba(255, 255, 255, 0.25)',
                     cursor: isDragging ? 'grabbing' : 'pointer',
-                    boxShadow: '0 12px 28px -4px rgba(0, 0, 0, 0.35), 0 6px 14px -2px rgba(0, 0, 0, 0.2)',
+                    boxShadow: '0 14px 32px -4px rgba(0, 0, 0, 0.35), 0 6px 14px -2px rgba(0, 0, 0, 0.2)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -420,7 +439,7 @@ function ChatWidget({ api }) {
                             backgroundColor: '#10b981',
                             borderRadius: '50%',
                             border: '2.5px solid #ffffff',
-                            boxShadow: '0 0 8px rgba(16, 185, 129, 0.8)',
+                            boxShadow: '0 0 8px rgba(16, 185, 129, 0.85)',
                         } }), (0, jsx_runtime_1.jsx)("svg", { width: "26", height: "26", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round", children: (0, jsx_runtime_1.jsx)("path", { d: "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" }) })] })), isOpen && ((0, jsx_runtime_1.jsxs)("div", { style: {
                     position: isMobile ? 'fixed' : 'relative',
                     top: isMobile ? '0' : 'auto',
@@ -430,11 +449,11 @@ function ChatWidget({ api }) {
                     zIndex: 999999,
                     width: isMobile ? '100vw' : '390px',
                     maxWidth: isMobile ? '100vw' : 'calc(100vw - 32px)',
-                    height: isMobile ? '100dvh' : '590px',
+                    height: isMobile ? '100dvh' : '600px',
                     maxHeight: isMobile ? '100dvh' : 'calc(100vh - 48px)',
                     backgroundColor: '#ffffff',
-                    borderRadius: isMobile ? '0px' : '20px',
-                    boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+                    borderRadius: isMobile ? '0px' : '24px',
+                    boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(0, 0, 0, 0.08)',
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
@@ -468,97 +487,54 @@ function ChatWidget({ api }) {
                             didDragRef.current = false;
                             setIsDragging(true);
                         }, style: {
-                            background: `linear-gradient(135deg, ${primaryColor} 0%, #1e293b 100%)`,
-                            color: '#ffffff',
-                            padding: '16px 18px',
+                            backgroundColor: '#ffffff',
+                            padding: '16px 20px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             cursor: isMobile ? 'default' : isDragging ? 'grabbing' : 'grab',
                             userSelect: 'none',
-                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                        }, title: "Click and drag to move chat window", children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '12px' }, children: [(0, jsx_runtime_1.jsxs)("div", { style: {
-                                            width: '38px',
-                                            height: '38px',
+                            borderBottom: '1px solid #f1f5f9',
+                        }, title: "Click and drag to move chat window", children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '12px' }, children: [(0, jsx_runtime_1.jsx)(BotMascotSvg, {}), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: { margin: 0, fontSize: '15px', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.2px' }, children: config.botName || 'MBot' }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '12px', color: '#64748b', display: 'block', marginTop: '1px' }, children: "The team can also help" })] })] }), (0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' }, children: [(0, jsx_runtime_1.jsx)("button", { onClick: handleResetSession, title: "Restart chat", style: {
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
                                             borderRadius: '50%',
-                                            background: 'rgba(255, 255, 255, 0.15)',
-                                            backdropFilter: 'blur(8px)',
+                                            width: '32px',
+                                            height: '32px',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            fontSize: '18px',
-                                            position: 'relative',
-                                            border: '1px solid rgba(255, 255, 255, 0.25)',
-                                        }, children: ["\uD83E\uDD16", (0, jsx_runtime_1.jsx)("span", { style: {
-                                                    position: 'absolute',
-                                                    bottom: '-1px',
-                                                    right: '-1px',
-                                                    width: '10px',
-                                                    height: '10px',
-                                                    borderRadius: '50%',
-                                                    backgroundColor: '#10b981',
-                                                    border: '2px solid #0f172a',
-                                                    boxShadow: '0 0 6px #10b981',
-                                                } })] }), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' }, children: [(0, jsx_runtime_1.jsx)("h3", { style: { margin: 0, fontSize: '15px', fontWeight: '700', color: '#ffffff', letterSpacing: '-0.2px' }, children: config.botName || 'AI Assistant' }), (0, jsx_runtime_1.jsx)("span", { style: {
-                                                            fontSize: '10px',
-                                                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                                                            color: '#6ee7b7',
-                                                            padding: '1px 6px',
-                                                            borderRadius: '10px',
-                                                            fontWeight: '600',
-                                                            border: '1px solid rgba(16, 185, 129, 0.3)',
-                                                        }, children: "LIVE" })] }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', display: 'block', marginTop: '1px' }, children: "Replies instantly \u2022 Verified Knowledge" })] })] }), (0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' }, children: [(0, jsx_runtime_1.jsx)("button", { onClick: handleResetSession, title: "Restart chat", style: {
-                                            background: 'rgba(255, 255, 255, 0.1)',
-                                            border: 'none',
-                                            borderRadius: '50%',
-                                            width: '30px',
-                                            height: '30px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: '#cbd5e1',
+                                            color: '#64748b',
                                             cursor: 'pointer',
-                                            fontSize: '13px',
-                                            transition: 'background 0.2s',
-                                        }, children: "\uD83D\uDD04" }), (0, jsx_runtime_1.jsx)("button", { onClick: () => setIsOpen(false), title: "Close chat", style: {
-                                            background: 'rgba(255, 255, 255, 0.1)',
-                                            border: 'none',
+                                            transition: 'all 0.15s ease',
+                                        }, children: (0, jsx_runtime_1.jsx)(RefreshSvg, {}) }), (0, jsx_runtime_1.jsx)("button", { onClick: () => setIsOpen(false), title: "Close chat", style: {
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
                                             borderRadius: '50%',
-                                            width: '30px',
-                                            height: '30px',
+                                            width: '32px',
+                                            height: '32px',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            color: '#ffffff',
+                                            color: '#0f172a',
                                             cursor: 'pointer',
-                                            fontSize: '14px',
-                                            fontWeight: 'bold',
-                                            transition: 'background 0.2s',
-                                        }, children: "\u2715" })] })] }), (0, jsx_runtime_1.jsxs)("div", { style: {
+                                            transition: 'all 0.15s ease',
+                                        }, children: (0, jsx_runtime_1.jsx)(CloseSvg, {}) })] })] }), isOpeningSkeleton ? ((0, jsx_runtime_1.jsxs)("div", { style: { flex: '1 1 0%', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }, children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', gap: '12px' }, children: [(0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0 } }), (0, jsx_runtime_1.jsxs)("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }, children: [(0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '70%', height: '36px', borderRadius: '14px' } }), (0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '35%', height: '14px' } })] })] }), (0, jsx_runtime_1.jsxs)("div", { style: { marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }, children: [(0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '65%', height: '38px', borderRadius: '20px' } }), (0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '80%', height: '38px', borderRadius: '20px' } }), (0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '55%', height: '38px', borderRadius: '20px' } })] })] })) : (
+                    /* Messages Body */
+                    (0, jsx_runtime_1.jsxs)("div", { style: {
                             flex: '1 1 0%',
                             minHeight: 0,
                             maxHeight: '100%',
-                            padding: '18px 16px',
+                            padding: '20px 18px',
                             overflowY: 'auto',
                             WebkitOverflowScrolling: 'touch',
                             overscrollBehaviorY: 'contain',
                             touchAction: 'pan-y',
-                            backgroundColor: '#f8fafc',
+                            backgroundColor: '#ffffff',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '14px',
-                        }, children: [messages.length <= 1 && ((0, jsx_runtime_1.jsxs)("div", { style: { marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }, children: "Frequently Asked" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }, children: quickPrompts.map((p, idx) => ((0, jsx_runtime_1.jsx)("button", { onClick: () => handleSend(p.query), style: {
-                                                backgroundColor: '#ffffff',
-                                                border: '1px solid #e2e8f0',
-                                                padding: '6px 12px',
-                                                borderRadius: '16px',
-                                                fontSize: '12px',
-                                                fontWeight: '500',
-                                                color: '#334155',
-                                                cursor: 'pointer',
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                                transition: 'all 0.15s ease',
-                                            }, children: p.label }, idx))) })] })), messages.map((msg) => ((0, jsx_runtime_1.jsxs)("div", { style: {
+                            gap: '16px',
+                        }, children: [messages.map((msg) => ((0, jsx_runtime_1.jsxs)("div", { style: {
                                     display: 'flex',
                                     flexDirection: 'column',
                                     alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start',
@@ -566,11 +542,11 @@ function ChatWidget({ api }) {
                                             marginBottom: '8px',
                                             fontSize: '11px',
                                             color: '#475569',
-                                            backgroundColor: '#f1f5f9',
+                                            backgroundColor: '#f8fafc',
                                             border: '1px solid #e2e8f0',
                                             borderRadius: '10px',
-                                            padding: '6px 10px',
-                                            maxWidth: '90%',
+                                            padding: '6px 12px',
+                                            maxWidth: '92%',
                                             lineHeight: '1.4',
                                         }, children: [(0, jsx_runtime_1.jsxs)("summary", { style: {
                                                     cursor: 'pointer',
@@ -581,7 +557,7 @@ function ChatWidget({ api }) {
                                                     gap: '6px',
                                                     userSelect: 'none',
                                                     color: '#334155',
-                                                }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '13px' }, children: "\uD83E\uDDE0" }), " AI Reasoning (", msg.thoughts.length, " steps)"] }), (0, jsx_runtime_1.jsx)("div", { style: {
+                                                }, children: [(0, jsx_runtime_1.jsx)(BrainSvg, {}), " AI Reasoning (", msg.thoughts.length, " steps)"] }), (0, jsx_runtime_1.jsx)("div", { style: {
                                                     marginTop: '6px',
                                                     display: 'flex',
                                                     flexDirection: 'column',
@@ -589,70 +565,56 @@ function ChatWidget({ api }) {
                                                     borderTop: '1px solid #e2e8f0',
                                                     paddingTop: '6px',
                                                 }, children: msg.thoughts.map((t, idx) => ((0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', alignItems: 'center', gap: '4px', color: '#475569' }, children: (0, jsx_runtime_1.jsx)("span", { children: t }) }, idx))) })] })), (0, jsx_runtime_1.jsx)("div", { style: {
-                                            backgroundColor: msg.sender === 'user' ? primaryColor : '#ffffff',
-                                            color: msg.sender === 'user' ? '#ffffff' : '#1e293b',
-                                            padding: '12px 16px',
-                                            borderRadius: msg.sender === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                                            backgroundColor: msg.sender === 'user' ? primaryColor : '#f1f5f9',
+                                            color: msg.sender === 'user' ? '#ffffff' : '#0f172a',
+                                            padding: '13px 18px',
+                                            borderRadius: msg.sender === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
                                             maxWidth: '85%',
                                             wordBreak: 'break-word',
-                                            boxShadow: msg.sender === 'user' ? '0 4px 12px rgba(0,0,0,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
-                                            fontSize: '14px',
+                                            boxShadow: msg.sender === 'user' ? '0 4px 12px rgba(0,0,0,0.12)' : 'none',
+                                            fontSize: '14.5px',
                                             lineHeight: '1.5',
-                                            border: msg.sender === 'user' ? 'none' : '1px solid #f1f5f9',
-                                        }, children: renderMarkdownText(msg.text) }), msg.products && msg.products.length > 0 && ((0, jsx_runtime_1.jsx)("div", { style: {
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '8px',
-                                            marginTop: '8px',
-                                            width: '100%',
-                                            maxWidth: '300px',
-                                        }, children: msg.products.map((prod) => ((0, jsx_runtime_1.jsxs)("div", { style: {
-                                                backgroundColor: '#ffffff',
-                                                border: '1px solid #e2e8f0',
-                                                borderRadius: '12px',
-                                                padding: '10px',
-                                                display: 'flex',
-                                                gap: '10px',
-                                                boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                                            }, children: [prod.imageUrl && ((0, jsx_runtime_1.jsx)("img", { src: prod.imageUrl, alt: prod.title, style: {
-                                                        width: '56px',
-                                                        height: '56px',
-                                                        borderRadius: '8px',
-                                                        objectFit: 'cover',
-                                                        backgroundColor: '#f8fafc',
-                                                    } })), (0, jsx_runtime_1.jsxs)("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }, children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h4", { style: { margin: '0 0 2px 0', fontSize: '13px', fontWeight: '600', color: '#1e293b' }, children: prod.title }), (0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '12px', fontWeight: '700', color: '#059669' }, children: [prod.price, " ", prod.currency] })] }), (0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', gap: '6px', marginTop: '6px' }, children: [config.addToCartEnabled && ((0, jsx_runtime_1.jsx)("button", { onClick: () => (0, cartBridge_1.requestAddToCart)(prod.id, 1), style: {
-                                                                        backgroundColor: primaryColor,
-                                                                        color: '#ffffff',
-                                                                        border: 'none',
-                                                                        borderRadius: '6px',
-                                                                        padding: '4px 8px',
-                                                                        fontSize: '11px',
-                                                                        fontWeight: '600',
-                                                                        cursor: 'pointer',
-                                                                    }, children: "+ Add to Cart" })), prod.productUrl && ((0, jsx_runtime_1.jsx)("a", { href: prod.productUrl, target: "_blank", rel: "noopener noreferrer", style: {
-                                                                        backgroundColor: '#f1f5f9',
-                                                                        color: '#475569',
-                                                                        border: '1px solid #cbd5e1',
-                                                                        borderRadius: '6px',
-                                                                        padding: '4px 8px',
-                                                                        fontSize: '11px',
-                                                                        textDecoration: 'none',
-                                                                        display: 'inline-flex',
-                                                                        alignItems: 'center',
-                                                                    }, children: "View \u2197" }))] })] })] }, prod.id))) })), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '10px', color: '#94a3b8', marginTop: '4px', paddingLeft: '4px', paddingRight: '4px' }, children: msg.time })] }, msg.id))), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                            fontWeight: '400',
+                                        }, children: renderMarkdownText(msg.text) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'MBot', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '8px',
-                                    fontSize: '12px',
+                                    fontSize: '12.5px',
                                     color: '#334155',
-                                    backgroundColor: '#ffffff',
+                                    backgroundColor: '#f8fafc',
                                     border: '1px solid #e2e8f0',
                                     padding: '8px 14px',
                                     borderRadius: '16px',
                                     maxWidth: '90%',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                                }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '14px' }, children: "\uD83E\uDDE0" }), (0, jsx_runtime_1.jsxs)("span", { style: { fontWeight: '600', color: '#1e293b' }, children: [thinkingPhase === 0 && '🔍 Analyzing intent & language...', thinkingPhase === 1 && '🧠 Querying knowledge base...', thinkingPhase === 2 && '⚡ Generating verified response...'] })] })), (0, jsx_runtime_1.jsx)("div", { ref: messagesEndRef })] }), (0, jsx_runtime_1.jsxs)("div", { style: {
-                            padding: '12px 16px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                                }, children: [(0, jsx_runtime_1.jsx)(BrainSvg, {}), (0, jsx_runtime_1.jsxs)("span", { style: { fontWeight: '600', color: '#0f172a' }, children: [thinkingPhase === 0 && 'Analyzing intent & language...', thinkingPhase === 1 && 'Querying knowledge base...', thinkingPhase === 2 && 'Generating verified response...'] })] })), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsx)("div", { style: {
+                                    marginTop: 'auto',
+                                    paddingTop: '16px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'flex-end',
+                                    gap: '8px',
+                                }, children: actionChips.map((chip, idx) => ((0, jsx_runtime_1.jsx)("button", { onClick: () => handleSend(chip.query), style: {
+                                        backgroundColor: '#ffffff',
+                                        border: '1.5px solid #00684a',
+                                        color: '#00684a',
+                                        padding: '10px 18px',
+                                        borderRadius: '22px',
+                                        fontSize: '13.5px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 6px rgba(0, 104, 74, 0.08)',
+                                        transition: 'all 0.15s ease',
+                                        textAlign: 'right',
+                                        maxWidth: '90%',
+                                    }, onMouseEnter: (e) => {
+                                        e.currentTarget.style.backgroundColor = '#00684a';
+                                        e.currentTarget.style.color = '#ffffff';
+                                    }, onMouseLeave: (e) => {
+                                        e.currentTarget.style.backgroundColor = '#ffffff';
+                                        e.currentTarget.style.color = '#00684a';
+                                    }, children: chip.label }, idx))) })), (0, jsx_runtime_1.jsx)("div", { ref: messagesEndRef })] })), (0, jsx_runtime_1.jsxs)("div", { style: {
+                            padding: '14px 18px',
                             backgroundColor: '#ffffff',
                             borderTop: '1px solid #f1f5f9',
                             display: 'flex',
@@ -665,33 +627,33 @@ function ChatWidget({ api }) {
                                     display: 'flex',
                                     gap: '8px',
                                     alignItems: 'center',
-                                    backgroundColor: '#f8fafc',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '24px',
-                                    padding: '4px 6px 4px 14px',
-                                    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                                    backgroundColor: '#ffffff',
+                                    border: '1.5px solid #e2e8f0',
+                                    borderRadius: '28px',
+                                    padding: '4px 6px 4px 16px',
+                                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
                                 }, children: [(0, jsx_runtime_1.jsx)("input", { type: "text", placeholder: "Ask about projects, services, or anything...", value: inputValue, onInput: (e) => setInputValue(e.target.value), style: {
                                             flex: 1,
-                                            padding: '8px 0',
+                                            padding: '9px 0',
                                             border: 'none',
                                             backgroundColor: 'transparent',
                                             color: '#0f172a',
-                                            fontSize: '13.5px',
+                                            fontSize: '14px',
                                             outline: 'none',
                                         } }), (0, jsx_runtime_1.jsx)("button", { type: "submit", disabled: !inputValue.trim() || isLoading, title: "Send message", style: {
-                                            backgroundColor: inputValue.trim() ? primaryColor : '#cbd5e1',
+                                            backgroundColor: inputValue.trim() ? '#00684a' : '#e2e8f0',
                                             color: '#ffffff',
                                             border: 'none',
                                             borderRadius: '50%',
-                                            width: '34px',
-                                            height: '34px',
+                                            width: '36px',
+                                            height: '36px',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             cursor: inputValue.trim() && !isLoading ? 'pointer' : 'default',
-                                            transition: 'background-color 0.2s ease, transform 0.15s ease',
+                                            transition: 'all 0.2s ease',
                                             flexShrink: 0,
-                                        }, children: (0, jsx_runtime_1.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("line", { x1: "22", y1: "2", x2: "11", y2: "13" }), (0, jsx_runtime_1.jsx)("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })] }) })] }), !config.hideBranding && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                        }, children: (0, jsx_runtime_1.jsx)(SendSvg, {}) })] }), !config.hideBranding && ((0, jsx_runtime_1.jsxs)("div", { style: {
                                     textAlign: 'center',
                                     fontSize: '10px',
                                     color: '#94a3b8',

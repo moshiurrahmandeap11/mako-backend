@@ -115,7 +115,8 @@ ${customPrompt}`;
     const tokenEfficiencyRule = `MAXIMUM CONCISENESS & ZERO REPETITION (STRICT RULE):
 - ALWAYS answer in ONLY 1 to 2 SHORT sentences (MAXIMUM 25-30 WORDS TOTAL).
 - Provide ONLY the direct, exact answer requested.
-- DO NOT create multiple paragraphs or repeating clauses (e.g. do NOT say "Apni ekhane click korle eta hobe... ar jodi sob dekhte chan tobe ekhane click korun...").
+- NEVER argue, challenge, or ask why the user said something (e.g. NEVER say "Ami bujhlam na keno bolchen").
+- DO NOT create multiple paragraphs or repeating clauses.
 - Example (Banglish query "amar direct project link lagbe"):
   - GOOD: "Amader project link: [Echo Platform](https://labtobit-frontend.vercel.app/casestudies/echo-platform) ebong [Lusion Studio](https://labtobit-frontend.vercel.app/casestudies/lusion-studio)।"`;
     return `${personaPrompt}
