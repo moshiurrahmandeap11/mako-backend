@@ -108,9 +108,10 @@ export class KeyRotator {
 
   /**
    * Execute Google Gemini OpenAI-compatible completion.
+   * Defaults to 'gemini-2.0-flash' with instant fallback to 'gemini-1.5-flash'.
    */
   public async executeGeminiCompletion(
-    model: string = 'gemini-3.6-flash',
+    model: string = 'gemini-2.0-flash',
     messages: any[],
     maxTokens: number = 380
   ): Promise<{ content: string; tokensUsed: number }> {
@@ -118,37 +119,38 @@ export class KeyRotator {
       throw new Error('No Gemini API keys available');
     }
 
-    const attempts = this.geminiClients.length;
-    for (let i = 0; i < attempts; i++) {
-      const { client, key } = this.geminiClients[this.geminiIndex];
-      this.geminiIndex = (this.geminiIndex + 1) % this.geminiClients.length;
+    const targetModels = [model, 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const uniqueModels = Array.from(new Set(targetModels));
 
-      try {
-        const completion = await client.chat.completions.create({
-          model,
-          messages,
-          max_tokens: maxTokens,
-          temperature: 0.3,
-        });
+    for (const currentModel of uniqueModels) {
+      const attempts = this.geminiClients.length;
+      for (let i = 0; i < attempts; i++) {
+        const { client, key } = this.geminiClients[this.geminiIndex];
+        this.geminiIndex = (this.geminiIndex + 1) % this.geminiClients.length;
 
-        const content = completion.choices[0]?.message?.content || '';
-        const tokensUsed = completion.usage?.total_tokens || 0;
-        return { content, tokensUsed };
-      } catch (error: any) {
-        const isRateLimit = error?.status === 429 || error?.message?.includes('429');
-        logger.warn(
-          `[KeyRotator] Gemini key (${key.substring(0, 10)}...) failed ${
-            isRateLimit ? '(429 Rate Limit)' : ''
-          }. Retrying with next key in pool...`
-        );
+        try {
+          const completion = await client.chat.completions.create({
+            model: currentModel,
+            messages,
+            max_tokens: maxTokens,
+            temperature: 0.3,
+          });
 
-        if (i === attempts - 1) {
-          throw error;
+          const content = completion.choices[0]?.message?.content || '';
+          const tokensUsed = completion.usage?.total_tokens || 0;
+          return { content, tokensUsed };
+        } catch (error: any) {
+          const isRateLimit = error?.status === 429 || error?.message?.includes('429');
+          logger.warn(
+            `[KeyRotator] Gemini key (${key.substring(0, 10)}...) on model ${currentModel} failed ${
+              isRateLimit ? '(429 Rate Limit)' : ''
+            }. Trying next key/model...`
+          );
         }
       }
     }
 
-    throw new Error('All Gemini API keys failed');
+    throw new Error('All Gemini API keys and model fallbacks failed');
   }
 
   /**

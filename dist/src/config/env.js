@@ -22,31 +22,36 @@ exports.env = {
     GROQ_API_KEY: process.env.GROQ_API_KEY || '',
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
     get ANTHROPIC_API_KEYS() {
-        return (process.env.ANTHROPIC_API_KEY || '')
+        const raw = process.env.ANTHROPIC_API_KEYS || process.env.ANTHROPIC_API_KEY || '';
+        return raw
             .split(',')
             .map((k) => k.trim())
             .filter((k) => k.length > 0 && !k.includes('...'));
     },
     get OPENAI_API_KEYS() {
-        return (process.env.OPENAI_API_KEY || '')
+        const raw = process.env.OPENAI_API_KEYS || process.env.OPENAI_API_KEY || '';
+        return raw
             .split(',')
             .map((k) => k.trim())
             .filter((k) => k.length > 0 && !k.includes('...'));
     },
     get OPENROUTER_API_KEYS() {
-        return (process.env.OPENROUTER_API_KEY || '')
+        const raw = process.env.OPENROUTER_API_KEYS || process.env.OPENROUTER_API_KEY || '';
+        return raw
             .split(',')
             .map((k) => k.trim())
             .filter((k) => k.length > 0 && !k.includes('...'));
     },
     get GROQ_API_KEYS() {
-        return (process.env.GROQ_API_KEY || '')
+        const raw = process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || '';
+        return raw
             .split(',')
             .map((k) => k.trim())
             .filter((k) => k.length > 0 && !k.includes('...'));
     },
     get GEMINI_API_KEYS() {
-        return (process.env.GEMINI_API_KEY || '')
+        const raw = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
+        return raw
             .split(',')
             .map((k) => k.trim())
             .filter((k) => k.length > 0 && !k.includes('...'));

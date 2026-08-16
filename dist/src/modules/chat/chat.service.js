@@ -85,9 +85,15 @@ ${customPrompt}`;
     const basePersona = yamlConfig?.system_instructions?.persona || `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
     const personaPrompt = `You are the official AI Assistant for "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}. ${basePersona}`;
     const rules = yamlConfig?.system_instructions?.strict_rules;
-    const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message. If the user writes in English, reply in English. If Bengali or Banglish, reply in Bengali.`;
     const formatRule = rules?.formatting?.instructions || `Use clean GitHub Flavored Markdown formatting with bold titles and clickable link badges.`;
     const cartRule = rules?.cart_action?.instructions || ``;
+    const langRule = `LANGUAGE MATCHING & NATURAL FLUENCY (CRITICAL):
+- Respond in the EXACT same language and script as the user's message.
+- If user writes in English -> Reply in clear English.
+- If user writes in Bengali script (বাংলা) -> Reply in natural, grammatically correct Bengali (বাংলা).
+- If user writes in Banglish (Romanized Bengali, e.g. "koto charge koro", "tumi ki kaj koro", "project link daw") -> Reply in smooth, natural, native Banglish.
+- NEVER mix conflicting pronouns (e.g. NEVER say "apni amra", say "Apni amader email korte paren").
+- NEVER repeat identical phrases or duplicate contact info across paragraphs. Keep it natural, human, and perfectly phrased.`;
     const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (CRITICAL):
 - You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "My").
 - NEVER refer to "${merchantName}" in the third person ("they", "their", "them", "${merchantName}'s team").
@@ -100,11 +106,12 @@ ${customPrompt}`;
 - NEVER write general programming code (e.g. Python scripts, games, algorithmic solutions, C++/Java code), solve general academic homework, or act as a general AI/ChatGPT.
 - If a user asks an out-of-scope query (e.g. "give me a snake game in python", general programming, trivia, recipes, or unrelated topics), you MUST POLITELY DECLINE. State clearly: "I am the AI assistant dedicated to ${merchantName}. I can only help you with questions about our projects, services, and website." and invite them to explore ${merchantName}'s offerings.`;
     const tokenEfficiencyRule = `MAXIMUM CONCISENESS & ZERO TOKEN WASTE (STRICT RULE):
-- ALWAYS answer in 1 to 2 SHORT sentences (MAX 35 WORDS).
+- ALWAYS answer in 1 to 2 SHORT sentences (MAX 35 WORDS TOTAL).
 - Provide ONLY the direct, exact answer requested.
 - NEVER add introductory fluff (e.g. "Certainly!", "I am afraid I don't have...", "Here is what you asked").
 - NEVER add closing questions or filler (e.g. "Would you like me to guide you?", "Let me know if you need help!").
-- Example 1:
+- Never list the same email/phone multiple times. State it once cleanly.
+- Example:
   - User: "project link daw"
   - BAD (WASTEFUL): "I'm afraid I don't have a direct link to a specific project. However, if you're interested in starting a project or learning more about our work, you can reach out..."
   - GOOD (CONCISE): "We don't have direct project links listed. You can contact us at hello@labtobit.com or click 'START A PROJECT' on our site."`;
@@ -224,10 +231,12 @@ Currently, no specific catalog items or knowledge base articles matched this que
     catch (err) {
         logger_1.logger.error('RAG Search Error:', err);
     }
-    // Resolve LLM Provider & Vision Support
+    // Resolve LLM Provider & Vision Support (Gemini as #1 Primary Choice for Superior Multilingual & Banglish Fluency)
     let selectedProvider = provider || '';
     if (!selectedProvider) {
-        if (keyRotator_1.keyRotator.hasGroqKeys())
+        if (keyRotator_1.keyRotator.hasGeminiKeys())
+            selectedProvider = 'gemini';
+        else if (keyRotator_1.keyRotator.hasGroqKeys())
             selectedProvider = 'groq';
         else if (keyRotator_1.keyRotator.hasOpenRouterKeys())
             selectedProvider = 'openrouter';
@@ -261,8 +270,21 @@ Currently, no specific catalog items or knowledge base articles matched this que
     messagesParam.push({ role: 'user', content: userContent });
     let executionSuccess = false;
     let estimatedTokens = 0;
-    // Attempt 1: Primary Provider (Groq)
-    if (selectedProvider === 'groq' && keyRotator_1.keyRotator.hasGroqKeys()) {
+    // Attempt 1: Primary High-Intelligence Multilingual Provider (Google Gemini AI Studio)
+    if ((selectedProvider === 'gemini' || keyRotator_1.keyRotator.hasGeminiKeys()) && !executionSuccess) {
+        try {
+            const result = await keyRotator_1.keyRotator.executeGeminiCompletion('gemini-2.0-flash', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
+            finalReply = result.content;
+            estimatedTokens = result.tokensUsed;
+            executionSuccess = true;
+        }
+        catch (error) {
+            logger_1.logger.error('Gemini provider pool failed, falling back to Groq pool:', error);
+            selectedProvider = 'groq';
+        }
+    }
+    // Attempt 2: High-Speed Groq Pool (llama-3.3-70b-versatile / llama-3.2-11b-vision-preview)
+    if (!executionSuccess && (selectedProvider === 'groq' || keyRotator_1.keyRotator.hasGroqKeys())) {
         try {
             const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
             const result = await keyRotator_1.keyRotator.executeGroqCompletion(model, [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
@@ -271,27 +293,14 @@ Currently, no specific catalog items or knowledge base articles matched this que
             executionSuccess = true;
         }
         catch (error) {
-            logger_1.logger.error('Groq provider pool failed, falling back to Gemini pool:', error);
-            selectedProvider = 'gemini';
-        }
-    }
-    // Attempt 2: Direct Google Gemini AI Studio Pool
-    if (!executionSuccess && (selectedProvider === 'gemini' || keyRotator_1.keyRotator.hasGeminiKeys())) {
-        try {
-            const result = await keyRotator_1.keyRotator.executeGeminiCompletion('gemini-3.6-flash', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
-            finalReply = result.content;
-            estimatedTokens = result.tokensUsed;
-            executionSuccess = true;
-        }
-        catch (error) {
-            logger_1.logger.error('Gemini provider pool failed, falling back to OpenRouter pool:', error);
+            logger_1.logger.error('Groq provider pool failed, falling back to OpenRouter pool:', error);
             selectedProvider = 'openrouter';
         }
     }
-    // Attempt 3: Fallback to OpenRouter
+    // Attempt 3: Fallback to OpenRouter (google/gemini-2.0-flash-001)
     if (!executionSuccess && (selectedProvider === 'openrouter' || keyRotator_1.keyRotator.hasOpenRouterKeys())) {
         try {
-            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('google/gemini-2.5-flash', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
+            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('google/gemini-2.0-flash-001', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;
@@ -301,7 +310,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
             selectedProvider = 'claude';
         }
     }
-    // Attempt 3: Fallback to Anthropic
+    // Attempt 4: Fallback to Anthropic Claude 3.5 Sonnet
     if (!executionSuccess && (selectedProvider === 'claude' || keyRotator_1.keyRotator.hasAnthropicKeys())) {
         try {
             const anthropicMessages = conversation.messages.map((m) => ({
