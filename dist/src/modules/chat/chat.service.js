@@ -163,17 +163,18 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
     let cartAction = null;
     let finalReply = '';
     const thoughts = [];
+    const textSafe = userMessage || '';
     // 1. Dynamic Language & Script Analysis
-    const isBengaliScript = /[\u0980-\u09FF]/.test(userMessage);
-    const isBanglish = /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website)\b/i.test(userMessage);
+    const isBengaliScript = /[\u0980-\u09FF]/.test(textSafe);
+    const isBanglish = /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website)\b/i.test(textSafe);
     if (isBengaliScript) {
         thoughts.push(`🗣️ Detected Bengali script query — Applying natural Bangla grammar.`);
     }
     else if (isBanglish) {
-        thoughts.push(`🗣️ Detected Romanized Banglish query ("${userMessage.substring(0, 30)}${userMessage.length > 30 ? '...' : ''}") — Enforcing native phonetics.`);
+        thoughts.push(`🗣️ Detected Romanized Banglish query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? '...' : ''}") — Enforcing native phonetics.`);
     }
     else {
-        thoughts.push(`🗣️ Analyzed English query ("${userMessage.substring(0, 30)}${userMessage.length > 30 ? '...' : ''}") — Setting concise representative persona.`);
+        thoughts.push(`🗣️ Analyzed English query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? '...' : ''}") — Setting concise representative persona.`);
     }
     if (imageUrl) {
         thoughts.push(`🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`);
