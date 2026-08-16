@@ -159,9 +159,15 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
       select: { allowedDomains: true },
     });
 
-    const targetDomain = req.body.domain || (user?.allowedDomains && user.allowedDomains[0]);
+    // Filter out localhost and 127.0.0.1 from allowedDomains to find the public domain
+    const publicDomains = (user?.allowedDomains || []).filter((d: string) => {
+      const clean = d.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+      return clean && clean !== 'localhost' && clean !== '127.0.0.1' && clean !== '0.0.0.0';
+    });
+
+    const targetDomain = req.body.domain || publicDomains[0] || user?.allowedDomains?.[0];
     if (!targetDomain) {
-      return res.status(400).json({ error: 'No domain configured for this merchant' });
+      return res.status(400).json({ error: 'No valid public domain configured for this merchant' });
     }
 
     logger.info(`Merchant ${merchantId} triggered full rescrape of domain ${targetDomain}`);
