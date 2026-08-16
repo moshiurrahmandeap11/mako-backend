@@ -297,10 +297,10 @@ Currently, no specific catalog items or knowledge base articles matched this que
             selectedProvider = 'openrouter';
         }
     }
-    // Attempt 3: Fallback to OpenRouter (google/gemini-2.0-flash-001)
+    // Attempt 3: Fallback to OpenRouter (meta-llama/llama-3.3-70b-instruct)
     if (!executionSuccess && (selectedProvider === 'openrouter' || keyRotator_1.keyRotator.hasOpenRouterKeys())) {
         try {
-            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('google/gemini-2.0-flash-001', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
+            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('meta-llama/llama-3.3-70b-instruct', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;
