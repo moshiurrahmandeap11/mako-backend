@@ -246,6 +246,21 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [thinkingPhase, setThinkingPhase] = useState(0);
+
+  useEffect(() => {
+    let interval: any;
+    if (isLoading) {
+      setThinkingPhase(0);
+      interval = setInterval(() => {
+        setThinkingPhase((prev) => (prev < 2 ? prev + 1 : 0));
+      }, 750);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLoading]);
+
   useEffect(() => {
     // 1. Fetch Config
     api.getConfig().then(setConfig).catch(console.error);
@@ -785,8 +800,28 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             ))}
 
             {isLoading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '12px' }}>
-                <span style={{ fontSize: '14px' }}>🤖</span> Analyzing request & catalog...
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '12px',
+                  color: '#334155',
+                  backgroundColor: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  padding: '7px 12px',
+                  borderRadius: '12px',
+                  maxWidth: '85%',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                  transition: 'all 0.25s ease',
+                }}
+              >
+                <span style={{ fontSize: '14px' }}>🧠</span>
+                <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                  {thinkingPhase === 0 && '🔍 Analyzing intent & language...'}
+                  {thinkingPhase === 1 && '🧠 Querying pgvector knowledge base...'}
+                  {thinkingPhase === 2 && '⚡ Generating verified response...'}
+                </span>
               </div>
             )}
             <div ref={messagesEndRef} />

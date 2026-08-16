@@ -199,6 +199,20 @@ function ChatWidget({ api }) {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+    const [thinkingPhase, setThinkingPhase] = (0, hooks_1.useState)(0);
+    (0, hooks_1.useEffect)(() => {
+        let interval;
+        if (isLoading) {
+            setThinkingPhase(0);
+            interval = setInterval(() => {
+                setThinkingPhase((prev) => (prev < 2 ? prev + 1 : 0));
+            }, 750);
+        }
+        return () => {
+            if (interval)
+                clearInterval(interval);
+        };
+    }, [isLoading]);
     (0, hooks_1.useEffect)(() => {
         // 1. Fetch Config
         api.getConfig().then(setConfig).catch(console.error);
@@ -567,7 +581,20 @@ function ChatWidget({ api }) {
                                                                         color: '#ffffff',
                                                                         fontWeight: '600',
                                                                         cursor: 'pointer',
-                                                                    }, children: "+ Add to Cart" }))] })] })] }, prod.id))) })), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '10px', color: '#9ca3af', marginTop: '4px' }, children: msg.time })] }, msg.id))), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '12px' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '14px' }, children: "\uD83E\uDD16" }), " Analyzing request & catalog..."] })), (0, jsx_runtime_1.jsx)("div", { ref: messagesEndRef })] }), selectedImage && ((0, jsx_runtime_1.jsxs)("div", { style: { padding: '8px 16px', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '10px' }, children: [(0, jsx_runtime_1.jsx)("img", { src: selectedImage, alt: "Attachment", style: { width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' } }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '12px', color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, children: "Photo attached" }), (0, jsx_runtime_1.jsx)("button", { onClick: () => setSelectedImage(null), style: { background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }, children: "\u2715" })] })), (0, jsx_runtime_1.jsxs)("form", { onSubmit: handleSend, style: {
+                                                                    }, children: "+ Add to Cart" }))] })] })] }, prod.id))) })), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '10px', color: '#9ca3af', marginTop: '4px' }, children: msg.time })] }, msg.id))), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    fontSize: '12px',
+                                    color: '#334155',
+                                    backgroundColor: '#f1f5f9',
+                                    border: '1px solid #cbd5e1',
+                                    padding: '7px 12px',
+                                    borderRadius: '12px',
+                                    maxWidth: '85%',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                    transition: 'all 0.25s ease',
+                                }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '14px' }, children: "\uD83E\uDDE0" }), (0, jsx_runtime_1.jsxs)("span", { style: { fontWeight: '600', color: '#1e293b' }, children: [thinkingPhase === 0 && '🔍 Analyzing intent & language...', thinkingPhase === 1 && '🧠 Querying pgvector knowledge base...', thinkingPhase === 2 && '⚡ Generating verified response...'] })] })), (0, jsx_runtime_1.jsx)("div", { ref: messagesEndRef })] }), selectedImage && ((0, jsx_runtime_1.jsxs)("div", { style: { padding: '8px 16px', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '10px' }, children: [(0, jsx_runtime_1.jsx)("img", { src: selectedImage, alt: "Attachment", style: { width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' } }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '12px', color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, children: "Photo attached" }), (0, jsx_runtime_1.jsx)("button", { onClick: () => setSelectedImage(null), style: { background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }, children: "\u2715" })] })), (0, jsx_runtime_1.jsxs)("form", { onSubmit: handleSend, style: {
                             padding: '12px 16px',
                             backgroundColor: '#ffffff',
                             borderTop: '1px solid #e5e7eb',

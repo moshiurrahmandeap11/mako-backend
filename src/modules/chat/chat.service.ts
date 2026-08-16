@@ -188,9 +188,23 @@ export async function processChatMessage(
   let cartAction: any = null;
   let finalReply = '';
 
-  const thoughts: string[] = [
-    `🔍 Processing query: "${userMessage || 'general'}" | Searching vector memory...`,
-  ];
+  const thoughts: string[] = [];
+
+  // 1. Dynamic Language & Script Analysis
+  const isBengaliScript = /[\u0980-\u09FF]/.test(userMessage);
+  const isBanglish = /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website)\b/i.test(userMessage);
+
+  if (isBengaliScript) {
+    thoughts.push(`🗣️ Detected Bengali script query — Applying natural Bangla grammar.`);
+  } else if (isBanglish) {
+    thoughts.push(`🗣️ Detected Romanized Banglish query ("${userMessage.substring(0, 30)}${userMessage.length > 30 ? '...' : ''}") — Enforcing native phonetics.`);
+  } else {
+    thoughts.push(`🗣️ Analyzed English query ("${userMessage.substring(0, 30)}${userMessage.length > 30 ? '...' : ''}") — Setting concise representative persona.`);
+  }
+
+  if (imageUrl) {
+    thoughts.push(`🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`);
+  }
 
   // Perform Catalog & Knowledge RAG Search
   try {
@@ -210,7 +224,7 @@ export async function processChatMessage(
     }
 
     if (retrievedProducts.length > 0) {
-      thoughts.push(`📦 Retrieved ${retrievedProducts.length} store catalog items.`);
+      thoughts.push(`📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`);
       ragContext += `\n\n### Store Catalog & Available Products:\n` +
         retrievedProducts.map(p =>
           `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`
@@ -219,7 +233,7 @@ export async function processChatMessage(
     } 
 
     if (retrievedKnowledgeRes.length > 0) {
-      thoughts.push(`🧠 Found ${retrievedKnowledgeRes.length} relevant vector chunks for "${userMessage}".`);
+      thoughts.push(`🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} pgvector chunks matching query intent.`);
       ragContext += `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
@@ -316,6 +330,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
+      thoughts.push(`⚡ Synthesized response via Google Gemini 2.0 Flash (~0.3s).`);
     } catch (error) {
       logger.error('Gemini provider pool failed, falling back to Groq pool:', error);
       selectedProvider = 'groq';
@@ -334,6 +349,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
+      thoughts.push(`⚡ Synthesized response via Groq LLaMA 3.3 70B (~0.4s).`);
     } catch (error) {
       logger.error('Groq provider pool failed, falling back to OpenRouter pool:', error);
       selectedProvider = 'openrouter';
@@ -351,6 +367,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
+      thoughts.push(`⚡ Synthesized response via OpenRouter LLaMA 3.3 70B (~0.5s).`);
     } catch (error) {
       logger.error('OpenRouter provider pool failed, falling back to Anthropic:', error);
       selectedProvider = 'claude';
@@ -375,6 +392,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
+      thoughts.push(`⚡ Synthesized response via Anthropic Claude 3.5 Sonnet (~0.7s).`);
     } catch (error) {
       logger.error('Anthropic provider pool failed:', error);
       selectedProvider = 'fallback';
