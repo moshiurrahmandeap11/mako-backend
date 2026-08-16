@@ -19,7 +19,7 @@ interface MessageItem {
 
 // Crisp Vector SVGs (No Emojis)
 const BotMascotSvg = () => (
-  <svg width="30" height="30" viewBox="0 0 32 32" fill="none" style={{ flexShrink: 0 }}>
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ flexShrink: 0 }}>
     <rect width="32" height="32" rx="10" fill="#f0fdf4" />
     <path d="M16 5V8" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
     <circle cx="16" cy="4" r="1.5" fill="#10b981" />
@@ -55,7 +55,7 @@ const RefreshSvg = () => (
 );
 
 const SendSvg = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="22" y1="2" x2="11" y2="13" />
     <polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" fillOpacity="0.25" />
   </svg>
@@ -205,7 +205,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       setIsOpeningSkeleton(true);
       const timer = setTimeout(() => {
         setIsOpeningSkeleton(false);
-      }, 400);
+      }, 380);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -280,6 +280,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       const absLeft = baseLeft + currentX;
       const absTop = baseTop + currentY;
 
+      // Nearest corner calculation
       const snapLeft = absLeft < (windowWidth - elemWidth) / 2 ? 24 : windowWidth - 24 - elemWidth;
       const snapTop = absTop < (windowHeight - elemHeight) / 2 ? 24 : windowHeight - 24 - elemHeight;
 
@@ -450,13 +451,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
 
   const primaryColor = config.primaryColor || '#0f172a';
 
-  // MongoDB Style Starter Action Chips
-  const actionChips = [
-    { label: 'Explore our projects', query: 'apnader portfolio te ki ki project ache' },
-    { label: 'Discuss pricing for a new project', query: 'What services and pricing do you offer?' },
-    { label: 'Contact our team', query: 'How can I contact your team directly?' },
-  ];
-
   return (
     <div
       style={{
@@ -477,6 +471,20 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       }}
     >
       <style>{`
+        @keyframes mbot-open-smooth {
+          0% {
+            opacity: 0;
+            transform: scale(0.9) translateY(24px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .mbot-window-enter {
+          animation: mbot-open-smooth 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transform-origin: bottom right;
+        }
         @keyframes mbot-shimmer {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
@@ -485,11 +493,11 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
           background-size: 200% 100%;
           animation: mbot-shimmer 1.4s infinite linear;
-          border-radius: 8px;
+          border-radius: 12px;
         }
       `}</style>
 
-      {/* Floating Circular Launcher FAB (MongoDB & Zoho Style) */}
+      {/* Floating Circular Launcher FAB */}
       {!isOpen && (
         <button
           onMouseDown={(e: MouseEvent) => {
@@ -529,7 +537,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             color: '#ffffff',
             border: '2px solid rgba(255, 255, 255, 0.25)',
             cursor: isDragging ? 'grabbing' : 'pointer',
-            boxShadow: '0 14px 32px -4px rgba(0, 0, 0, 0.35), 0 6px 14px -2px rgba(0, 0, 0, 0.2)',
+            boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.38), 0 6px 16px -2px rgba(0, 0, 0, 0.22)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -559,9 +567,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         </button>
       )}
 
-      {/* Heavy, Ultra-Premium MongoDB MBot Window */}
+      {/* Heavy, Ultra-Premium Enterprise Chat Window with Spring Opening Animation */}
       {isOpen && (
         <div
+          className={!isDragging ? 'mbot-window-enter' : ''}
           style={{
             position: isMobile ? 'fixed' : 'relative',
             top: isMobile ? '0' : 'auto',
@@ -575,14 +584,14 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             maxHeight: isMobile ? '100dvh' : 'calc(100vh - 48px)',
             backgroundColor: '#ffffff',
             borderRadius: isMobile ? '0px' : '24px',
-            boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+            boxShadow: '0 28px 65px -12px rgba(15, 23, 42, 0.32), 0 12px 28px -6px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.08)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            border: isMobile ? 'none' : '1px solid #e2e8f0',
+            border: isMobile ? 'none' : '1px solid #cbd5e1',
           }}
         >
-          {/* Header (MongoDB MBot Style Clean White with Vector Icons) */}
+          {/* Header (Clean, Heavy, Enterprise-Grade Header) */}
           <div
             onMouseDown={(e: MouseEvent) => {
               if ((e.target as HTMLElement)?.closest('button')) return;
@@ -612,13 +621,14 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             }}
             style={{
               backgroundColor: '#ffffff',
-              padding: '16px 20px',
+              padding: '18px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               cursor: isMobile ? 'default' : isDragging ? 'grabbing' : 'grab',
               userSelect: 'none',
-              borderBottom: '1px solid #f1f5f9',
+              borderBottom: '1.5px solid #f1f5f9',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             }}
             title="Click and drag to move chat window"
           >
@@ -628,7 +638,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
 
               <div>
                 <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.2px' }}>
-                  {config.botName || 'MBot'}
+                  {config.botName || 'Shop Assistant'}
                 </h3>
                 <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginTop: '1px' }}>
                   The team can also help
@@ -643,10 +653,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 title="Restart chat"
                 style={{
                   background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
+                  border: '1.5px solid #e2e8f0',
                   borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -663,10 +673,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 title="Close chat"
                 style={{
                   background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
+                  border: '1.5px solid #e2e8f0',
                   borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -680,21 +690,22 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             </div>
           </div>
 
-          {/* Skeleton Loading State (400ms on open) */}
+          {/* Skeleton Shimmer Loading State (~380ms) */}
           {isOpeningSkeleton ? (
             <div style={{ flex: '1 1 0%', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div className="mbot-skeleton" style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0 }} />
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div className="mbot-skeleton" style={{ width: '70%', height: '36px', borderRadius: '14px' }} />
-                  <div className="mbot-skeleton" style={{ width: '35%', height: '14px' }} />
+                  <div className="mbot-skeleton" style={{ width: '75%', height: '44px', borderRadius: '16px' }} />
+                  <div className="mbot-skeleton" style={{ width: '40%', height: '14px' }} />
                 </div>
               </div>
 
-              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
-                <div className="mbot-skeleton" style={{ width: '65%', height: '38px', borderRadius: '20px' }} />
-                <div className="mbot-skeleton" style={{ width: '80%', height: '38px', borderRadius: '20px' }} />
-                <div className="mbot-skeleton" style={{ width: '55%', height: '38px', borderRadius: '20px' }} />
+              <div style={{ display: 'flex', gap: '12px', marginTop: '14px' }}>
+                <div className="mbot-skeleton" style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className="mbot-skeleton" style={{ width: '60%', height: '36px', borderRadius: '16px' }} />
+                </div>
               </div>
             </div>
           ) : (
@@ -778,14 +789,15 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     style={{
                       backgroundColor: msg.sender === 'user' ? primaryColor : '#f1f5f9',
                       color: msg.sender === 'user' ? '#ffffff' : '#0f172a',
-                      padding: '13px 18px',
+                      padding: '14px 18px',
                       borderRadius: msg.sender === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
                       maxWidth: '85%',
                       wordBreak: 'break-word',
-                      boxShadow: msg.sender === 'user' ? '0 4px 12px rgba(0,0,0,0.12)' : 'none',
+                      boxShadow: msg.sender === 'user' ? '0 4px 14px rgba(0,0,0,0.15)' : 'none',
                       fontSize: '14.5px',
                       lineHeight: '1.5',
-                      fontWeight: '400',
+                      fontWeight: '450',
+                      border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
                     }}
                   >
                     {renderMarkdownText(msg.text)}
@@ -794,7 +806,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   {/* Subtitle / Timestamp under Bot Bubble */}
                   {msg.sender === 'bot' && (
                     <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }}>
-                      {config.botName || 'MBot'} • AI Agent • {msg.time}
+                      {config.botName || 'Shop Assistant'} • AI Agent • {msg.time}
                     </span>
                   )}
                   {msg.sender === 'user' && (
@@ -815,7 +827,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     fontSize: '12.5px',
                     color: '#334155',
                     backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    border: '1.5px solid #e2e8f0',
                     padding: '8px 14px',
                     borderRadius: '16px',
                     maxWidth: '90%',
@@ -831,61 +843,16 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 </div>
               )}
 
-              {/* Stacked Suggested Action Chips (MongoDB MBot Style at Bottom-Right) */}
-              {messages.length <= 1 && !isLoading && (
-                <div
-                  style={{
-                    marginTop: 'auto',
-                    paddingTop: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end',
-                    gap: '8px',
-                  }}
-                >
-                  {actionChips.map((chip, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSend(chip.query)}
-                      style={{
-                        backgroundColor: '#ffffff',
-                        border: '1.5px solid #00684a',
-                        color: '#00684a',
-                        padding: '10px 18px',
-                        borderRadius: '22px',
-                        fontSize: '13.5px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(0, 104, 74, 0.08)',
-                        transition: 'all 0.15s ease',
-                        textAlign: 'right',
-                        maxWidth: '90%',
-                      }}
-                      onMouseEnter={(e: any) => {
-                        e.currentTarget.style.backgroundColor = '#00684a';
-                        e.currentTarget.style.color = '#ffffff';
-                      }}
-                      onMouseLeave={(e: any) => {
-                        e.currentTarget.style.backgroundColor = '#ffffff';
-                        e.currentTarget.style.color = '#00684a';
-                      }}
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
               <div ref={messagesEndRef} />
             </div>
           )}
 
-          {/* Footer Input Bar (MongoDB MBot Pill Bar with SVG Send Button) */}
+          {/* Heavy Footer Input Bar with SVG Send Button */}
           <div
             style={{
               padding: '14px 18px',
               backgroundColor: '#ffffff',
-              borderTop: '1px solid #f1f5f9',
+              borderTop: '1.5px solid #f1f5f9',
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
@@ -901,10 +868,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 gap: '8px',
                 alignItems: 'center',
                 backgroundColor: '#ffffff',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '28px',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: '30px',
                 padding: '4px 6px 4px 16px',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
               }}
             >
               <input
@@ -928,7 +895,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 disabled={!inputValue.trim() || isLoading}
                 title="Send message"
                 style={{
-                  backgroundColor: inputValue.trim() ? '#00684a' : '#e2e8f0',
+                  backgroundColor: inputValue.trim() ? primaryColor : '#cbd5e1',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '50%',
@@ -951,9 +918,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               <div
                 style={{
                   textAlign: 'center',
-                  fontSize: '10px',
+                  fontSize: '10.5px',
                   color: '#94a3b8',
                   letterSpacing: '0.2px',
+                  marginTop: '2px',
                 }}
               >
                 Powered by <strong style={{ color: '#64748b', fontWeight: '600' }}>Labto AI</strong>
