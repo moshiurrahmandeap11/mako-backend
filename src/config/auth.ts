@@ -6,7 +6,7 @@ import { env } from './env';
 import { sendOtpEmail } from '../utils/email';
 
 export const auth = betterAuth({
-  baseURL: env.BETTER_AUTH_URL || 'https://labto.ahsanul.dev/api/auth',
+  baseURL: env.BETTER_AUTH_URL || 'https://mako-frontend.vercel.app/api/auth',
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
