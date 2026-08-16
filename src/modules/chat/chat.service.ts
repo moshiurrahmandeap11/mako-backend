@@ -7,6 +7,7 @@ import { prisma } from '../../config/db';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { keyRotator } from '../../utils/keyRotator';
+import { autoLearnFromConversation } from '../../services/autoLearning.service';
 import { searchProductsTool } from './tools/searchProducts.tool';
 import { searchKnowledgeTool } from './tools/searchKnowledge.tool';
 import { addToCartTool } from './tools/addToCart.tool';
@@ -376,6 +377,11 @@ Currently, no specific catalog items or knowledge base articles matched this que
       toolCalls: recommendedProducts.length > 0 || cartAction ? { recommendedProducts, cartAction } : undefined,
     },
   });
+
+  // Trigger non-blocking background AI Auto-Learning from conversation history
+  autoLearnFromConversation(merchantId, sessionId).catch((err) =>
+    logger.error('Background auto-learning failed:', err)
+  );
 
   return {
     sessionId,
