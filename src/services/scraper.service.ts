@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import puppeteer from 'puppeteer';
 import { prisma } from '../config/db';
 import { generateEmbedding } from '../utils/embeddings';
 import { logger } from '../utils/logger';
@@ -458,6 +459,65 @@ async function indexPageContent(
 }
 
 /**
+ * Headless Browser SPA Hydration (Smart Puppeteer Scraper)
+ * Used when a modern client-rendered SPA (Next.js, React, Vue) has missing or client-rendered DOM.
+ */
+async function fetchRenderedHtmlWithPuppeteer(url: string): Promise<string> {
+  let browser: any = null;
+  try {
+    logger.info(`[Puppeteer] Launching lightweight headless browser for SPA rendering on ${url}`);
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+      ],
+    });
+
+    const page = await browser.newPage();
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 LabtoBot/2.0'
+    );
+
+    // Save memory & speed up crawl by blocking images, media, stylesheets, and fonts
+    await page.setRequestInterception(true);
+    page.on('request', (req: any) => {
+      const type = req.resourceType();
+      if (['image', 'media', 'font'].includes(type)) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    // Brief sleep for React/Next.js hydration
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    const content = await page.content();
+    if (content.includes("This page couldn’t load") || content.includes("This page couldn't load")) {
+      logger.warn(`[Puppeteer] Page rendered WebGL fallback error, preserving static HTML`);
+      return '';
+    }
+
+    logger.info(`[Puppeteer] Rendered SPA HTML successfully (${content.length} bytes) for ${url}`);
+    return content;
+  } catch (err: any) {
+    logger.warn(`[Puppeteer] Headless render skipped or failed on ${url}: ${err?.message || err}`);
+    return '';
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {}
+    }
+  }
+}
+
+/**
  * Main Full Hybrid Web Crawler
  */
 export async function scrapeWebsite(targetUrl: string, merchantId: string): Promise<ScrapeResult> {
@@ -527,7 +587,22 @@ export async function scrapeWebsite(targetUrl: string, merchantId: string): Prom
 
       if (!response.ok) continue;
 
-      const html = await response.text();
+      let html = await response.text();
+
+      // Detect Client-Side React/Next.js SPA or SSR Bailout
+      const isSpaBailout =
+        html.includes('BAILOUT_TO_CLIENT_SIDE_RENDERING') ||
+        html.includes('data-dgst="BAILOUT') ||
+        (html.includes('id="__next"') && html.length < 2500) ||
+        (html.includes('id="root"') && html.length < 1500);
+
+      if (isSpaBailout) {
+        logger.info(`[Scraper] SPA / Client-Side Rendering detected on ${currentUrlStr}. Running Headless Hydration...`);
+        const hydratedHtml = await fetchRenderedHtmlWithPuppeteer(currentUrlStr);
+        if (hydratedHtml && hydratedHtml.length > html.length) {
+          html = hydratedHtml;
+        }
+      }
 
       // Index current page content
       const { products, chunksCount, pageTitle, pageMarkdown } = await indexPageContent(
@@ -607,7 +682,22 @@ export async function scrapeSingleUrl(targetUrl: string, merchantId: string) {
     throw new Error(`Failed to fetch URL: HTTP ${response.status} ${response.statusText}`);
   }
 
-  const html = await response.text();
+  let html = await response.text();
+
+  const isSpaBailout =
+    html.includes('BAILOUT_TO_CLIENT_SIDE_RENDERING') ||
+    html.includes('data-dgst="BAILOUT') ||
+    (html.includes('id="__next"') && html.length < 2500) ||
+    (html.includes('id="root"') && html.length < 1500);
+
+  if (isSpaBailout) {
+    logger.info(`[Scraper] Single URL SPA detected on ${parsedUrl.href}. Hydrating via Puppeteer...`);
+    const hydratedHtml = await fetchRenderedHtmlWithPuppeteer(parsedUrl.href);
+    if (hydratedHtml && hydratedHtml.length > html.length) {
+      html = hydratedHtml;
+    }
+  }
+
   return await indexPageContent(parsedUrl.href, html, merchantId, parsedUrl.origin);
 }
 
