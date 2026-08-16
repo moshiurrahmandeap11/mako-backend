@@ -107,11 +107,15 @@ ${customPrompt}`;
 - NEVER write general programming code (e.g. Python scripts, games, algorithmic solutions, C++/Java code), solve general academic homework, or act as a general AI/ChatGPT.
 - If a user asks an out-of-scope query (e.g. "give me a snake game in python", general programming, trivia, recipes, or unrelated topics), you MUST POLITELY DECLINE. State clearly: "I am the AI assistant dedicated to ${merchantName}. I can only help you with questions about our projects, services, and website." and invite them to explore ${merchantName}'s offerings.`;
 
-  const tokenEfficiencyRule = `TOKEN EFFICIENCY & DIRECTNESS (CRITICAL):
-- Answer DIRECTLY and concisely. Answer ONLY what the user asked.
-- NEVER add introductory filler (e.g. "Certainly!", "I would be happy to help!", "Here is what you requested:").
-- NEVER add repetitive conversational filler or closing pleasantries (e.g. "Please let me know if you need anything else!").
-- Keep paragraphs brief, high-density, and structured with bold keywords and bullet points.`;
+  const tokenEfficiencyRule = `MAXIMUM CONCISENESS & ZERO TOKEN WASTE (STRICT RULE):
+- ALWAYS answer in 1 to 2 SHORT sentences (MAX 35 WORDS).
+- Provide ONLY the direct, exact answer requested.
+- NEVER add introductory fluff (e.g. "Certainly!", "I am afraid I don't have...", "Here is what you asked").
+- NEVER add closing questions or filler (e.g. "Would you like me to guide you?", "Let me know if you need help!").
+- Example 1:
+  - User: "project link daw"
+  - BAD (WASTEFUL): "I'm afraid I don't have a direct link to a specific project. However, if you're interested in starting a project or learning more about our work, you can reach out..."
+  - GOOD (CONCISE): "We don't have direct project links listed. You can contact us at hello@labtobit.com or click 'START A PROJECT' on our site."`;
 
   return `${personaPrompt}
 
@@ -177,7 +181,7 @@ export async function processChatMessage(
   let finalReply = '';
 
   const thoughts: string[] = [
-    '🔍 Searching store catalog & vector knowledge memory...',
+    `🔍 Processing query: "${userMessage || 'general'}" | Searching vector memory...`,
   ];
 
   // Perform Catalog & Knowledge RAG Search
@@ -198,7 +202,7 @@ export async function processChatMessage(
     }
 
     if (retrievedProducts.length > 0) {
-      thoughts.push(`📦 Retrieved ${retrievedProducts.length} relevant store products.`);
+      thoughts.push(`📦 Retrieved ${retrievedProducts.length} store catalog items.`);
       ragContext += `\n\n### Store Catalog & Available Products:\n` +
         retrievedProducts.map(p =>
           `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`
@@ -207,7 +211,7 @@ export async function processChatMessage(
     } 
 
     if (retrievedKnowledgeRes.length > 0) {
-      thoughts.push(`🧠 Found ${retrievedKnowledgeRes.length} relevant knowledge base chunks.`);
+      thoughts.push(`🧠 Found ${retrievedKnowledgeRes.length} relevant vector chunks for "${userMessage}".`);
       ragContext += `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
@@ -215,7 +219,7 @@ export async function processChatMessage(
       // 1. On-Demand Live Site Re-Crawl (if vector memory is empty & domain exists)
       if (primaryDomain && (primaryDomain.startsWith('http://') || primaryDomain.startsWith('https://'))) {
         try {
-          thoughts.push(`🌐 Vector memory empty for topic. Live re-crawling ${primaryDomain}...`);
+          thoughts.push(`🌐 Memory incomplete for "${userMessage}". Executing live site scan on ${primaryDomain}...`);
           await scrapeSingleUrl(primaryDomain, merchantId);
           // Re-search newly indexed vector chunks
           const freshKnowledge = await searchKnowledgeTool(merchantId, userMessage, 3);
@@ -232,7 +236,7 @@ export async function processChatMessage(
 
       // 2. Trigger Live Web Search as secondary fallback if still empty
       if (retrievedKnowledgeRes.length === 0) {
-        thoughts.push(`🌐 Searching live web for up-to-date information...`);
+        thoughts.push(`🌐 Executing real-time web search for "${userMessage}"...`);
         const webResults = await webSearchTool(userMessage, 3);
         if (webResults.length > 0) {
           thoughts.push(`✨ Retrieved ${webResults.length} real-time internet search results.`);

@@ -145,6 +145,27 @@ export async function deleteKnowledge(req: DashboardAuthRequest, res: Response) 
 }
 
 /**
+ * Delete ALL knowledge chunks for merchant
+ */
+export async function deleteAllKnowledge(req: DashboardAuthRequest, res: Response) {
+  try {
+    const merchantId = req.merchant?.id;
+    if (!merchantId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    await prisma.knowledgeChunk.deleteMany({
+      where: { merchantId },
+    });
+
+    return res.json({ message: 'All knowledge chunks deleted successfully' });
+  } catch (error: any) {
+    logger.error('Error clearing all knowledge chunks:', error);
+    return res.status(500).json({ error: 'Failed to clear knowledge base' });
+  }
+}
+
+/**
  * Trigger full re-crawl for merchant's primary domain
  */
 export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
