@@ -12,7 +12,6 @@ interface MessageItem {
   id: string;
   sender: 'user' | 'bot';
   text: string;
-  imageUrl?: string;
   products?: ProductCard[];
   thoughts?: string[];
   time: string;
@@ -21,7 +20,7 @@ interface MessageItem {
 function renderMarkdownText(text: string) {
   if (!text) return null;
 
-  // Strip accidental base64 data URIs or markdown image tags from text bubbles
+  // Clean text from accidental tags
   let clean = text
     .replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '')
     .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '')
@@ -50,27 +49,27 @@ function renderMarkdownText(text: string) {
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            color: '#1d4ed8',
+            color: '#2563eb',
             backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            padding: '2px 8px',
+            border: '1px solid #dbeafe',
+            padding: '2px 9px',
             borderRadius: '6px',
             textDecoration: 'none',
             fontWeight: '600',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '3px',
+            gap: '4px',
             margin: '2px 0',
             lineHeight: '1.4',
             transition: 'all 0.15s ease',
           }}
         >
-          {linkTitle} <span style={{ fontSize: '11px', opacity: 0.7 }}>↗</span>
+          {linkTitle} <span style={{ fontSize: '11px', opacity: 0.8 }}>↗</span>
         </a>
       );
     } else if (match[3]) {
       // Bold **text**
-      parts.push(<strong style={{ fontWeight: '700', color: '#111827' }}>{match[3]}</strong>);
+      parts.push(<strong style={{ fontWeight: '700', color: '#0f172a' }}>{match[3]}</strong>);
     } else if (match[4]) {
       // Auto-convert raw URLs to clean title badges
       const rawUrl = match[4];
@@ -93,22 +92,22 @@ function renderMarkdownText(text: string) {
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            color: '#1d4ed8',
+            color: '#2563eb',
             backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            padding: '2px 8px',
+            border: '1px solid #dbeafe',
+            padding: '2px 9px',
             borderRadius: '6px',
             textDecoration: 'none',
             fontWeight: '600',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '3px',
+            gap: '4px',
             margin: '2px 0',
             lineHeight: '1.4',
             wordBreak: 'break-all',
           }}
         >
-          {displayLabel} <span style={{ fontSize: '11px', opacity: 0.7 }}>↗</span>
+          {displayLabel} <span style={{ fontSize: '11px', opacity: 0.8 }}>↗</span>
         </a>
       );
     }
@@ -129,9 +128,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     typeof window !== 'undefined' ? window.innerWidth <= 640 : false
   );
   const [config, setConfig] = useState<WidgetConfig>({
-    primaryColor: '#111111',
-    greetingMessage: 'Hi! How can I help you shop today?',
-    botName: 'Shop Assistant',
+    primaryColor: '#0f172a',
+    greetingMessage: 'Hi there! How can I help you today?',
+    botName: 'AI Assistant',
     position: 'bottom-right',
     addToCartEnabled: true,
     hideBranding: false,
@@ -141,16 +140,38 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [thinkingPhase, setThinkingPhase] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [windowOffset, setWindowOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [launcherOffset, setLauncherOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragStartRef = useRef<{ clientX: number; clientY: number; startX: number; startY: number; target: 'window' | 'launcher' } | null>(null);
   const didDragRef = useRef<boolean>(false);
+
+  // Resize listener for mobile viewport
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Cycle thinking phases during loading
+  useEffect(() => {
+    let interval: any;
+    if (isLoading) {
+      setThinkingPhase(0);
+      interval = setInterval(() => {
+        setThinkingPhase((prev) => (prev < 2 ? prev + 1 : 0));
+      }, 700);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLoading]);
 
   // Dragging event listeners for window & launcher
   useEffect(() => {
@@ -199,8 +220,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
 
-      const elemWidth = target === 'window' ? (windowWidth <= 640 ? windowWidth : 380) : 180;
-      const elemHeight = target === 'window' ? (windowHeight <= 640 ? windowHeight : 560) : 52;
+      const elemWidth = target === 'window' ? (windowWidth <= 640 ? windowWidth : 390) : 60;
+      const elemHeight = target === 'window' ? (windowHeight <= 640 ? windowHeight : 590) : 60;
 
       const baseLeft = isLeft ? 24 : windowWidth - 24 - elemWidth;
       const baseTop = windowHeight - 24 - elemHeight;
@@ -244,35 +265,11 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     };
   }, [isLeft]);
 
-  // Resize listener for mobile viewport
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 640);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const [thinkingPhase, setThinkingPhase] = useState(0);
-
-  useEffect(() => {
-    let interval: any;
-    if (isLoading) {
-      setThinkingPhase(0);
-      interval = setInterval(() => {
-        setThinkingPhase((prev) => (prev < 2 ? prev + 1 : 0));
-      }, 750);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isLoading]);
-
   useEffect(() => {
     // 1. Fetch Config
     api.getConfig().then(setConfig).catch(console.error);
 
-    // 2. Manage Visitor SessionId & Restore History (localStorage for persistence across refresh)
+    // 2. Manage Visitor SessionId & Restore History
     let storedSession = '';
     try {
       storedSession = localStorage.getItem('aiw_session_id') || sessionStorage.getItem('aiw_session_id') || '';
@@ -320,7 +317,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         {
           id: 'msg_welcome',
           sender: 'bot',
-          text: config.greetingMessage,
+          text: config.greetingMessage || 'Hi there! How can I help you today?',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -331,44 +328,23 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  const handleImageFileChange = (e: any) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image file size must be smaller than 5MB.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setSelectedImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSend = async (e?: Event) => {
-    if (e) e.preventDefault();
-    const text = inputValue.trim();
-    const imageToAttach = selectedImage;
-
-    if ((!text && !imageToAttach) || isLoading) return;
+  const handleSend = async (queryText?: string) => {
+    const text = (typeof queryText === 'string' ? queryText : inputValue).trim();
+    if (!text || isLoading) return;
 
     const userMsg: MessageItem = {
       id: `user_${Date.now()}`,
       sender: 'user',
       text,
-      imageUrl: imageToAttach || undefined,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputValue('');
-    setSelectedImage(null);
     setIsLoading(true);
 
     try {
-      const res = await api.sendMessage(sessionId, text, undefined, undefined, imageToAttach || undefined);
+      const res = await api.sendMessage(sessionId, text);
 
       // Handle AI returned cart action
       if (res.cartAction && config.eventBridgeEnabled) {
@@ -407,7 +383,32 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     }
   };
 
-  const primaryColor = config.primaryColor || '#111111';
+  const handleResetSession = () => {
+    if (window.confirm('Start a fresh new chat session?')) {
+      api.createSession().then((newSess) => {
+        setSessionId(newSess);
+        try {
+          localStorage.setItem('aiw_session_id', newSess);
+        } catch {}
+        setMessages([
+          {
+            id: `msg_welcome_${Date.now()}`,
+            sender: 'bot',
+            text: config.greetingMessage || 'Hi there! How can I help you today?',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+      }).catch(console.error);
+    }
+  };
+
+  const primaryColor = config.primaryColor || '#0f172a';
+
+  const quickPrompts = [
+    { label: '✨ Explore Projects', query: 'apnader portfolio te ki ki project ache' },
+    { label: '💼 Agency Services', query: 'What services do you offer?' },
+    { label: '📩 Contact Team', query: 'How can I contact your team?' },
+  ];
 
   return (
     <div
@@ -417,7 +418,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         right: isLeft ? 'auto' : '24px',
         left: isLeft ? '24px' : 'auto',
         zIndex: 999999,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
         transform: isMobile
           ? 'none'
           : isOpen
@@ -428,7 +429,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         transition: isMobile ? 'none' : isDragging ? 'none' : 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
       }}
     >
-      {/* Floating Chat Launcher Button (Draggable) */}
+      {/* Floating Circular Launcher FAB (Zoho / MongoDB Style, Pure Icon) */}
       {!isOpen && (
         <button
           onMouseDown={(e: MouseEvent) => {
@@ -459,32 +460,56 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               setIsOpen(true);
             }
           }}
+          title="Open AI Assistant"
           style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
             backgroundColor: primaryColor,
             color: '#ffffff',
-            border: 'none',
-            borderRadius: '50px',
-            padding: '14px 22px',
-            fontSize: '15px',
-            fontWeight: '600',
-            cursor: isDragging ? 'grabbing' : 'grab',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            border: '2px solid rgba(255, 255, 255, 0.2)',
+            cursor: isDragging ? 'grabbing' : 'pointer',
+            boxShadow: '0 12px 28px -4px rgba(0, 0, 0, 0.35), 0 6px 14px -2px rgba(0, 0, 0, 0.2)',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            justifyContent: 'center',
+            position: 'relative',
             userSelect: 'none',
-            transition: isDragging ? 'none' : 'transform 0.2s ease, box-shadow 0.2s ease',
+            transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease',
           }}
         >
-          <span style={{ opacity: 0.6, fontSize: '13px', letterSpacing: '-1px' }}>⠿</span>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          {/* Glowing Active Status Beacon */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '2px',
+              right: '2px',
+              width: '14px',
+              height: '14px',
+              backgroundColor: '#10b981',
+              borderRadius: '50%',
+              border: '2.5px solid #ffffff',
+              boxShadow: '0 0 8px rgba(16, 185, 129, 0.8)',
+            }}
+          />
+
+          {/* Premium Chat AI SVG Icon */}
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
           </svg>
-          <span>Chat with AI</span>
         </button>
       )}
 
-      {/* Expandable Chat Window (Draggable Header) */}
+      {/* Enterprise Chat Window (Zoho SalesIQ & MongoDB AI Style) */}
       {isOpen && (
         <div
           style={{
@@ -494,20 +519,20 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             right: isMobile ? '0' : 'auto',
             bottom: isMobile ? '0' : 'auto',
             zIndex: 999999,
-            width: isMobile ? '100vw' : '380px',
+            width: isMobile ? '100vw' : '390px',
             maxWidth: isMobile ? '100vw' : 'calc(100vw - 32px)',
-            height: isMobile ? '100dvh' : '560px',
+            height: isMobile ? '100dvh' : '590px',
             maxHeight: isMobile ? '100dvh' : 'calc(100vh - 48px)',
             backgroundColor: '#ffffff',
-            borderRadius: isMobile ? '0px' : '16px',
-            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.22)',
+            borderRadius: isMobile ? '0px' : '20px',
+            boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.08)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            border: isMobile ? 'none' : '1px solid #e5e7eb',
+            border: isMobile ? 'none' : '1px solid #e2e8f0',
           }}
         >
-          {/* Header (Drag Handle) */}
+          {/* Header (Zoho SalesIQ Style Dark Luxury Gradient with Controls) */}
           <div
             onMouseDown={(e: MouseEvent) => {
               if ((e.target as HTMLElement)?.closest('button')) return;
@@ -536,50 +561,121 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               setIsDragging(true);
             }}
             style={{
-              backgroundColor: primaryColor,
+              background: `linear-gradient(135deg, ${primaryColor} 0%, #1e293b 100%)`,
               color: '#ffffff',
-              padding: '16px 20px',
+              padding: '16px 18px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               cursor: isMobile ? 'default' : isDragging ? 'grabbing' : 'grab',
               userSelect: 'none',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             }}
             title="Click and drag to move chat window"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ opacity: 0.5, fontSize: '14px', letterSpacing: '-1px' }}>⠿</span>
+            {/* Left: Avatar & Identity */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div
                 style={{
-                  width: '10px',
-                  height: '10px',
+                  width: '38px',
+                  height: '38px',
                   borderRadius: '50%',
-                  backgroundColor: '#10b981',
-                  boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.25)',
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  position: 'relative',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
                 }}
-              />
+              >
+                🤖
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: '-1px',
+                    right: '-1px',
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    backgroundColor: '#10b981',
+                    border: '2px solid #0f172a',
+                    boxShadow: '0 0 6px #10b981',
+                  }}
+                />
+              </div>
+
               <div>
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#ffffff' }}>
-                  {config.botName || 'Shop Assistant'}
-                </h3>
-                <span style={{ fontSize: '11px', opacity: 0.8, color: '#e5e7eb' }}>
-                  Online • Labto AI Assistant
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#ffffff', letterSpacing: '-0.2px' }}>
+                    {config.botName || 'AI Assistant'}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                      color: '#6ee7b7',
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      fontWeight: '600',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                    }}
+                  >
+                    LIVE
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginTop: '1px' }}>
+                  Replies instantly • Verified Knowledge
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontSize: '20px',
-                lineHeight: 1,
-              }}
-            >
-              ✕
-            </button>
+
+            {/* Right: Actions (Reset & Close) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                onClick={handleResetSession}
+                title="Restart chat"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#cbd5e1',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  transition: 'background 0.2s',
+                }}
+              >
+                🔄
+              </button>
+
+              <button
+                onClick={() => setIsOpen(false)}
+                title="Close chat"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  transition: 'background 0.2s',
+                }}
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Messages Body */}
@@ -588,17 +684,49 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               flex: '1 1 0%',
               minHeight: 0,
               maxHeight: '100%',
-              padding: '16px',
+              padding: '18px 16px',
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               overscrollBehaviorY: 'contain',
               touchAction: 'pan-y',
-              backgroundColor: '#f9fafb',
+              backgroundColor: '#f8fafc',
               display: 'flex',
               flexDirection: 'column',
               gap: '14px',
             }}
           >
+            {/* Quick Action Suggestion Chips (Zoho / MongoDB Style) */}
+            {messages.length <= 1 && (
+              <div style={{ marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Frequently Asked
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {quickPrompts.map((p, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(p.query)}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        padding: '6px 12px',
+                        borderRadius: '16px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: '#334155',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Message Feed */}
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -608,34 +736,18 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start',
                 }}
               >
-                {/* User Uploaded Image Preview in Bubble */}
-                {msg.imageUrl && (
-                  <img
-                    src={msg.imageUrl}
-                    alt="Attached input"
-                    style={{
-                      maxWidth: '180px',
-                      maxHeight: '140px',
-                      borderRadius: '12px',
-                      marginBottom: '6px',
-                      objectFit: 'cover',
-                      border: '1px solid #e5e7eb',
-                    }}
-                  />
-                )}
-
-                {/* AI Thinking Process Accordion */}
+                {/* AI Thinking Process Accordion (MongoDB AI Style) */}
                 {msg.sender === 'bot' && msg.thoughts && msg.thoughts.length > 0 && (
                   <details
                     style={{
                       marginBottom: '8px',
                       fontSize: '11px',
-                      color: '#4b5563',
-                      backgroundColor: '#f3f4f6',
-                      border: '1px solid #e5e7eb',
+                      color: '#475569',
+                      backgroundColor: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
                       borderRadius: '10px',
                       padding: '6px 10px',
-                      maxWidth: '85%',
+                      maxWidth: '90%',
                       lineHeight: '1.4',
                     }}
                   >
@@ -646,8 +758,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         outline: 'none',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '5px',
+                        gap: '6px',
                         userSelect: 'none',
+                        color: '#334155',
                       }}
                     >
                       <span style={{ fontSize: '13px' }}>🧠</span> AI Reasoning ({msg.thoughts.length} steps)
@@ -658,12 +771,12 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '4px',
-                        borderTop: '1px solid #e5e7eb',
+                        borderTop: '1px solid #e2e8f0',
                         paddingTop: '6px',
                       }}
                     >
                       {msg.thoughts.map((t, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#374151' }}>
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#475569' }}>
                           <span>{t}</span>
                         </div>
                       ))}
@@ -671,34 +784,34 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   </details>
                 )}
 
-                {msg.text && (
-                  <div
-                    style={{
-                      maxWidth: '85%',
-                      backgroundColor: msg.sender === 'user' ? primaryColor : '#ffffff',
-                      color: msg.sender === 'user' ? '#ffffff' : '#1f2937',
-                      padding: '12px 16px',
-                      borderRadius: msg.sender === 'user' ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                      fontSize: '14px',
-                      lineHeight: '1.45',
-                      boxShadow: msg.sender === 'bot' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {renderMarkdownText(msg.text)}
-                  </div>
-                )}
+                {/* Text Bubble */}
+                <div
+                  style={{
+                    backgroundColor: msg.sender === 'user' ? primaryColor : '#ffffff',
+                    color: msg.sender === 'user' ? '#ffffff' : '#1e293b',
+                    padding: '12px 16px',
+                    borderRadius: msg.sender === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                    maxWidth: '85%',
+                    wordBreak: 'break-word',
+                    boxShadow: msg.sender === 'user' ? '0 4px 12px rgba(0,0,0,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    border: msg.sender === 'user' ? 'none' : '1px solid #f1f5f9',
+                  }}
+                >
+                  {renderMarkdownText(msg.text)}
+                </div>
 
-                {/* Product Cards Carousel / Grid */}
+                {/* Product Recommendations Grid (If Any) */}
                 {msg.products && msg.products.length > 0 && (
                   <div
                     style={{
-                      width: '100%',
-                      marginTop: '12px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '10px',
+                      gap: '8px',
+                      marginTop: '8px',
+                      width: '100%',
+                      maxWidth: '300px',
                     }}
                   >
                     {msg.products.map((prod) => (
@@ -706,16 +819,15 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         key={prod.id}
                         style={{
                           backgroundColor: '#ffffff',
+                          border: '1px solid #e2e8f0',
                           borderRadius: '12px',
-                          border: '1px solid #e5e7eb',
-                          padding: '12px',
+                          padding: '10px',
                           display: 'flex',
-                          gap: '12px',
-                          alignItems: 'center',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                          gap: '10px',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
                         }}
                       >
-                        {prod.imageUrl ? (
+                        {prod.imageUrl && (
                           <img
                             src={prod.imageUrl}
                             alt={prod.title}
@@ -724,76 +836,57 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                               height: '56px',
                               borderRadius: '8px',
                               objectFit: 'cover',
+                              backgroundColor: '#f8fafc',
                             }}
                           />
-                        ) : (
-                          <div
-                            style={{
-                              width: '56px',
-                              height: '56px',
-                              borderRadius: '8px',
-                              backgroundColor: '#e5e7eb',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '20px',
-                            }}
-                          >
-                            🛍️
-                          </div>
                         )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <h4
-                            style={{
-                              margin: '0 0 4px 0',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              color: '#111827',
-                            }}
-                          >
-                            {prod.title}
-                          </h4>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: primaryColor }}>
-                            {prod.currency === 'USD' ? '$' : ''}
-                            {prod.price} {prod.currency !== 'USD' ? prod.currency : ''}
-                          </span>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                            <h4 style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
+                              {prod.title}
+                            </h4>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#059669' }}>
+                              {prod.price} {prod.currency}
+                            </span>
+                          </div>
 
-                          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                            <a
-                              href={prod.productUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                fontSize: '11px',
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                border: '1px solid #d1d5db',
-                                textDecoration: 'none',
-                                color: '#374151',
-                                fontWeight: '500',
-                              }}
-                            >
-                              View Page
-                            </a>
+                          <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
                             {config.addToCartEnabled && (
                               <button
                                 onClick={() => requestAddToCart(prod.id, 1)}
                                 style={{
-                                  fontSize: '11px',
-                                  padding: '4px 10px',
-                                  borderRadius: '6px',
-                                  border: 'none',
                                   backgroundColor: primaryColor,
                                   color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  fontSize: '11px',
                                   fontWeight: '600',
                                   cursor: 'pointer',
                                 }}
                               >
                                 + Add to Cart
                               </button>
+                            )}
+                            {prod.productUrl && (
+                              <a
+                                href={prod.productUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  backgroundColor: '#f1f5f9',
+                                  color: '#475569',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  fontSize: '11px',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                View ↗
+                              </a>
                             )}
                           </div>
                         </div>
@@ -802,10 +895,13 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   </div>
                 )}
 
-                <span style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}>{msg.time}</span>
+                <span style={{ fontSize: '10px', color: '#94a3b8', marginTop: '4px', paddingLeft: '4px', paddingRight: '4px' }}>
+                  {msg.time}
+                </span>
               </div>
             ))}
 
+            {/* Dynamic Real-time AI Thinking Stage Badge */}
             {isLoading && (
               <div
                 style={{
@@ -814,19 +910,18 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   gap: '8px',
                   fontSize: '12px',
                   color: '#334155',
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
-                  padding: '7px 12px',
-                  borderRadius: '12px',
-                  maxWidth: '85%',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                  transition: 'all 0.25s ease',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  padding: '8px 14px',
+                  borderRadius: '16px',
+                  maxWidth: '90%',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                 }}
               >
                 <span style={{ fontSize: '14px' }}>🧠</span>
                 <span style={{ fontWeight: '600', color: '#1e293b' }}>
                   {thinkingPhase === 0 && '🔍 Analyzing intent & language...'}
-                  {thinkingPhase === 1 && '🧠 Querying pgvector knowledge base...'}
+                  {thinkingPhase === 1 && '🧠 Querying knowledge base...'}
                   {thinkingPhase === 2 && '⚡ Generating verified response...'}
                 </span>
               </div>
@@ -834,91 +929,98 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Selected Image Attachment Thumbnail Badge */}
-          {selectedImage && (
-            <div style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img src={selectedImage} alt="Attachment" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
-              <span style={{ fontSize: '12px', color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Photo attached</span>
-              <button onClick={() => setSelectedImage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }}>✕</button>
-            </div>
-          )}
-
-          {/* Footer Input */}
-          <form
-            onSubmit={handleSend}
+          {/* Footer Input Bar (Zoho & MongoDB AI Style Clean Pill) */}
+          <div
             style={{
               padding: '12px 16px',
               backgroundColor: '#ffffff',
-              borderTop: '1px solid #e5e7eb',
+              borderTop: '1px solid #f1f5f9',
               display: 'flex',
-              gap: '8px',
-              alignItems: 'center',
+              flexDirection: 'column',
+              gap: '6px',
             }}
           >
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleImageFileChange}
-              style={{ display: 'none' }}
-            />
-            
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              title="Attach photo / image"
-              style={{
-                background: 'none',
-                border: '1px solid #d1d5db',
-                borderRadius: '50%',
-                width: '36px',
-                height: '36px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#6b7280',
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSend();
               }}
-            >
-              📷
-            </button>
-
-            <input
-              type="text"
-              placeholder="Ask products or attach photo..."
-              value={inputValue}
-              onInput={(e: any) => setInputValue(e.target.value)}
               style={{
-                flex: 1,
-                padding: '10px 14px',
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
                 borderRadius: '24px',
-                border: '1px solid #d1d5db',
-                backgroundColor: '#ffffff',
-                color: '#111827',
-                fontSize: '14px',
-                outline: 'none',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={(!inputValue.trim() && !selectedImage) || isLoading}
-              style={{
-                backgroundColor: primaryColor,
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '50%',
-                width: '38px',
-                height: '38px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: (inputValue.trim() || selectedImage) ? 'pointer' : 'default',
-                opacity: (inputValue.trim() || selectedImage) ? 1 : 0.5,
+                padding: '4px 6px 4px 14px',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
               }}
             >
-              ➔
-            </button>
-          </form>
+              <input
+                type="text"
+                placeholder="Ask about projects, services, or anything..."
+                value={inputValue}
+                onInput={(e: any) => setInputValue(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: '#0f172a',
+                  fontSize: '13.5px',
+                  outline: 'none',
+                }}
+              />
+
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || isLoading}
+                title="Send message"
+                style={{
+                  backgroundColor: inputValue.trim() ? primaryColor : '#cbd5e1',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '34px',
+                  height: '34px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: inputValue.trim() && !isLoading ? 'pointer' : 'default',
+                  transition: 'background-color 0.2s ease, transform 0.15s ease',
+                  flexShrink: 0,
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </form>
+
+            {/* Subtle Clean Watermark */}
+            {!config.hideBranding && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  fontSize: '10px',
+                  color: '#94a3b8',
+                  letterSpacing: '0.2px',
+                }}
+              >
+                Powered by <strong style={{ color: '#64748b', fontWeight: '600' }}>Labto AI</strong>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
