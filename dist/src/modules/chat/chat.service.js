@@ -12,9 +12,13 @@ const path_1 = __importDefault(require("path"));
 const db_1 = require("../../config/db");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
+const keyRotator_1 = require("../../utils/keyRotator");
+const autoLearning_service_1 = require("../../services/autoLearning.service");
+const scraper_service_1 = require("../../services/scraper.service");
 const searchProducts_tool_1 = require("./tools/searchProducts.tool");
 const searchKnowledge_tool_1 = require("./tools/searchKnowledge.tool");
 const addToCart_tool_1 = require("./tools/addToCart.tool");
+const webSearch_tool_1 = require("./tools/webSearch.tool");
 const anthropic = env_1.env.ANTHROPIC_API_KEY ? new sdk_1.default({ apiKey: env_1.env.ANTHROPIC_API_KEY }) : null;
 const groq = env_1.env.GROQ_API_KEY
     ? new openai_1.default({
@@ -84,6 +88,12 @@ ${customPrompt}`;
     const langRule = rules?.language_matching?.instructions || `Respond in the exact same language as the user's message. If the user writes in English, reply in English. If Bengali or Banglish, reply in Bengali.`;
     const formatRule = rules?.formatting?.instructions || `Use clean GitHub Flavored Markdown formatting with bold titles and clickable link badges.`;
     const cartRule = rules?.cart_action?.instructions || ``;
+    const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (CRITICAL):
+- You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "My").
+- NEVER refer to "${merchantName}" in the third person ("they", "their", "them", "${merchantName}'s team").
+- Example conversion:
+  - WRONG: "Labtobit Studio is an agency. They help build custom apps. Would you like to know more about their services?"
+  - RIGHT: "We are Labtobit Studio, a web development agency. We help build custom apps... Would you like to know more about our services or portfolio?"`;
     const scopeLockRule = `STRICT DOMAIN & SCOPE LOCK:
 - You are EXCLUSIVELY the customer assistant and sales representative for "${merchantName}" (${primaryDomain || 'this website'}).
 - You must ONLY assist with questions directly related to ${merchantName}'s services, projects, portfolio, store products, pricing, agency capabilities, contact details, or company information.
@@ -97,14 +107,15 @@ ${customPrompt}`;
     return `${personaPrompt}
 
 Strict Rules:
-1. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
-2. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
-3. STRICT CLICKABLE LINKS RULE: When mentioning any project, portfolio item, service, product, or page from the Website Knowledge Base or Catalog, you MUST ALWAYS format it as a clickable Markdown link with the title: \`[Title of Item](Full_URL)\`. NEVER print raw unformatted URLs like "Name: https://...". Always write \`[Title](https://...)\` directly.
-4. ${tokenEfficiencyRule}
-5. ${scopeLockRule}
-6. LANGUAGE RULE: ${langRule}
-7. FORMATTING RULE: ${formatRule}
-${cartRule ? `8. CART ACTION RULE: ${cartRule}` : ''}`.trim();
+1. FIRST-PERSON PERSPECTIVE: ${firstPersonPerspectiveRule}
+2. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
+3. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
+4. STRICT CLICKABLE LINKS RULE: When mentioning any project, portfolio item, service, product, or page from the Website Knowledge Base or Catalog, you MUST ALWAYS format it as a clickable Markdown link with the title: \`[Title of Item](Full_URL)\`. NEVER print raw unformatted URLs like "Name: https://...". Always write \`[Title](https://...)\` directly.
+5. ${tokenEfficiencyRule}
+6. ${scopeLockRule}
+7. LANGUAGE RULE: ${langRule}
+8. FORMATTING RULE: ${formatRule}
+${cartRule ? `9. CART ACTION RULE: ${cartRule}` : ''}`.trim();
 }
 async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
     // Fetch merchant profile for branding & domain identity
@@ -140,9 +151,12 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
     let ragContext = '';
     let cartAction = null;
     let finalReply = '';
+    const thoughts = [
+        '🔍 Searching store catalog & vector knowledge memory...',
+    ];
     // Perform Catalog & Knowledge RAG Search
     try {
-        const [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
+        let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
             (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage || 'general', undefined, 5),
             (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage || 'general', 3)
         ]);
@@ -155,16 +169,49 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
             });
         }
         if (retrievedProducts.length > 0) {
+            thoughts.push(`📦 Retrieved ${retrievedProducts.length} relevant store products.`);
             ragContext += `\n\n### Store Catalog & Available Products:\n` +
                 retrievedProducts.map(p => `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`).join('\n') +
                 `\n\nInstructions: Use the catalog items above to recommend items or provide details. Include product page links where appropriate.`;
         }
         if (retrievedKnowledgeRes.length > 0) {
+            thoughts.push(`🧠 Found ${retrievedKnowledgeRes.length} relevant knowledge base chunks.`);
             ragContext += `\n\n### Website Knowledge Base (Scraped Content):\n` +
                 retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
                 `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
         }
-        if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
+        else if (userMessage && userMessage.trim().length > 3 && !isSimpleGreeting(userMessage)) {
+            // 1. On-Demand Live Site Re-Crawl (if vector memory is empty & domain exists)
+            if (primaryDomain && (primaryDomain.startsWith('http://') || primaryDomain.startsWith('https://'))) {
+                try {
+                    thoughts.push(`🌐 Vector memory empty for topic. Live re-crawling ${primaryDomain}...`);
+                    await (0, scraper_service_1.scrapeSingleUrl)(primaryDomain, merchantId);
+                    // Re-search newly indexed vector chunks
+                    const freshKnowledge = await (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage, 3);
+                    if (freshKnowledge.length > 0) {
+                        retrievedKnowledgeRes = freshKnowledge;
+                        thoughts.push(`💾 Auto-indexed ${freshKnowledge.length} fresh website knowledge chunks into pgvector!`);
+                        ragContext += `\n\n### Website Knowledge Base (Freshly Scraped Content):\n` +
+                            retrievedKnowledgeRes.map((k) => `[Source: ${k.url}]\n${k.content}`).join('\n\n');
+                    }
+                }
+                catch (scrapeErr) {
+                    logger_1.logger.debug('On-demand live site crawl failed:', scrapeErr);
+                }
+            }
+            // 2. Trigger Live Web Search as secondary fallback if still empty
+            if (retrievedKnowledgeRes.length === 0) {
+                thoughts.push(`🌐 Searching live web for up-to-date information...`);
+                const webResults = await (0, webSearch_tool_1.webSearchTool)(userMessage, 3);
+                if (webResults.length > 0) {
+                    thoughts.push(`✨ Retrieved ${webResults.length} real-time internet search results.`);
+                    ragContext += `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
+                        webResults.map(w => `[Source: ${w.title}](${w.url})\n${w.snippet}`).join('\n\n') +
+                        `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
+                }
+            }
+        }
+        if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0 && !ragContext.includes('Live Web Search Results')) {
             ragContext = `\n\n### Website Context:
 Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ''}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
@@ -176,82 +223,95 @@ Currently, no specific catalog items or knowledge base articles matched this que
     // Resolve LLM Provider & Vision Support
     let selectedProvider = provider || '';
     if (!selectedProvider) {
-        if (env_1.env.GROQ_API_KEY)
+        if (keyRotator_1.keyRotator.hasGroqKeys())
             selectedProvider = 'groq';
-        else if (env_1.env.OPENROUTER_API_KEY)
+        else if (keyRotator_1.keyRotator.hasOpenRouterKeys())
             selectedProvider = 'openrouter';
-        else if (env_1.env.ANTHROPIC_API_KEY)
+        else if (keyRotator_1.keyRotator.hasAnthropicKeys())
             selectedProvider = 'claude';
     }
     const systemPrompt = getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, template);
-    // Configure Client & Model (Groq supports llama-3.2-11b-vision-preview for images)
-    const openAiConfig = selectedProvider === 'groq' && groq
-        ? { client: groq, model: imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile' }
-        : selectedProvider === 'openrouter' && openrouter
-            ? { client: openrouter, model: 'google/gemini-2.5-flash' }
-            : null;
-    if (openAiConfig) {
+    // Construct historical messages
+    const messagesParam = conversation.messages.map((m) => {
+        let text = m.content || '';
+        if (text.includes('data:image/')) {
+            text = text
+                .replace(/!\[Uploaded Image\]\(data:image\/[^)]+\)/g, '[Image Attached]')
+                .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image Attached]');
+        }
+        return {
+            role: m.role === 'user' ? 'user' : 'assistant',
+            content: text,
+        };
+    });
+    // Construct user content (Multimodal Vision array if imageUrl present)
+    const formattedUserText = userMessage
+        ? `### User Input:\n${userMessage}`
+        : `Please analyze this attached image in the context of ${merchantName}.`;
+    const userContent = imageUrl
+        ? [
+            { type: 'text', text: formattedUserText },
+            { type: 'image_url', image_url: { url: imageUrl } },
+        ]
+        : formattedUserText;
+    messagesParam.push({ role: 'user', content: userContent });
+    let executionSuccess = false;
+    let estimatedTokens = 0;
+    // Attempt 1: Primary Provider (Groq)
+    if (selectedProvider === 'groq' && keyRotator_1.keyRotator.hasGroqKeys()) {
         try {
-            const { client, model } = openAiConfig;
-            // Sanitize historical messages so huge base64 strings never poison the context window
-            const messagesParam = conversation.messages.map((m) => {
-                let text = m.content || '';
-                if (text.includes('data:image/')) {
-                    text = text.replace(/!\[Uploaded Image\]\(data:image\/[^)]+\)/g, '[Image Attached]').replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image Attached]');
-                }
-                return {
-                    role: m.role === 'user' ? 'user' : 'assistant',
-                    content: text,
-                };
-            });
-            // Construct user content (Multimodal Vision array if imageUrl present)
-            const formattedUserText = userMessage ? `### User Input:\n${userMessage}` : `Please analyze this attached image in the context of ${merchantName}.`;
-            const userContent = imageUrl
-                ? [
-                    { type: 'text', text: formattedUserText },
-                    { type: 'image_url', image_url: { url: imageUrl } },
-                ]
-                : formattedUserText;
-            messagesParam.push({ role: 'user', content: userContent });
-            let totalTokensUsed = 0;
-            const completion = await client.chat.completions.create({
-                model: model,
-                max_tokens: 380,
-                temperature: 0.3,
-                messages: [
-                    { role: 'system', content: systemPrompt + ragContext },
-                    ...messagesParam,
-                ],
-            });
-            finalReply = completion.choices[0].message.content || '';
-            if (completion.usage) {
-                totalTokensUsed = completion.usage.total_tokens || 0;
-            }
+            const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+            const result = await keyRotator_1.keyRotator.executeGroqCompletion(model, [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
+            finalReply = result.content;
+            estimatedTokens = result.tokensUsed;
+            executionSuccess = true;
         }
         catch (error) {
-            logger_1.logger.error(`OpenAI provider (${selectedProvider}) call error, falling back to local:`, error);
-            selectedProvider = 'fallback';
+            logger_1.logger.error('Groq provider pool failed, falling back to Gemini pool:', error);
+            selectedProvider = 'gemini';
         }
     }
-    else if (selectedProvider === 'claude' && anthropic) {
+    // Attempt 2: Direct Google Gemini AI Studio Pool
+    if (!executionSuccess && (selectedProvider === 'gemini' || keyRotator_1.keyRotator.hasGeminiKeys())) {
         try {
-            const messagesParam = conversation.messages.map((m) => ({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                content: m.content,
-            }));
-            messagesParam.push({ role: 'user', content: userMessage });
-            const response = await anthropic.messages.create({
-                model: 'claude-3-5-sonnet-20241022',
-                max_tokens: 380,
-                temperature: 0.3,
-                system: systemPrompt + ragContext,
-                messages: messagesParam,
-            });
-            const textBlock = response.content.find((c) => c.type === 'text');
-            finalReply = textBlock && 'text' in textBlock ? textBlock.text : '';
+            const result = await keyRotator_1.keyRotator.executeGeminiCompletion('gemini-3.6-flash', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
+            finalReply = result.content;
+            estimatedTokens = result.tokensUsed;
+            executionSuccess = true;
         }
         catch (error) {
-            logger_1.logger.error('Anthropic API Call Error, falling back to local:', error);
+            logger_1.logger.error('Gemini provider pool failed, falling back to OpenRouter pool:', error);
+            selectedProvider = 'openrouter';
+        }
+    }
+    // Attempt 3: Fallback to OpenRouter
+    if (!executionSuccess && (selectedProvider === 'openrouter' || keyRotator_1.keyRotator.hasOpenRouterKeys())) {
+        try {
+            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('google/gemini-2.5-flash', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 380);
+            finalReply = result.content;
+            estimatedTokens = result.tokensUsed;
+            executionSuccess = true;
+        }
+        catch (error) {
+            logger_1.logger.error('OpenRouter provider pool failed, falling back to Anthropic:', error);
+            selectedProvider = 'claude';
+        }
+    }
+    // Attempt 3: Fallback to Anthropic
+    if (!executionSuccess && (selectedProvider === 'claude' || keyRotator_1.keyRotator.hasAnthropicKeys())) {
+        try {
+            const anthropicMessages = conversation.messages.map((m) => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: m.content || '',
+            }));
+            anthropicMessages.push({ role: 'user', content: userMessage });
+            const result = await keyRotator_1.keyRotator.executeAnthropicCompletion('claude-3-5-sonnet-20241022', systemPrompt + ragContext, anthropicMessages, 380);
+            finalReply = result.content;
+            estimatedTokens = result.tokensUsed;
+            executionSuccess = true;
+        }
+        catch (error) {
+            logger_1.logger.error('Anthropic provider pool failed:', error);
             selectedProvider = 'fallback';
         }
     }
@@ -296,7 +356,9 @@ Currently, no specific catalog items or knowledge base articles matched this que
         recommendedProducts = retrievedProducts;
     }
     // Calculate estimated tokens if not provided by API
-    const estimatedTokens = Math.max(15, Math.ceil(((userMessage || '').length + (finalReply || '').length) / 3.6));
+    if (!estimatedTokens) {
+        estimatedTokens = Math.max(15, Math.ceil(((userMessage || '').length + (finalReply || '').length) / 3.6));
+    }
     // Save assistant reply to database
     await db_1.prisma.message.create({
         data: {
@@ -307,6 +369,9 @@ Currently, no specific catalog items or knowledge base articles matched this que
             toolCalls: recommendedProducts.length > 0 || cartAction ? { recommendedProducts, cartAction } : undefined,
         },
     });
+    // Trigger non-blocking background AI Auto-Learning from conversation history
+    (0, autoLearning_service_1.autoLearnFromConversation)(merchantId, sessionId).catch((err) => logger_1.logger.error('Background auto-learning failed:', err));
+    thoughts.push('✨ Formulated optimal response.');
     return {
         sessionId,
         reply: finalReply,
@@ -320,5 +385,6 @@ Currently, no specific catalog items or knowledge base articles matched this que
             inStock: p.inStock,
         })),
         cartAction,
+        thoughts,
     };
 }

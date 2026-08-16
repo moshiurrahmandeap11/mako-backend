@@ -8,6 +8,7 @@ const db_1 = require("./db");
 const env_1 = require("./env");
 const email_1 = require("../utils/email");
 exports.auth = (0, better_auth_1.betterAuth)({
+    baseURL: env_1.env.BETTER_AUTH_URL || 'https://mako-frontend.vercel.app/api/auth',
     database: (0, prisma_1.prismaAdapter)(db_1.prisma, {
         provider: 'postgresql',
     }),
@@ -33,10 +34,6 @@ exports.auth = (0, better_auth_1.betterAuth)({
         google: {
             clientId: env_1.env.GOOGLE_CLIENT_ID,
             clientSecret: env_1.env.GOOGLE_CLIENT_SECRET,
-        },
-        github: {
-            clientId: env_1.env.GITHUB_CLIENT_ID,
-            clientSecret: env_1.env.GITHUB_CLIENT_SECRET,
         },
     },
     databaseHooks: {
@@ -78,5 +75,5 @@ exports.auth = (0, better_auth_1.betterAuth)({
         'http://localhost:3001',
         'http://127.0.0.1:3001',
     ].filter(Boolean),
-    secret: env_1.env.JWT_SECRET || 'fallback_jwt_secret_dev_key_32chars_min',
+    secret: env_1.env.BETTER_AUTH_SECRET || env_1.env.JWT_SECRET || 'fallback_jwt_secret_dev_key_32chars_min',
 });

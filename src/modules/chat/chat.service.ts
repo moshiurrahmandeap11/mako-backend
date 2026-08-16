@@ -8,6 +8,7 @@ import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { keyRotator } from '../../utils/keyRotator';
 import { autoLearnFromConversation } from '../../services/autoLearning.service';
+import { scrapeSingleUrl } from '../../services/scraper.service';
 import { searchProductsTool } from './tools/searchProducts.tool';
 import { searchKnowledgeTool } from './tools/searchKnowledge.tool';
 import { addToCartTool } from './tools/addToCart.tool';
@@ -175,9 +176,13 @@ export async function processChatMessage(
   let cartAction: any = null;
   let finalReply = '';
 
+  const thoughts: string[] = [
+    '🔍 Searching store catalog & vector knowledge memory...',
+  ];
+
   // Perform Catalog & Knowledge RAG Search
   try {
-    const [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
+    let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
       searchProductsTool(merchantId, userMessage || 'general', undefined, 5),
       searchKnowledgeTool(merchantId, userMessage || 'general', 3)
     ]);
@@ -193,6 +198,7 @@ export async function processChatMessage(
     }
 
     if (retrievedProducts.length > 0) {
+      thoughts.push(`📦 Retrieved ${retrievedProducts.length} relevant store products.`);
       ragContext += `\n\n### Store Catalog & Available Products:\n` +
         retrievedProducts.map(p =>
           `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`
@@ -201,16 +207,39 @@ export async function processChatMessage(
     } 
 
     if (retrievedKnowledgeRes.length > 0) {
+      thoughts.push(`🧠 Found ${retrievedKnowledgeRes.length} relevant knowledge base chunks.`);
       ragContext += `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
     } else if (userMessage && userMessage.trim().length > 3 && !isSimpleGreeting(userMessage)) {
-      // Trigger Live Web Search when store knowledge is insufficient
-      const webResults = await webSearchTool(userMessage, 3);
-      if (webResults.length > 0) {
-        ragContext += `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
-          webResults.map(w => `[Source: ${w.title}](${w.url})\n${w.snippet}`).join('\n\n') +
-          `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
+      // 1. On-Demand Live Site Re-Crawl (if vector memory is empty & domain exists)
+      if (primaryDomain && (primaryDomain.startsWith('http://') || primaryDomain.startsWith('https://'))) {
+        try {
+          thoughts.push(`🌐 Vector memory empty for topic. Live re-crawling ${primaryDomain}...`);
+          await scrapeSingleUrl(primaryDomain, merchantId);
+          // Re-search newly indexed vector chunks
+          const freshKnowledge = await searchKnowledgeTool(merchantId, userMessage, 3);
+          if (freshKnowledge.length > 0) {
+            retrievedKnowledgeRes = freshKnowledge;
+            thoughts.push(`💾 Auto-indexed ${freshKnowledge.length} fresh website knowledge chunks into pgvector!`);
+            ragContext += `\n\n### Website Knowledge Base (Freshly Scraped Content):\n` +
+              retrievedKnowledgeRes.map((k) => `[Source: ${k.url}]\n${k.content}`).join('\n\n');
+          }
+        } catch (scrapeErr) {
+          logger.debug('On-demand live site crawl failed:', scrapeErr);
+        }
+      }
+
+      // 2. Trigger Live Web Search as secondary fallback if still empty
+      if (retrievedKnowledgeRes.length === 0) {
+        thoughts.push(`🌐 Searching live web for up-to-date information...`);
+        const webResults = await webSearchTool(userMessage, 3);
+        if (webResults.length > 0) {
+          thoughts.push(`✨ Retrieved ${webResults.length} real-time internet search results.`);
+          ragContext += `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
+            webResults.map(w => `[Source: ${w.title}](${w.url})\n${w.snippet}`).join('\n\n') +
+            `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
+        }
       }
     }
 
@@ -400,6 +429,8 @@ Currently, no specific catalog items or knowledge base articles matched this que
     logger.error('Background auto-learning failed:', err)
   );
 
+  thoughts.push('✨ Formulated optimal response.');
+
   return {
     sessionId,
     reply: finalReply,
@@ -413,5 +444,6 @@ Currently, no specific catalog items or knowledge base articles matched this que
       inStock: p.inStock,
     })),
     cartAction,
+    thoughts,
   };
 }

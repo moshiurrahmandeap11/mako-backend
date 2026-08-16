@@ -26,6 +26,7 @@ export interface ChatResponse {
     productId: string;
     quantity: number;
   };
+  thoughts?: string[];
 }
 
 export class WidgetAPI {

@@ -14,6 +14,7 @@ interface MessageItem {
   text: string;
   imageUrl?: string;
   products?: ProductCard[];
+  thoughts?: string[];
   time: string;
 }
 
@@ -357,6 +358,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         sender: 'bot',
         text: res.reply,
         products: res.products,
+        thoughts: res.thoughts,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -598,6 +600,53 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       border: '1px solid #e5e7eb',
                     }}
                   />
+                )}
+
+                {/* AI Thinking Process Accordion */}
+                {msg.sender === 'bot' && msg.thoughts && msg.thoughts.length > 0 && (
+                  <details
+                    style={{
+                      marginBottom: '8px',
+                      fontSize: '11px',
+                      color: '#4b5563',
+                      backgroundColor: '#f3f4f6',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '10px',
+                      padding: '6px 10px',
+                      maxWidth: '85%',
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    <summary
+                      style={{
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        outline: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <span style={{ fontSize: '13px' }}>🧠</span> AI Reasoning ({msg.thoughts.length} steps)
+                    </summary>
+                    <div
+                      style={{
+                        marginTop: '6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        borderTop: '1px solid #e5e7eb',
+                        paddingTop: '6px',
+                      }}
+                    >
+                      {msg.thoughts.map((t, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#374151' }}>
+                          <span>{t}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 )}
 
                 {msg.text && (

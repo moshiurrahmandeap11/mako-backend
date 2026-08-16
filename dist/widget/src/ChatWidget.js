@@ -91,6 +91,7 @@ function ChatWidget({ api }) {
         hideBranding: false,
         eventBridgeEnabled: false,
     });
+    const isLeft = config.position === 'bottom-left';
     const [sessionId, setSessionId] = (0, hooks_1.useState)('');
     const [messages, setMessages] = (0, hooks_1.useState)([]);
     const [inputValue, setInputValue] = (0, hooks_1.useState)('');
@@ -147,7 +148,35 @@ function ChatWidget({ api }) {
                 });
             }
         };
+        const calculateSnap = (target, currentX, currentY) => {
+            if (typeof window === 'undefined')
+                return { x: currentX, y: currentY };
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const elemWidth = target === 'window' ? (windowWidth <= 640 ? windowWidth : 380) : 180;
+            const elemHeight = target === 'window' ? (windowHeight <= 640 ? windowHeight : 560) : 52;
+            const baseLeft = isLeft ? 24 : windowWidth - 24 - elemWidth;
+            const baseTop = windowHeight - 24 - elemHeight;
+            const absLeft = baseLeft + currentX;
+            const absTop = baseTop + currentY;
+            // Nearest corner calculation
+            const snapLeft = absLeft < (windowWidth - elemWidth) / 2 ? 24 : windowWidth - 24 - elemWidth;
+            const snapTop = absTop < (windowHeight - elemHeight) / 2 ? 24 : windowHeight - 24 - elemHeight;
+            return {
+                x: snapLeft - baseLeft,
+                y: snapTop - baseTop,
+            };
+        };
         const onEnd = () => {
+            if (dragStartRef.current && didDragRef.current) {
+                const target = dragStartRef.current.target;
+                if (target === 'window') {
+                    setWindowOffset((prev) => calculateSnap('window', prev.x, prev.y));
+                }
+                else {
+                    setLauncherOffset((prev) => calculateSnap('launcher', prev.x, prev.y));
+                }
+            }
             dragStartRef.current = null;
             setIsDragging(false);
         };
@@ -161,7 +190,7 @@ function ChatWidget({ api }) {
             window.removeEventListener('touchmove', onTouchMove);
             window.removeEventListener('touchend', onEnd);
         };
-    }, []);
+    }, [isLeft]);
     // Resize listener for mobile viewport
     (0, hooks_1.useEffect)(() => {
         const handleResize = () => {
@@ -272,6 +301,7 @@ function ChatWidget({ api }) {
                 sender: 'bot',
                 text: res.reply,
                 products: res.products,
+                thoughts: res.thoughts,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             };
             setMessages((prev) => [...prev, botMsg]);
@@ -298,7 +328,6 @@ function ChatWidget({ api }) {
             setIsLoading(false);
         }
     };
-    const isLeft = config.position === 'bottom-left';
     const primaryColor = config.primaryColor || '#111111';
     return ((0, jsx_runtime_1.jsxs)("div", { style: {
             position: 'fixed',
@@ -314,6 +343,7 @@ function ChatWidget({ api }) {
                     : (launcherOffset.x !== 0 || launcherOffset.y !== 0 ? `translate3d(${launcherOffset.x}px, ${launcherOffset.y}px, 0)` : 'none'),
             touchAction: isMobile ? 'auto' : 'none',
             userSelect: isDragging ? 'none' : 'auto',
+            transition: isMobile ? 'none' : isDragging ? 'none' : 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
         }, children: [!isOpen && ((0, jsx_runtime_1.jsxs)("button", { onMouseDown: (e) => {
                     dragStartRef.current = {
                         clientX: e.clientX,
@@ -447,7 +477,32 @@ function ChatWidget({ api }) {
                                             marginBottom: '6px',
                                             objectFit: 'cover',
                                             border: '1px solid #e5e7eb',
-                                        } })), msg.text && ((0, jsx_runtime_1.jsx)("div", { style: {
+                                        } })), msg.sender === 'bot' && msg.thoughts && msg.thoughts.length > 0 && ((0, jsx_runtime_1.jsxs)("details", { style: {
+                                            marginBottom: '8px',
+                                            fontSize: '11px',
+                                            color: '#4b5563',
+                                            backgroundColor: '#f3f4f6',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '10px',
+                                            padding: '6px 10px',
+                                            maxWidth: '85%',
+                                            lineHeight: '1.4',
+                                        }, children: [(0, jsx_runtime_1.jsxs)("summary", { style: {
+                                                    cursor: 'pointer',
+                                                    fontWeight: '600',
+                                                    outline: 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '5px',
+                                                    userSelect: 'none',
+                                                }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '13px' }, children: "\uD83E\uDDE0" }), " AI Reasoning (", msg.thoughts.length, " steps)"] }), (0, jsx_runtime_1.jsx)("div", { style: {
+                                                    marginTop: '6px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '4px',
+                                                    borderTop: '1px solid #e5e7eb',
+                                                    paddingTop: '6px',
+                                                }, children: msg.thoughts.map((t, idx) => ((0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', alignItems: 'center', gap: '4px', color: '#374151' }, children: (0, jsx_runtime_1.jsx)("span", { children: t }) }, idx))) })] })), msg.text && ((0, jsx_runtime_1.jsx)("div", { style: {
                                             maxWidth: '85%',
                                             backgroundColor: msg.sender === 'user' ? primaryColor : '#ffffff',
                                             color: msg.sender === 'user' ? '#ffffff' : '#1f2937',

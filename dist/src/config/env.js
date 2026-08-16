@@ -20,6 +20,37 @@ exports.env = {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
     GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+    get ANTHROPIC_API_KEYS() {
+        return (process.env.ANTHROPIC_API_KEY || '')
+            .split(',')
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0 && !k.includes('...'));
+    },
+    get OPENAI_API_KEYS() {
+        return (process.env.OPENAI_API_KEY || '')
+            .split(',')
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0 && !k.includes('...'));
+    },
+    get OPENROUTER_API_KEYS() {
+        return (process.env.OPENROUTER_API_KEY || '')
+            .split(',')
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0 && !k.includes('...'));
+    },
+    get GROQ_API_KEYS() {
+        return (process.env.GROQ_API_KEY || '')
+            .split(',')
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0 && !k.includes('...'));
+    },
+    get GEMINI_API_KEYS() {
+        return (process.env.GEMINI_API_KEY || '')
+            .split(',')
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0 && !k.includes('...'));
+    },
     REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
