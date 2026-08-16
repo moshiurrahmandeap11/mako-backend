@@ -72,12 +72,19 @@ function renderMarkdownText(text: string) {
       // Bold **text**
       parts.push(<strong style={{ fontWeight: '700', color: '#111827' }}>{match[3]}</strong>);
     } else if (match[4]) {
-      // Auto-convert raw URLs
+      // Auto-convert raw URLs to clean title badges
       const rawUrl = match[4];
       let displayLabel = rawUrl;
       try {
         const u = new URL(rawUrl);
-        displayLabel = u.pathname.length > 1 ? u.pathname.replace(/^\//, '') : u.hostname;
+        if (u.pathname && u.pathname.length > 1) {
+          const lastSegment = u.pathname.split('/').filter(Boolean).pop() || '';
+          displayLabel = lastSegment
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+        } else {
+          displayLabel = u.hostname.replace('.vercel.app', '').replace('.com', '');
+        }
       } catch {}
 
       parts.push(
