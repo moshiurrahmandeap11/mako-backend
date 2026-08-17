@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const https_1 = __importDefault(require("https"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
-dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../../.env') });
+dotenv_1.default.config({ path: path_1.default.resolve(process.cwd(), '.env') });
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
     console.error('DATABASE_URL is not set!');
