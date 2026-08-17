@@ -65,12 +65,29 @@ function loadAiPromptsYaml(template?: string): any {
 function isSimpleGreeting(message: string): boolean {
   const clean = message.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
   const commonGreetings = [
-    'hi', 'hello', 'hey', 'yo', 'sup', 'hola', 'hi there', 'hello there',
-    'kemon achis', 'kemon acho', 'kemon aco', 'kire', 'ki khobor', 'bro',
-    'good morning', 'good afternoon', 'good evening', 'thanks', 'thank you',
-    'kemon acis', 'kemne acho', 'kemon'
+    'hi', 'hello', 'hey', 'yo', 'sup', 'hola', 'hi there', 'hello there', 'hi bro', 'hey bro', 'hello bro',
+    'kemon achis', 'kemon acho', 'kemon aco', 'kire', 'kire bro', 'ki khobor', 'bro', 'vai', 'bhai',
+    'good morning', 'good afternoon', 'good evening', 'thanks', 'thank you', 'thx',
+    'kemon acis', 'kemne acho', 'kemon', 'assalamu alaikum', 'salam'
   ];
-  return commonGreetings.some(g => clean === g || clean.includes(g) && clean.length < 20);
+  return commonGreetings.some(g => clean === g || (clean.includes(g) && clean.length <= 15));
+}
+
+function isCodeOrOutOfScopeRequest(message: string): boolean {
+  const clean = message.toLowerCase();
+  const codePatterns = [
+    /\b(write|create|make|give|show|generate)\s+(me\s+)?(a\s+)?(code|script|program|game|function|class|algorithm)\b/i,
+    /\b(in|using)\s+(c#|c\+\+|python|java|javascript|typescript|rust|go|php|ruby|swift|kotlin|c\b)/i,
+    /\b(snake game|tic tac toe|flappy bird|chess game|calculator|sudoku)\b/i,
+    /\b(solve|do)\s+(my\s+)?(homework|math|physics|assignment|exam)\b/i,
+  ];
+  return codePatterns.some((p) => p.test(clean)) &&
+    !clean.includes('portfolio') &&
+    !clean.includes('service') &&
+    !clean.includes('hire') &&
+    !clean.includes('project') &&
+    !clean.includes('pricing') &&
+    !clean.includes('contact');
 }
 
 function getSystemPrompt(
@@ -112,10 +129,7 @@ ${customPrompt}`;
   const linkAndContextRule = `CONTEXT AWARENESS & CLEAN CLICKABLE LINKS (CRITICAL):
 - The user is ALREADY ON THIS WEBSITE chatting with the embedded assistant.
 - NEVER say "visit our website [homepage_url]" or suggest navigating to the homepage, because the visitor is already on it!
-- When the user asks for project links, case studies, or portfolio, ONLY provide direct deep links to the specific item requested.
-- Always use clean, human-friendly title names in Markdown: \`[Human Friendly Title](Full_URL)\`.
-  - BAD (WRONG): \`[casestudies/echo-platform](https://...)\` or \`[our website](https://...)\`
-  - GOOD (CORRECT): \`[Echo Platform](https://labtobit-frontend.vercel.app/casestudies/echo-platform)\` or \`[Lusion Studio](https://labtobit-frontend.vercel.app/casestudies/lusion-studio)\`.`;
+- When the user asks for project links, case studies, or portfolio, ONLY provide direct deep links to the specific item requested.`;
 
   const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (CRITICAL):
 - You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "My").
@@ -124,19 +138,18 @@ ${customPrompt}`;
   - WRONG: "Labtobit Studio is an agency. They help build custom apps. Would you like to know more about their services?"
   - RIGHT: "We are Labtobit Studio, a web development agency. We help build custom apps... Would you like to know more about our services or portfolio?"`;
 
-  const scopeLockRule = `STRICT DOMAIN & SCOPE LOCK:
+  const scopeLockRule = `CRITICAL SCOPE LOCK & NO GENERAL CODING (STRICT):
 - You are EXCLUSIVELY the customer assistant and sales representative for "${merchantName}" (${primaryDomain || 'this website'}).
 - You must ONLY assist with questions directly related to ${merchantName}'s services, projects, portfolio, store products, pricing, agency capabilities, contact details, or company information.
-- NEVER write general programming code (e.g. Python scripts, games, algorithmic solutions, C++/Java code), solve general academic homework, or act as a general AI/ChatGPT.
-- If a user asks an out-of-scope query (e.g. "give me a snake game in python", general programming, trivia, recipes, or unrelated topics), you MUST POLITELY DECLINE. State clearly: "I am the AI assistant dedicated to ${merchantName}. I can only help you with questions about our projects, services, and website." and invite them to explore ${merchantName}'s offerings.`;
+- NEVER write general programming code (e.g. Python/C#/C++/Java scripts, console games like Snake/Tic-Tac-Toe, algorithms, academic homework, or non-business code).
+- If a user asks an out-of-scope query or general coding request, YOU MUST POLITELY DECLINE. State clearly: "I am the AI assistant dedicated to ${merchantName}. I can only help you with questions about our projects, services, and website."`;
 
   const casualGreetingRule = `CASUAL GREETINGS & SHORT CHATS (CRITICAL):
-- When the user sends a greeting or casual phrase (e.g. "kire bro", "hi", "hello", "hey", "kemon acho", "ki khobor", "bro"):
+- When the user sends a greeting or casual phrase:
   - DO NOT output an essay or list multiple questions.
-  - DO NOT say "It seems like you've reached out to us at Moshiur Bhau (Labtobit Studio)..."
   - Reply in EXACTLY ONE SHORT SENTENCE (under 10 words) in the user's matching script.
   - Examples:
-    - User: "kire bro" -> Reply: "Hello bro! Bolun, kivabe help korte pari?"
+    - User: "kire bro" / "hi bro" -> Reply: "Hello bro! Bolun, kivabe help korte pari?"
     - User: "hi" / "hello" -> Reply: "Hello! How can I help you today?"
     - User: "kemon আছেন" -> Reply: "ভালো আছি, ধন্যবাদ! কীভাবে সাহায্য করতে পারি?"`;
 
@@ -144,9 +157,7 @@ ${customPrompt}`;
 - ALWAYS answer concisely in 1 to 2 sentences (MAXIMUM 30-35 WORDS TOTAL).
 - Provide ONLY the direct, exact answer requested with clean clickable markdown links.
 - NEVER argue, challenge, or ask why the user said something.
-- DO NOT create multiple paragraphs or repeating clauses.
-- Example (Banglish query "amar direct project link lagbe"):
-  - GOOD: "Amader project link: [Echo Platform](https://labtobit-frontend.vercel.app/casestudies/echo-platform) ebong [Lusion Studio](https://labtobit-frontend.vercel.app/casestudies/lusion-studio)।"`;
+- DO NOT create multiple paragraphs or repeating clauses.`;
 
   return `${personaPrompt}
 
@@ -195,6 +206,66 @@ export async function processChatMessage(
     });
   }
 
+  const textSafe = userMessage || '';
+  const isBengaliScript = /[\u0980-\u09FF]/.test(textSafe);
+  const isBanglish = /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website|bro)\b/i.test(textSafe);
+
+  // FAST PATH 1: Instant Greetings (<10ms, 0 thoughts, instant user response)
+  if (isSimpleGreeting(userMessage)) {
+    let fastGreeting = '';
+    if (isBengaliScript) {
+      fastGreeting = `হ্যালো! কীভাবে আপনাকে সাহায্য করতে পারি?`;
+    } else if (isBanglish) {
+      fastGreeting = `Hello bro! Bolun, kivabe help korte pari?`;
+    } else {
+      fastGreeting = `Hello! How can I help you today?`;
+    }
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: fastGreeting,
+      },
+    });
+
+    return {
+      reply: fastGreeting,
+      thoughts: [],
+      cartAction: undefined,
+      recommendedProducts: [],
+      tokensUsed: 10,
+    };
+  }
+
+  // FAST PATH 2: Out of Scope / General Coding Rejection Guard (<10ms, 0 token waste)
+  if (isCodeOrOutOfScopeRequest(userMessage)) {
+    let declineReply = '';
+    if (isBengaliScript) {
+      declineReply = `আমি ${merchantName}-এর এআই সহকারী। আমি শুধুমাত্র আমাদের প্রজেক্ট, সেবা ও ওয়েবসাইট সম্পর্কিত তথ্যে সাহায্য করতে পারি।`;
+    } else if (isBanglish) {
+      declineReply = `Ami ${merchantName}-er AI assistant. Ami sudhu amader services, projects ebong company information niye help korte pari.`;
+    } else {
+      declineReply = `I am the AI assistant dedicated to ${merchantName}. I can only assist you with our services, portfolio projects, and company information.`;
+    }
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: declineReply,
+      },
+    });
+
+    return {
+      reply: declineReply,
+      thoughts: [`🛡️ Policy Guard: Declining out-of-scope coding/homework request.`],
+      cartAction: undefined,
+      recommendedProducts: [],
+      tokensUsed: 12,
+    };
+  }
+
   // Save user message to database (keep content clean without raw 200KB base64 strings)
   const cleanUserText = userMessage || (imageUrl ? 'Analyzing attached image.' : '');
   await prisma.message.create({
@@ -213,11 +284,8 @@ export async function processChatMessage(
   let finalReply = '';
 
   const thoughts: string[] = [];
-  const textSafe = userMessage || '';
 
   // 1. Dynamic Language & Script Analysis
-  const isBengaliScript = /[\u0980-\u09FF]/.test(textSafe);
-  const isBanglish = /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website)\b/i.test(textSafe);
 
   if (isBengaliScript) {
     thoughts.push(`🗣️ Detected Bengali script query — Applying natural Bangla grammar.`);
