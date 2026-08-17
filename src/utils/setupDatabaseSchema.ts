@@ -195,7 +195,9 @@ async function setupSchema() {
   await executeQuery('CREATE INDEX IF NOT EXISTS "Conversation_merchantId_sessionId_idx" ON "Conversation"("merchantId", "sessionId");');
   await executeQuery('CREATE INDEX IF NOT EXISTS "Message_conversationId_idx" ON "Message"("conversationId");');
   await executeQuery('CREATE INDEX IF NOT EXISTS "KnowledgeChunk_merchantId_idx" ON "KnowledgeChunk"("merchantId");');
-  console.log('✔ Indexes created');
+  await executeQuery('CREATE INDEX IF NOT EXISTS "KnowledgeChunk_embedding_hnsw_idx" ON "KnowledgeChunk" USING hnsw (embedding vector_cosine_ops);');
+  await executeQuery('CREATE INDEX IF NOT EXISTS "Product_embedding_hnsw_idx" ON "Product" USING hnsw (embedding vector_cosine_ops);');
+  console.log('✔ Indexes and HNSW vector acceleration created');
 
   console.log('🚀 ALL TABLES PROVISIONED SUCCESSFULLY ON NEON DB!');
 }

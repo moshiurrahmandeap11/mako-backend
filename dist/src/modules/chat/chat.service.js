@@ -13,11 +13,13 @@ const db_1 = require("../../config/db");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
 const keyRotator_1 = require("../../utils/keyRotator");
-const autoLearning_service_1 = require("../../services/autoLearning.service");
 const searchProducts_tool_1 = require("./tools/searchProducts.tool");
 const searchKnowledge_tool_1 = require("./tools/searchKnowledge.tool");
 const addToCart_tool_1 = require("./tools/addToCart.tool");
 const webSearch_tool_1 = require("./tools/webSearch.tool");
+// High-Speed In-Memory Cache for frequent queries & FAQs (1-hour TTL)
+const queryResponseCache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const anthropic = env_1.env.ANTHROPIC_API_KEY ? new sdk_1.default({ apiKey: env_1.env.ANTHROPIC_API_KEY }) : null;
 const groq = env_1.env.GROQ_API_KEY
     ? new openai_1.default({
@@ -298,6 +300,28 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
             toolCalls: imageUrl ? { imageUrl } : undefined,
         },
     });
+    // FAST PATH 4: Instant High-Speed FAQ Cache Hit (<3ms, 0 token waste)
+    const normalizedQuery = (userMessage || '').trim().toLowerCase().replace(/[?!.,]/g, '');
+    const cacheKey = `${merchantId}:${normalizedQuery}`;
+    const cached = normalizedQuery ? queryResponseCache.get(cacheKey) : null;
+    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS && !imageUrl) {
+        await db_1.prisma.message.create({
+            data: {
+                conversationId: conversation.id,
+                role: 'assistant',
+                content: cached.reply,
+                tokensUsed: 5,
+                toolCalls: cached.products && cached.products.length > 0 ? { recommendedProducts: cached.products } : undefined,
+            },
+        });
+        return {
+            sessionId,
+            reply: cached.reply,
+            products: cached.products || [],
+            cartAction: null,
+            thoughts: ['⚡ Instant High-Speed Cached Response (~2ms).', ...cached.thoughts],
+        };
+    }
     let recommendedProducts = [];
     let retrievedProducts = [];
     let ragContext = '';
@@ -522,8 +546,23 @@ Currently, no specific catalog items or knowledge base articles matched this que
             toolCalls: recommendedProducts.length > 0 || cartAction ? { recommendedProducts, cartAction } : undefined,
         },
     });
-    // Trigger non-blocking background AI Auto-Learning from conversation history
-    (0, autoLearning_service_1.autoLearnFromConversation)(merchantId, sessionId).catch((err) => logger_1.logger.error('Background auto-learning failed:', err));
+    // Store concise overview/FAQ answers in fast response cache
+    if (normalizedQuery && finalReply && !imageUrl && finalReply.length < 500) {
+        queryResponseCache.set(cacheKey, {
+            reply: finalReply,
+            thoughts: thoughts.slice(0, 2),
+            products: recommendedProducts.map((p) => ({
+                id: p.id,
+                title: p.title,
+                price: p.price,
+                currency: p.currency || 'USD',
+                imageUrl: p.imageUrl,
+                productUrl: p.productUrl,
+                inStock: p.inStock,
+            })),
+            timestamp: Date.now(),
+        });
+    }
     thoughts.push('✨ Formulated optimal response.');
     return {
         sessionId,

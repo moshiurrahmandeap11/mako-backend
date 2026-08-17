@@ -426,7 +426,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     } catch (err: any) {
       let errorMsg = 'Sorry, I ran into an error. Please try again.';
       if (err?.message?.includes('revoked') || err?.message?.includes('Invalid') || err?.message?.includes('Unauthorized')) {
-        errorMsg = 'This chatbot is currently offline. Please contact the website administrator.';
+        errorMsg = 'This assistant is currently offline. Please contact the website administrator.';
+      } else if (err?.message?.includes('limit') || err?.message?.includes('quota') || err?.message?.includes('429')) {
+        errorMsg = 'Our live chat support is currently taking a short break. Please feel free to reach out to us directly via our Contact page or email!';
       } else if (err?.message) {
         errorMsg = err.message;
       }
@@ -767,6 +769,47 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }}>
                       {msg.time}
                     </span>
+                  )}
+
+                  {/* Quick Starter Suggestion Chips (Rendered only on initial greeting) */}
+                  {msg.id === 'msg_welcome' && messages.length === 1 && !isLoading && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px', maxWidth: '95%' }}>
+                      {[
+                        { label: '💼 View Portfolio', query: 'Show me your portfolio projects' },
+                        { label: '🛠️ Our Services', query: 'What services do you provide?' },
+                        { label: '📩 Contact Details', query: 'How can I contact you?' },
+                      ].map((chip, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSend(chip.query)}
+                          style={{
+                            backgroundColor: '#f8fafc',
+                            color: '#334155',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '20px',
+                            padding: '7px 13px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.backgroundColor = '#f1f5f9';
+                            (e.currentTarget as HTMLElement).style.borderColor = '#cbd5e1';
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.backgroundColor = '#f8fafc';
+                            (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0';
+                          }}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               ))}
