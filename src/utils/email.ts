@@ -24,6 +24,60 @@ const transporter = nodemailer.createTransport(
       }
 );
 
+const resendApiKey = process.env.RESEND_API_KEY || '';
+
+async function sendEmailViaResendOrSmtp({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}) {
+  if (resendApiKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Labto AI <onboarding@resend.dev>',
+          to: [to],
+          subject,
+          html,
+        }),
+      });
+
+      const data: any = await res.json();
+      if (data.id) {
+        logger.info(`Email successfully delivered via Resend HTTPS to ${to} (ID: ${data.id})`);
+        return data;
+      } else {
+        logger.warn(`Resend response for ${to}:`, data.message || data);
+      }
+    } catch (err) {
+      logger.error(`Resend HTTPS dispatch failed for ${to}:`, err);
+    }
+  }
+
+  // Fallback to Nodemailer transporter
+  try {
+    const info = await transporter.sendMail({
+      from: env.SMTP_FROM || 'Labto AI Assistant <moshiurbhau@gmail.com>',
+      to,
+      subject,
+      html,
+    });
+    logger.info(`Email sent via SMTP transporter to ${to} (MessageId: ${info.messageId})`);
+    return info;
+  } catch (smtpErr) {
+    logger.error(`SMTP fallback also failed for ${to}:`, smtpErr);
+    throw smtpErr;
+  }
+}
 export async function sendOtpEmail({
   to,
   otp,
@@ -78,19 +132,7 @@ export async function sendOtpEmail({
     </html>
   `;
 
-  try {
-    const info = await transporter.sendMail({
-      from: env.SMTP_FROM,
-      to,
-      subject,
-      html,
-    });
-    logger.info(`OTP Email successfully sent to ${to} (MessageId: ${info.messageId})`);
-    return info;
-  } catch (error) {
-    logger.error(`Failed to send OTP email to ${to}:`, error);
-    throw error;
-  }
+  return sendEmailViaResendOrSmtp({ to, subject, html });
 }
 
 export async function sendQuotaWarningEmail({
@@ -163,18 +205,7 @@ export async function sendQuotaWarningEmail({
     </html>
   `;
 
-  try {
-    const info = await transporter.sendMail({
-      from: env.SMTP_FROM,
-      to,
-      subject,
-      html,
-    });
-    logger.info(`Quota Warning Email (90%) sent to ${to} (MessageId: ${info.messageId})`);
-    return info;
-  } catch (error) {
-    logger.error(`Failed to send quota warning email to ${to}:`, error);
-  }
+  return sendEmailViaResendOrSmtp({ to, subject, html });
 }
 
 export async function sendQuotaExceededEmail({
@@ -244,16 +275,5 @@ export async function sendQuotaExceededEmail({
     </html>
   `;
 
-  try {
-    const info = await transporter.sendMail({
-      from: env.SMTP_FROM,
-      to,
-      subject,
-      html,
-    });
-    logger.info(`Quota Exceeded Email (100%) sent to ${to} (MessageId: ${info.messageId})`);
-    return info;
-  } catch (error) {
-    logger.error(`Failed to send quota exceeded email to ${to}:`, error);
-  }
+  return sendEmailViaResendOrSmtp({ to, subject, html });
 }

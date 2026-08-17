@@ -27,6 +27,52 @@ const transporter = nodemailer_1.default.createTransport(isGmail
             pass: env_1.env.SMTP_PASS,
         },
     });
+const resendApiKey = process.env.RESEND_API_KEY || '';
+async function sendEmailViaResendOrSmtp({ to, subject, html, }) {
+    if (resendApiKey) {
+        try {
+            const res = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${resendApiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    from: 'Labto AI <onboarding@resend.dev>',
+                    to: [to],
+                    subject,
+                    html,
+                }),
+            });
+            const data = await res.json();
+            if (data.id) {
+                logger_1.logger.info(`Email successfully delivered via Resend HTTPS to ${to} (ID: ${data.id})`);
+                return data;
+            }
+            else {
+                logger_1.logger.warn(`Resend response for ${to}:`, data.message || data);
+            }
+        }
+        catch (err) {
+            logger_1.logger.error(`Resend HTTPS dispatch failed for ${to}:`, err);
+        }
+    }
+    // Fallback to Nodemailer transporter
+    try {
+        const info = await transporter.sendMail({
+            from: env_1.env.SMTP_FROM || 'Labto AI Assistant <moshiurbhau@gmail.com>',
+            to,
+            subject,
+            html,
+        });
+        logger_1.logger.info(`Email sent via SMTP transporter to ${to} (MessageId: ${info.messageId})`);
+        return info;
+    }
+    catch (smtpErr) {
+        logger_1.logger.error(`SMTP fallback also failed for ${to}:`, smtpErr);
+        throw smtpErr;
+    }
+}
 async function sendOtpEmail({ to, otp, type, }) {
     const isVerification = type === 'email-verification';
     const subject = isVerification
@@ -70,20 +116,7 @@ async function sendOtpEmail({ to, otp, type, }) {
     </body>
     </html>
   `;
-    try {
-        const info = await transporter.sendMail({
-            from: env_1.env.SMTP_FROM,
-            to,
-            subject,
-            html,
-        });
-        logger_1.logger.info(`OTP Email successfully sent to ${to} (MessageId: ${info.messageId})`);
-        return info;
-    }
-    catch (error) {
-        logger_1.logger.error(`Failed to send OTP email to ${to}:`, error);
-        throw error;
-    }
+    return sendEmailViaResendOrSmtp({ to, subject, html });
 }
 async function sendQuotaWarningEmail({ to, name, used, limit, tier, }) {
     const subject = `⚠️ Action Required: You've used 90% of your Labto AI monthly messages`;
@@ -141,19 +174,7 @@ async function sendQuotaWarningEmail({ to, name, used, limit, tier, }) {
     </body>
     </html>
   `;
-    try {
-        const info = await transporter.sendMail({
-            from: env_1.env.SMTP_FROM,
-            to,
-            subject,
-            html,
-        });
-        logger_1.logger.info(`Quota Warning Email (90%) sent to ${to} (MessageId: ${info.messageId})`);
-        return info;
-    }
-    catch (error) {
-        logger_1.logger.error(`Failed to send quota warning email to ${to}:`, error);
-    }
+    return sendEmailViaResendOrSmtp({ to, subject, html });
 }
 async function sendQuotaExceededEmail({ to, name, used, limit, tier, }) {
     const subject = `🛑 Labto AI Widget Paused: Monthly message limit reached (${limit}/${limit})`;
@@ -208,17 +229,5 @@ async function sendQuotaExceededEmail({ to, name, used, limit, tier, }) {
     </body>
     </html>
   `;
-    try {
-        const info = await transporter.sendMail({
-            from: env_1.env.SMTP_FROM,
-            to,
-            subject,
-            html,
-        });
-        logger_1.logger.info(`Quota Exceeded Email (100%) sent to ${to} (MessageId: ${info.messageId})`);
-        return info;
-    }
-    catch (error) {
-        logger_1.logger.error(`Failed to send quota exceeded email to ${to}:`, error);
-    }
+    return sendEmailViaResendOrSmtp({ to, subject, html });
 }
