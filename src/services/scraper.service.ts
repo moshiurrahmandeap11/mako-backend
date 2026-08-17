@@ -227,6 +227,20 @@ function extractSpaRoutes(html: string, baseUrl: URL): string[] {
   return Array.from(discoveredRoutes);
 }
 
+export function decodeCloudflareEmail(encodedHex: string): string {
+  try {
+    let email = '';
+    const r = parseInt(encodedHex.substring(0, 2), 16);
+    for (let n = 2; n < encodedHex.length; n += 2) {
+      const charCode = parseInt(encodedHex.substring(n, n + 2), 16) ^ r;
+      email += String.fromCharCode(charCode);
+    }
+    return email;
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Indexes a single page's markdown and structured items into KnowledgeChunk and Product
  */
@@ -237,7 +251,30 @@ async function indexPageContent(
   origin: string,
   isMainDomain = false
 ): Promise<{ products: ScrapedProduct[]; chunksCount: number; pageTitle: string; pageMarkdown: string }> {
-  const $ = cheerio.load(html);
+  // Pre-process Cloudflare Email Protection tokens into plaintext emails
+  let cleanHtml = html.replace(/\/cdn-cgi\/l\/email-protection#([a-fA-F0-9]+)/g, (match, hex) => {
+    const decoded = decodeCloudflareEmail(hex);
+    return decoded ? `mailto:${decoded}` : match;
+  });
+
+  cleanHtml = cleanHtml.replace(/data-cfemail="([a-fA-F0-9]+)"/g, (match, hex) => {
+    const decoded = decodeCloudflareEmail(hex);
+    return decoded ? `data-email="${decoded}"` : match;
+  });
+
+  const $ = cheerio.load(cleanHtml);
+
+  // Replace any remaining [email protected] spans with decoded text
+  $('a[href^="mailto:"], [data-email]').each((_, el) => {
+    const mailto = $(el).attr('href')?.replace(/^mailto:/i, '').trim();
+    const dataEmail = $(el).attr('data-email')?.trim();
+    const email = mailto || dataEmail;
+    if (email && email.includes('@')) {
+      if ($(el).text().includes('[email') || $(el).text().trim() === '') {
+        $(el).text(email);
+      }
+    }
+  });
 
   const pageTitle =
     $('title').text().trim() ||

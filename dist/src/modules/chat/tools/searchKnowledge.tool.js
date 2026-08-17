@@ -8,13 +8,13 @@ async function searchKnowledgeTool(merchantId, query, maxResults = 8, targetDoma
     try {
         let chunks = [];
         const domainFilter = targetDomain ? `%${targetDomain.replace(/^https?:\/\//, '').split('/')[0]}%` : '';
-        // 1. Diverse Vector Similarity Search (Grouped & Partitioned by URL)
+        // 1. Diverse Vector Similarity Search (Grouped & Partitioned by URL via local pgvector)
         try {
             const queryVector = await (0, embeddings_1.generateEmbedding)(query);
             const isRealVector = queryVector && queryVector.some((v) => v !== 0);
             if (isRealVector) {
                 const vectorStr = `[${queryVector.join(',')}]`;
-                const rawResults = await (0, db_1.executeRawNeonQuery)(`WITH RankedChunks AS (
+                const rawResults = await db_1.prisma.$queryRawUnsafe(`WITH RankedChunks AS (
              SELECT id, url, content, 
                     (embedding <=> $1::vector) as distance,
                     ROW_NUMBER() OVER (PARTITION BY url ORDER BY (embedding <=> $1::vector) ASC) as rank_per_url
@@ -26,7 +26,7 @@ async function searchKnowledgeTool(merchantId, query, maxResults = 8, targetDoma
            SELECT id, url, content, distance
            FROM RankedChunks
            ORDER BY rank_per_url ASC, distance ASC
-           LIMIT $3`, [vectorStr, merchantId, maxResults, domainFilter]);
+           LIMIT $3`, vectorStr, merchantId, maxResults, domainFilter);
                 if (rawResults && rawResults.length > 0) {
                     chunks = rawResults;
                 }

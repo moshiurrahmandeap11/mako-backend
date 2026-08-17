@@ -14,7 +14,6 @@ const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
 const keyRotator_1 = require("../../utils/keyRotator");
 const autoLearning_service_1 = require("../../services/autoLearning.service");
-const scraper_service_1 = require("../../services/scraper.service");
 const searchProducts_tool_1 = require("./tools/searchProducts.tool");
 const searchKnowledge_tool_1 = require("./tools/searchKnowledge.tool");
 const addToCart_tool_1 = require("./tools/addToCart.tool");
@@ -228,34 +227,14 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
                 `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
         }
         else if (userMessage && userMessage.trim().length > 3 && !isSimpleGreeting(userMessage)) {
-            // 1. On-Demand Live Site Re-Crawl (if vector memory is empty & domain exists)
-            if (primaryDomain && (primaryDomain.startsWith('http://') || primaryDomain.startsWith('https://'))) {
-                try {
-                    thoughts.push(`🌐 Memory incomplete for "${userMessage}". Executing live site scan on ${primaryDomain}...`);
-                    await (0, scraper_service_1.scrapeSingleUrl)(primaryDomain, merchantId);
-                    // Re-search newly indexed vector chunks
-                    const freshKnowledge = await (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage, 8, primaryDomain);
-                    if (freshKnowledge.length > 0) {
-                        retrievedKnowledgeRes = freshKnowledge;
-                        thoughts.push(`💾 Auto-indexed ${freshKnowledge.length} fresh website knowledge chunks into pgvector!`);
-                        ragContext += `\n\n### Website Knowledge Base (Freshly Scraped Content):\n` +
-                            retrievedKnowledgeRes.map((k) => `[Source: ${k.url}]\n${k.content}`).join('\n\n');
-                    }
-                }
-                catch (scrapeErr) {
-                    logger_1.logger.debug('On-demand live site crawl failed:', scrapeErr);
-                }
-            }
-            // 2. Trigger Live Web Search as secondary fallback if still empty
-            if (retrievedKnowledgeRes.length === 0) {
-                thoughts.push(`🌐 Executing real-time web search for "${userMessage}"...`);
-                const webResults = await (0, webSearch_tool_1.webSearchTool)(userMessage, 3);
-                if (webResults.length > 0) {
-                    thoughts.push(`✨ Retrieved ${webResults.length} real-time internet search results.`);
-                    ragContext += `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
-                        webResults.map(w => `[Source: ${w.title}](${w.url})\n${w.snippet}`).join('\n\n') +
-                        `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
-                }
+            // Trigger Live Web Search fallback if vector memory has 0 matches
+            thoughts.push(`🌐 Executing real-time web search for "${userMessage}"...`);
+            const webResults = await (0, webSearch_tool_1.webSearchTool)(userMessage, 3);
+            if (webResults.length > 0) {
+                thoughts.push(`✨ Retrieved ${webResults.length} real-time internet search results.`);
+                ragContext += `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
+                    webResults.map(w => `[Source: ${w.title}](${w.url})\n${w.snippet}`).join('\n\n') +
+                    `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
             }
         }
         if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0 && !ragContext.includes('Live Web Search Results')) {

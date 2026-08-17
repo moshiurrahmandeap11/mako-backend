@@ -1,4 +1,4 @@
-import { prisma, executeRawNeonQuery } from '../../../config/db';
+import { prisma } from '../../../config/db';
 import { generateEmbedding } from '../../../utils/embeddings';
 import { logger } from '../../../utils/logger';
 
@@ -12,14 +12,14 @@ export async function searchKnowledgeTool(
     let chunks: any[] = [];
     const domainFilter = targetDomain ? `%${targetDomain.replace(/^https?:\/\//, '').split('/')[0]}%` : '';
 
-    // 1. Diverse Vector Similarity Search (Grouped & Partitioned by URL)
+    // 1. Diverse Vector Similarity Search (Grouped & Partitioned by URL via local pgvector)
     try {
       const queryVector = await generateEmbedding(query);
       const isRealVector = queryVector && queryVector.some((v) => v !== 0);
 
       if (isRealVector) {
         const vectorStr = `[${queryVector.join(',')}]`;
-        const rawResults = await executeRawNeonQuery(
+        const rawResults: any[] = await prisma.$queryRawUnsafe(
           `WITH RankedChunks AS (
              SELECT id, url, content, 
                     (embedding <=> $1::vector) as distance,
@@ -33,7 +33,10 @@ export async function searchKnowledgeTool(
            FROM RankedChunks
            ORDER BY rank_per_url ASC, distance ASC
            LIMIT $3`,
-          [vectorStr, merchantId, maxResults, domainFilter]
+          vectorStr,
+          merchantId,
+          maxResults,
+          domainFilter
         );
 
         if (rawResults && rawResults.length > 0) {
