@@ -130,8 +130,8 @@ ${customPrompt}`;
     - User: "hi" / "hello" -> Reply: "Hello! How can I help you today?"
     - User: "kemon আছেন" -> Reply: "ভালো আছি, ধন্যবাদ! কীভাবে সাহায্য করতে পারি?"`;
     const tokenEfficiencyRule = `MAXIMUM CONCISENESS & ZERO REPETITION (STRICT RULE):
-- ALWAYS answer in ONLY 1 to 2 SHORT sentences (MAXIMUM 20 WORDS TOTAL).
-- Provide ONLY the direct, exact answer requested.
+- ALWAYS answer concisely in 1 to 2 sentences (MAXIMUM 30-35 WORDS TOTAL).
+- Provide ONLY the direct, exact answer requested with clean clickable markdown links.
 - NEVER argue, challenge, or ask why the user said something.
 - DO NOT create multiple paragraphs or repeating clauses.
 - Example (Banglish query "amar direct project link lagbe"):
@@ -309,11 +309,11 @@ Currently, no specific catalog items or knowledge base articles matched this que
     // Attempt 1: Primary High-Intelligence Multilingual Provider (Google Gemini AI Studio)
     if ((selectedProvider === 'gemini' || keyRotator_1.keyRotator.hasGeminiKeys()) && !executionSuccess) {
         try {
-            const result = await keyRotator_1.keyRotator.executeGeminiCompletion('gemini-2.0-flash', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 160);
+            const result = await keyRotator_1.keyRotator.executeGeminiCompletion('gemini-3.6-flash', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 280);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;
-            thoughts.push(`⚡ Synthesized response via Google Gemini 2.0 Flash (~0.3s).`);
+            thoughts.push(`⚡ Synthesized response via Google Gemini 3.6 Flash (~0.3s).`);
         }
         catch (error) {
             logger_1.logger.error('Gemini provider pool failed, falling back to Groq pool:', error);
@@ -324,7 +324,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
     if (!executionSuccess && (selectedProvider === 'groq' || keyRotator_1.keyRotator.hasGroqKeys())) {
         try {
             const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
-            const result = await keyRotator_1.keyRotator.executeGroqCompletion(model, [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 160);
+            const result = await keyRotator_1.keyRotator.executeGroqCompletion(model, [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 280);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;
@@ -338,7 +338,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
     // Attempt 3: Fallback to OpenRouter (meta-llama/llama-3.3-70b-instruct)
     if (!executionSuccess && (selectedProvider === 'openrouter' || keyRotator_1.keyRotator.hasOpenRouterKeys())) {
         try {
-            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('meta-llama/llama-3.3-70b-instruct', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 160);
+            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('meta-llama/llama-3.3-70b-instruct', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 280);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;
@@ -357,7 +357,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
                 content: m.content || '',
             }));
             anthropicMessages.push({ role: 'user', content: userMessage });
-            const result = await keyRotator_1.keyRotator.executeAnthropicCompletion('claude-3-5-sonnet-20241022', systemPrompt + ragContext, anthropicMessages, 160);
+            const result = await keyRotator_1.keyRotator.executeAnthropicCompletion('claude-3-5-sonnet-20241022', systemPrompt + ragContext, anthropicMessages, 280);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;

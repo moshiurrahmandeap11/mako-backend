@@ -141,8 +141,8 @@ ${customPrompt}`;
     - User: "kemon আছেন" -> Reply: "ভালো আছি, ধন্যবাদ! কীভাবে সাহায্য করতে পারি?"`;
 
   const tokenEfficiencyRule = `MAXIMUM CONCISENESS & ZERO REPETITION (STRICT RULE):
-- ALWAYS answer in ONLY 1 to 2 SHORT sentences (MAXIMUM 20 WORDS TOTAL).
-- Provide ONLY the direct, exact answer requested.
+- ALWAYS answer concisely in 1 to 2 sentences (MAXIMUM 30-35 WORDS TOTAL).
+- Provide ONLY the direct, exact answer requested with clean clickable markdown links.
 - NEVER argue, challenge, or ask why the user said something.
 - DO NOT create multiple paragraphs or repeating clauses.
 - Example (Banglish query "amar direct project link lagbe"):
@@ -348,14 +348,14 @@ Currently, no specific catalog items or knowledge base articles matched this que
   if ((selectedProvider === 'gemini' || keyRotator.hasGeminiKeys()) && !executionSuccess) {
     try {
       const result = await keyRotator.executeGeminiCompletion(
-        'gemini-2.0-flash',
+        'gemini-3.6-flash',
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        160
+        280
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(`⚡ Synthesized response via Google Gemini 2.0 Flash (~0.3s).`);
+      thoughts.push(`⚡ Synthesized response via Google Gemini 3.6 Flash (~0.3s).`);
     } catch (error) {
       logger.error('Gemini provider pool failed, falling back to Groq pool:', error);
       selectedProvider = 'groq';
@@ -369,7 +369,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeGroqCompletion(
         model,
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        160
+        280
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -387,7 +387,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeOpenRouterCompletion(
         'meta-llama/llama-3.3-70b-instruct',
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        160
+        280
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -412,7 +412,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
         'claude-3-5-sonnet-20241022',
         systemPrompt + ragContext,
         anthropicMessages,
-        160
+        280
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
