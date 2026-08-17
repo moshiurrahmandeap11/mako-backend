@@ -422,6 +422,11 @@ Currently, no specific catalog items or knowledge base articles matched this que
   }
 
   // Process Add-to-cart triggers
+  finalReply = finalReply
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+    .trim();
+
   const cartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)\]/);
   if (cartMatch) {
     try {
