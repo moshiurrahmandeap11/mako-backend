@@ -3,10 +3,10 @@ import { WidgetAuthRequest } from './authenticateWidget';
 import { prisma } from '../config/db';
 import { logger } from '../utils/logger';
 
-const PLAN_LIMITS: Record<string, number> = {
+const PLAN_MONTHLY_LIMITS: Record<string, number> = {
   FREE: 100,
-  STARTER: 1000,
-  PRO: 10000,
+  STARTER: 500,
+  PRO: 1500,
   ENTERPRISE: Infinity,
 };
 
@@ -23,32 +23,34 @@ export async function rateLimitWidget(
     }
 
     const tier = merchant.planTier || 'FREE';
-    const limit = PLAN_LIMITS[tier] !== undefined ? PLAN_LIMITS[tier] : 100;
+    const limit = PLAN_MONTHLY_LIMITS[tier] !== undefined ? PLAN_MONTHLY_LIMITS[tier] : 100;
 
     if (limit === Infinity) {
       return next();
     }
 
-    // Get the start of today in UTC
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    // Get the start of the current month in UTC
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
 
-    // Count messages sent by this merchant's widget today
+    // Count user messages sent by this merchant's widget in the current calendar month
     const count = await prisma.message.count({
       where: {
+        role: 'user',
         conversation: {
           merchantId: merchant.id,
         },
         createdAt: {
-          gte: startOfDay,
+          gte: startOfMonth,
         },
       },
     });
 
     if (count >= limit) {
-      logger.warn(`Merchant ${merchant.id} (${tier}) exceeded daily limit of ${limit} messages.`);
+      logger.warn(`Merchant ${merchant.id} (${tier}) reached monthly limit of ${limit} messages.`);
       res.status(429).json({
-        error: `Daily message limit reached for the ${tier} plan. Please upgrade to continue using Labto AI.`,
+        error: `Monthly message limit of ${limit} reached for your ${tier} plan. Please upgrade to continue using Labto AI.`,
         limit,
         count,
         upgradeRequired: true,

@@ -12,8 +12,8 @@ const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
 const authenticateDashboard_1 = require("../../middleware/authenticateDashboard");
 const PLAN_PRICES = {
-    STARTER: { amount: 29, name: 'Starter Plan' },
-    PRO: { amount: 79, name: 'Pro Plan' },
+    STARTER: { amount: 2, name: 'Starter Plan' },
+    PRO: { amount: 5, name: 'Pro Plan' },
 };
 // Helper function to get or dynamically create products/prices in developer's Stripe account
 async function getOrCreatePriceId(tier) {

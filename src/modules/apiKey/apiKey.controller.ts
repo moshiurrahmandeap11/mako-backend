@@ -4,10 +4,30 @@ import { generateApiKey } from '../../utils/apiKeyGenerator';
 import { logger } from '../../utils/logger';
 import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
 
+const API_KEY_LIMITS: Record<string, number> = {
+  FREE: 1,
+  STARTER: 2,
+  PRO: 4,
+  ENTERPRISE: Infinity,
+};
+
 export async function createKey(req: DashboardAuthRequest, res: Response): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
+    const planTier = req.merchant?.planTier || 'FREE';
     const { name, template, systemPrompt, allowedDomains } = req.body;
+
+    const limit = API_KEY_LIMITS[planTier] !== undefined ? API_KEY_LIMITS[planTier] : 1;
+    const existingCount = await prisma.apiKey.count({
+      where: { merchantId, isActive: true },
+    });
+
+    if (existingCount >= limit) {
+      res.status(400).json({
+        error: `Your ${planTier} plan allows up to ${limit} active API key${limit > 1 ? 's' : ''}. Please upgrade your plan to create more keys.`,
+      });
+      return;
+    }
 
     const { fullKey, keyPrefix, hashedKey } = generateApiKey();
 

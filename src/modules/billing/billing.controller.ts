@@ -7,8 +7,8 @@ import { DashboardAuthRequest, clearPlanTierCache } from '../../middleware/authe
 import { PlanTier } from '@prisma/client';
 
 const PLAN_PRICES: Record<string, { amount: number; name: string }> = {
-  STARTER: { amount: 29, name: 'Starter Plan' },
-  PRO: { amount: 79, name: 'Pro Plan' },
+  STARTER: { amount: 2, name: 'Starter Plan' },
+  PRO: { amount: 5, name: 'Pro Plan' },
 };
 
 // Helper function to get or dynamically create products/prices in developer's Stripe account

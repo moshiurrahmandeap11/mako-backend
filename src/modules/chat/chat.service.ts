@@ -73,6 +73,18 @@ function isSimpleGreeting(message: string): boolean {
   return commonGreetings.some(g => clean === g || (clean.includes(g) && clean.length <= 15));
 }
 
+function isRoleHijackingAttempt(message: string): boolean {
+  const clean = message.toLowerCase().trim();
+  const hijackPatterns = [
+    /\b(marketing\s+off|promotion\s+off|branding\s+off)\b/i,
+    /\b(act\s+as|work\s+as|be\s+my|become\s+my)\s+(my\s+)?(personal|private|general|coding|developer)\s+assistant\b/i,
+    /\b(forget|ignore|disregard|override)\s+(all\s+)?(previous\s+)?(rules|instructions|prompts|identity|company|agency)\b/i,
+    /\b(dan\s+mode|jailbreak|unfiltered\s+mode|developer\s+mode)\b/i,
+    /\b(ami\s+ja\s+bolbo\s+shunba|kono\s+kotha\s+bolbi\s+na|mukheu\s+anbi\s+na)\b/i,
+  ];
+  return hijackPatterns.some((p) => p.test(clean));
+}
+
 function isOutOfScopeRequest(message: string): boolean {
   const clean = message.toLowerCase().trim();
 
@@ -255,7 +267,35 @@ export async function processChatMessage(
     };
   }
 
-  // FAST PATH 2: Out of Scope / Off-Topic / Essay / Academic / Coding Rejection Guard (<10ms, 0 token waste)
+  // FAST PATH 2: Anti-Jailbreak / Role Hijacking Guard (<10ms, 0 token waste)
+  if (isRoleHijackingAttempt(userMessage)) {
+    let hijackReply = '';
+    if (isBengaliScript) {
+      hijackReply = `আমি ${merchantName}-এর অফিশিয়াল সহকারী। আমি ভূমিকা পরিবর্তন করতে পারি না। কীভাবে আমাদের সেবা বা প্রজেক্টে সাহায্য করতে পারি?`;
+    } else if (isBanglish) {
+      hijackReply = `Ami ${merchantName}-er official AI assistant hishebe kaj kori. Identity ba role change kora sombhov noy। Bolun, amader website ba services niye kivabe help korte pari?`;
+    } else {
+      hijackReply = `I am the official AI assistant dedicated exclusively to ${merchantName}. I cannot change my role or act as a personal assistant. How can I help you with our services today?`;
+    }
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: hijackReply,
+      },
+    });
+
+    return {
+      reply: hijackReply,
+      thoughts: [`🛡️ Security Guard: Prevented role hijacking / prompt injection attempt.`],
+      cartAction: undefined,
+      recommendedProducts: [],
+      tokensUsed: 15,
+    };
+  }
+
+  // FAST PATH 3: Out of Scope / Off-Topic / Essay / Academic / Coding Rejection Guard (<10ms, 0 token waste)
   if (isOutOfScopeRequest(userMessage)) {
     let declineReply = '';
     if (isBengaliScript) {

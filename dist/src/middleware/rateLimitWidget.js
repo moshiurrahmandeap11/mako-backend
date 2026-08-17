@@ -3,10 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.rateLimitWidget = rateLimitWidget;
 const db_1 = require("../config/db");
 const logger_1 = require("../utils/logger");
-const PLAN_LIMITS = {
+const PLAN_MONTHLY_LIMITS = {
     FREE: 100,
-    STARTER: 1000,
-    PRO: 10000,
+    STARTER: 500,
+    PRO: 1500,
     ENTERPRISE: Infinity,
 };
 async function rateLimitWidget(req, res, next) {
@@ -17,28 +17,30 @@ async function rateLimitWidget(req, res, next) {
             return;
         }
         const tier = merchant.planTier || 'FREE';
-        const limit = PLAN_LIMITS[tier] !== undefined ? PLAN_LIMITS[tier] : 100;
+        const limit = PLAN_MONTHLY_LIMITS[tier] !== undefined ? PLAN_MONTHLY_LIMITS[tier] : 100;
         if (limit === Infinity) {
             return next();
         }
-        // Get the start of today in UTC
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        // Count messages sent by this merchant's widget today
+        // Get the start of the current month in UTC
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        // Count user messages sent by this merchant's widget in the current calendar month
         const count = await db_1.prisma.message.count({
             where: {
+                role: 'user',
                 conversation: {
                     merchantId: merchant.id,
                 },
                 createdAt: {
-                    gte: startOfDay,
+                    gte: startOfMonth,
                 },
             },
         });
         if (count >= limit) {
-            logger_1.logger.warn(`Merchant ${merchant.id} (${tier}) exceeded daily limit of ${limit} messages.`);
+            logger_1.logger.warn(`Merchant ${merchant.id} (${tier}) reached monthly limit of ${limit} messages.`);
             res.status(429).json({
-                error: `Daily message limit reached for the ${tier} plan. Please upgrade to continue using Labto AI.`,
+                error: `Monthly message limit of ${limit} reached for your ${tier} plan. Please upgrade to continue using Labto AI.`,
                 limit,
                 count,
                 upgradeRequired: true,
