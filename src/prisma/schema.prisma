@@ -28,6 +28,10 @@ model User {
   stripePriceId        String?
   subscriptionStatus   String?
 
+  // Quota & Email Alert Tracking
+  lastQuotaWarningEmailSentAt  DateTime?
+  lastQuotaExceededEmailSentAt DateTime?
+
   // Custom relations
   apiKeys         ApiKey[]
   products        Product[]

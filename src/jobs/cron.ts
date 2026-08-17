@@ -42,4 +42,90 @@ export function initCronJobs() {
   }, {
     timezone: 'UTC' // 06:00 UTC is 12:00 PM BST
   });
+
+  // Run every day at 09:00 UTC (03:00 PM BST) to evaluate monthly quotas and alert merchants
+  cron.schedule('0 9 * * *', async () => {
+    logger.info('CRON: Checking monthly message quotas for all merchants...');
+    try {
+      const PLAN_MONTHLY_LIMITS: Record<string, number> = {
+        FREE: 100,
+        STARTER: 500,
+        PRO: 1500,
+        ENTERPRISE: Infinity,
+      };
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const merchants = await prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          planTier: true,
+          lastQuotaWarningEmailSentAt: true,
+          lastQuotaExceededEmailSentAt: true,
+        },
+      });
+
+      const { sendQuotaWarningEmail, sendQuotaExceededEmail } = await import('../utils/email');
+
+      for (const m of merchants) {
+        const limit = PLAN_MONTHLY_LIMITS[m.planTier] !== undefined ? PLAN_MONTHLY_LIMITS[m.planTier] : 100;
+        if (limit === Infinity) continue;
+
+        const count = await prisma.message.count({
+          where: {
+            conversation: { merchantId: m.id },
+            createdAt: { gte: startOfMonth },
+          },
+        });
+
+        const percentage = (count / limit) * 100;
+
+        // 90% Warning
+        if (percentage >= 90 && percentage < 100) {
+          const needsWarning = !m.lastQuotaWarningEmailSentAt || m.lastQuotaWarningEmailSentAt < startOfMonth;
+          if (needsWarning && m.email) {
+            await sendQuotaWarningEmail({
+              to: m.email,
+              name: m.name,
+              used: count,
+              limit,
+              tier: m.planTier,
+            });
+            await prisma.user.update({
+              where: { id: m.id },
+              data: { lastQuotaWarningEmailSentAt: new Date() },
+            });
+          }
+        }
+
+        // 100% Exceeded
+        if (count >= limit) {
+          const needsExceededAlert = !m.lastQuotaExceededEmailSentAt || m.lastQuotaExceededEmailSentAt < startOfMonth;
+          if (needsExceededAlert && m.email) {
+            await sendQuotaExceededEmail({
+              to: m.email,
+              name: m.name,
+              used: count,
+              limit,
+              tier: m.planTier,
+            });
+            await prisma.user.update({
+              where: { id: m.id },
+              data: { lastQuotaExceededEmailSentAt: new Date() },
+            });
+          }
+        }
+      }
+
+      logger.info('CRON: Quota evaluation completed.');
+    } catch (error) {
+      logger.error('CRON: Error during quota evaluation:', error);
+    }
+  }, {
+    timezone: 'UTC'
+  });
 }
