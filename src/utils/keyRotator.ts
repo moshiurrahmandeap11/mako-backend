@@ -107,44 +107,80 @@ export class KeyRotator {
   }
 
   /**
-   * Execute Google Gemini OpenAI-compatible completion.
-   * Defaults to 'gemini-2.0-flash' with instant fallback to 'gemini-1.5-flash'.
+   * Execute Google Gemini completion using multi-key pool with automatic model rotation.
    */
   public async executeGeminiCompletion(
-    model: string = 'gemini-2.0-flash',
+    model: string = 'gemini-3.6-flash',
     messages: any[],
-    maxTokens: number = 380
+    maxTokens: number = 180
   ): Promise<{ content: string; tokensUsed: number }> {
-    if (this.geminiClients.length === 0) {
+    const geminiKeys = env.GEMINI_API_KEYS;
+    if (geminiKeys.length === 0) {
       throw new Error('No Gemini API keys available');
     }
 
-    const targetModels = [model, 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const targetModels = [model, 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash'];
     const uniqueModels = Array.from(new Set(targetModels));
 
+    // Convert standard OpenAI messages to Google Generative format
+    let systemText = '';
+    const contents: any[] = [];
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        systemText += (systemText ? '\n\n' : '') + (msg.content || '');
+      } else if (msg.role === 'user') {
+        contents.push({ role: 'user', parts: [{ text: msg.content || '' }] });
+      } else if (msg.role === 'assistant') {
+        contents.push({ role: 'model', parts: [{ text: msg.content || '' }] });
+      }
+    }
+
     for (const currentModel of uniqueModels) {
-      const attempts = this.geminiClients.length;
+      const attempts = geminiKeys.length;
       for (let i = 0; i < attempts; i++) {
-        const { client, key } = this.geminiClients[this.geminiIndex];
-        this.geminiIndex = (this.geminiIndex + 1) % this.geminiClients.length;
+        const key = geminiKeys[this.geminiIndex];
+        this.geminiIndex = (this.geminiIndex + 1) % geminiKeys.length;
 
         try {
-          const completion = await client.chat.completions.create({
-            model: currentModel,
-            messages,
-            max_tokens: maxTokens,
-            temperature: 0.3,
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${key}`;
+          const bodyPayload: any = {
+            contents,
+            generationConfig: {
+              maxOutputTokens: maxTokens,
+              temperature: 0.3,
+            },
+          };
+          if (systemText) {
+            bodyPayload.systemInstruction = { parts: [{ text: systemText }] };
+          }
+
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyPayload),
           });
 
-          const content = completion.choices[0]?.message?.content || '';
-          const tokensUsed = completion.usage?.total_tokens || 0;
-          return { content, tokensUsed };
-        } catch (error: any) {
-          const isRateLimit = error?.status === 429 || error?.message?.includes('429');
+          if (resp.ok) {
+            const data: any = await resp.json();
+            const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
+            if (content) {
+              return { content, tokensUsed };
+            }
+          }
+
+          const errData: any = await resp.json().catch(() => ({}));
+          const isRateLimit = resp.status === 429 || resp.status === 503;
           logger.warn(
-            `[KeyRotator] Gemini key (${key.substring(0, 10)}...) on model ${currentModel} failed ${
-              isRateLimit ? '(429 Rate Limit)' : ''
+            `[KeyRotator] Gemini key (${key.substring(0, 10)}...) on model ${currentModel} returned ${resp.status} ${
+              isRateLimit ? '(Rate Limit/High Demand)' : errData.error?.message || ''
             }. Trying next key/model...`
+          );
+        } catch (error: any) {
+          logger.warn(
+            `[KeyRotator] Gemini key (${key.substring(0, 10)}...) on model ${currentModel} network error: ${
+              error.message || error
+            }`
           );
         }
       }

@@ -534,11 +534,16 @@ export async function scrapeWebsite(targetUrl: string, merchantId: string): Prom
     throw new Error(`Target URL '${targetUrl}' is invalid or resolves to a restricted/private network address.`);
   }
 
-  // Clear old knowledge chunks for this merchant to maintain clean fresh data
+  // Clear old knowledge chunks ONLY for this specific website domain to maintain clean domain isolation
   try {
-    await prisma.$executeRawUnsafe(`DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1`, merchantId);
+    const domainFilter = `%${parsedUrl.hostname}%`;
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1 AND "url" ILIKE $2`,
+      merchantId,
+      domainFilter
+    );
   } catch (err) {
-    logger.error('Failed to clear old knowledge chunks:', err);
+    logger.error('Failed to clear old knowledge chunks for domain:', err);
   }
 
   const visitedUrls = new Set<string>();
@@ -631,6 +636,36 @@ export async function scrapeWebsite(targetUrl: string, merchantId: string): Prom
     } catch (err) {
       logger.error(`Failed to process ${currentUrlStr}:`, err);
     }
+  }
+
+  // Create Master Site Index Chunk for comprehensive site-wide awareness
+  try {
+    const siteMapOverview = `[Site Master Index: ${parsedUrl.hostname}]\nWebsite Title: ${mainPageTitle}\nTotal Indexed Pages (${visitedUrls.size}):\n` +
+      Array.from(visitedUrls).map((u) => `- ${u}`).join('\n') +
+      (allProductsFound.length > 0
+        ? `\nDiscovered Projects & Showcase Items:\n` +
+          allProductsFound.map((p) => `- [${p.title}](${p.productUrl}) - ${p.description || p.category || ''}`).join('\n')
+        : '');
+
+    const indexChunk = await (prisma as any).knowledgeChunk.create({
+      data: {
+        merchantId,
+        url: `${parsedUrl.origin}/#site-master-index`,
+        content: siteMapOverview,
+      },
+    });
+    totalKnowledgeChunks++;
+
+    const emb = await generateEmbedding(siteMapOverview);
+    if (emb && emb.some((v) => v !== 0)) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
+        `[${emb.join(',')}]`,
+        indexChunk.id
+      );
+    }
+  } catch (err) {
+    logger.error('Failed to generate site master index chunk:', err);
   }
 
   logger.info(

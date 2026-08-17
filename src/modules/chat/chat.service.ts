@@ -93,13 +93,21 @@ ${customPrompt}`;
   const formatRule = rules?.formatting?.instructions || `Use clean GitHub Flavored Markdown formatting with bold titles and clickable link badges.`;
   const cartRule = rules?.cart_action?.instructions || ``;
 
-  const langRule = `STRICT SCRIPT & LANGUAGE MATCHING (CRITICAL):
+  const langRule = `STRICT SCRIPT & LANGUAGE MATCHING & BANGLISH FLUENCY (CRITICAL):
 - Match the user's EXACT writing script and alphabet:
-  - If user writes in Banglish (English/Latin alphabet, e.g. "link daw to", "amar project link lagbe", "koto charge koro", "portfolio project link daw") -> You MUST ALWAYS reply in ROMANIZED BANGLISH (Latin alphabet). NEVER reply in Bengali script (বাংলা হরফ) when the user writes in English alphabet Banglish.
+  - If user writes in Banglish (English/Latin alphabet, e.g. "link daw to", "amar project link lagbe", "koto charge koro", "portfolio project link daw", "ki ki project ache") -> You MUST ALWAYS reply in ROMANIZED BANGLISH (Latin alphabet). NEVER reply in Bengali script (বাংলা হরফ) when user writes in English alphabet Banglish.
   - If user writes in Bengali script (বাংলা হরফ, e.g. "প্রজেক্টের লিংক দিন", "কেমন আছেন") -> Reply in Bengali script (বাংলা হরফ).
   - If user writes in English -> Reply in clear English.
-- NEVER mix conflicting pronouns (e.g. NEVER say "apni amra", say "Apni amader project dekhte paren").
-- NEVER repeat identical phrases or duplicate statements.`;
+- FEW-SHOT BANGLISH CONVERSATION EXAMPLES (Follow this exact natural tone):
+  - User: "apnader portfolio te ki ki project ache?"
+    Assistant: "Amader main project gulo holo: [Echo Platform](url), [Lusion Studio](url), ebong [AESHUT](url)। Apni konta somporke jante chan?"
+  - User: "hero io project er link daw"
+    Assistant: "Ei je [Hero IO](https://abidnirob.com/projects/hero-io) er project link। Ekhane project details dekhte parben।"
+  - User: "apnader services gulo ki ki?"
+    Assistant: "Amra custom web development, AI integration, ebong UI/UX design service diye thaki।"
+  - User: "koto charge koro?"
+    Assistant: "Project er scope ebong requirement onujayi amader pricing nirdharon kora hoy।"
+- NEVER mix conflicting pronouns or broken phonetics. Use clear, fluent, natural conversational Banglish.`;
 
   const linkAndContextRule = `CONTEXT AWARENESS & CLEAN CLICKABLE LINKS (CRITICAL):
 - The user is ALREADY ON THIS WEBSITE chatting with the embedded assistant.
@@ -226,8 +234,8 @@ export async function processChatMessage(
   // Perform Catalog & Knowledge RAG Search
   try {
     let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
-      searchProductsTool(merchantId, userMessage || 'general', undefined, 5),
-      searchKnowledgeTool(merchantId, userMessage || 'general', 3)
+      searchProductsTool(merchantId, userMessage || 'general', undefined, 6),
+      searchKnowledgeTool(merchantId, userMessage || 'general', 8, primaryDomain)
     ]);
 
     retrievedProducts = retrievedProductsRes;
@@ -250,7 +258,7 @@ export async function processChatMessage(
     } 
 
     if (retrievedKnowledgeRes.length > 0) {
-      thoughts.push(`🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} pgvector chunks matching query intent.`);
+      thoughts.push(`🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`);
       ragContext += `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
@@ -261,7 +269,7 @@ export async function processChatMessage(
           thoughts.push(`🌐 Memory incomplete for "${userMessage}". Executing live site scan on ${primaryDomain}...`);
           await scrapeSingleUrl(primaryDomain, merchantId);
           // Re-search newly indexed vector chunks
-          const freshKnowledge = await searchKnowledgeTool(merchantId, userMessage, 3);
+          const freshKnowledge = await searchKnowledgeTool(merchantId, userMessage, 8, primaryDomain);
           if (freshKnowledge.length > 0) {
             retrievedKnowledgeRes = freshKnowledge;
             thoughts.push(`💾 Auto-indexed ${freshKnowledge.length} fresh website knowledge chunks into pgvector!`);

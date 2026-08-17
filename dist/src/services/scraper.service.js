@@ -500,12 +500,13 @@ async function scrapeWebsite(targetUrl, merchantId) {
     if (!isSafeUrl(parsedUrl)) {
         throw new Error(`Target URL '${targetUrl}' is invalid or resolves to a restricted/private network address.`);
     }
-    // Clear old knowledge chunks for this merchant to maintain clean fresh data
+    // Clear old knowledge chunks ONLY for this specific website domain to maintain clean domain isolation
     try {
-        await db_1.prisma.$executeRawUnsafe(`DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1`, merchantId);
+        const domainFilter = `%${parsedUrl.hostname}%`;
+        await db_1.prisma.$executeRawUnsafe(`DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1 AND "url" ILIKE $2`, merchantId, domainFilter);
     }
     catch (err) {
-        logger_1.logger.error('Failed to clear old knowledge chunks:', err);
+        logger_1.logger.error('Failed to clear old knowledge chunks for domain:', err);
     }
     const visitedUrls = new Set();
     const queue = [parsedUrl.href];
@@ -583,6 +584,30 @@ async function scrapeWebsite(targetUrl, merchantId) {
         catch (err) {
             logger_1.logger.error(`Failed to process ${currentUrlStr}:`, err);
         }
+    }
+    // Create Master Site Index Chunk for comprehensive site-wide awareness
+    try {
+        const siteMapOverview = `[Site Master Index: ${parsedUrl.hostname}]\nWebsite Title: ${mainPageTitle}\nTotal Indexed Pages (${visitedUrls.size}):\n` +
+            Array.from(visitedUrls).map((u) => `- ${u}`).join('\n') +
+            (allProductsFound.length > 0
+                ? `\nDiscovered Projects & Showcase Items:\n` +
+                    allProductsFound.map((p) => `- [${p.title}](${p.productUrl}) - ${p.description || p.category || ''}`).join('\n')
+                : '');
+        const indexChunk = await db_1.prisma.knowledgeChunk.create({
+            data: {
+                merchantId,
+                url: `${parsedUrl.origin}/#site-master-index`,
+                content: siteMapOverview,
+            },
+        });
+        totalKnowledgeChunks++;
+        const emb = await (0, embeddings_1.generateEmbedding)(siteMapOverview);
+        if (emb && emb.some((v) => v !== 0)) {
+            await db_1.prisma.$executeRawUnsafe(`UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`, `[${emb.join(',')}]`, indexChunk.id);
+        }
+    }
+    catch (err) {
+        logger_1.logger.error('Failed to generate site master index chunk:', err);
     }
     logger_1.logger.info(`Scraper: Complete! Crawled ${visitedUrls.size} pages. Indexed ${allProductsFound.length} items and ${totalKnowledgeChunks} knowledge chunks.`);
     return {
