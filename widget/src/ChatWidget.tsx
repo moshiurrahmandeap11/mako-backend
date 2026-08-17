@@ -770,49 +770,60 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       {msg.time}
                     </span>
                   )}
-
-                  {/* Quick Starter Suggestion Chips (Rendered only on initial greeting) */}
-                  {msg.id === 'msg_welcome' && messages.length === 1 && !isLoading && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px', maxWidth: '95%' }}>
-                      {[
-                        { label: '💼 View Portfolio', query: 'Show me your portfolio projects' },
-                        { label: '🛠️ Our Services', query: 'What services do you provide?' },
-                        { label: '📩 Contact Details', query: 'How can I contact you?' },
-                      ].map((chip, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleSend(chip.query)}
-                          style={{
-                            backgroundColor: '#f8fafc',
-                            color: '#334155',
-                            border: '1.5px solid #e2e8f0',
-                            borderRadius: '20px',
-                            padding: '7px 13px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.15s ease',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                          }}
-                          onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLElement).style.backgroundColor = '#f1f5f9';
-                            (e.currentTarget as HTMLElement).style.borderColor = '#cbd5e1';
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.backgroundColor = '#f8fafc';
-                            (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0';
-                          }}
-                        >
-                          {chip.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ))}
+
+              {/* Quick Starter Suggestion Chips (Rendered on initial chat) */}
+              {messages.length <= 1 && !isLoading && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }}>
+                  <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }}>
+                    Suggested Questions
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {[
+                      { label: '💼 View Projects', query: 'Show me your portfolio projects' },
+                      { label: '🛠️ Our Services', query: 'What services do you provide?' },
+                      { label: '📩 Contact Info', query: 'How can I contact you?' },
+                    ].map((chip, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleSend(chip.query)}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '16px',
+                          padding: '8px 14px',
+                          fontSize: '12.5px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxShadow: '0 2px 4px rgba(15, 23, 42, 0.05)',
+                          userSelect: 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = '#f8fafc';
+                          (e.currentTarget as HTMLElement).style.borderColor = '#0f172a';
+                          (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
+                          (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 10px rgba(15, 23, 42, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = '#ffffff';
+                          (e.currentTarget as HTMLElement).style.borderColor = '#cbd5e1';
+                          (e.currentTarget as HTMLElement).style.transform = 'none';
+                          (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 4px rgba(15, 23, 42, 0.05)';
+                        }}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Dynamic Real-time AI Thinking Stage Badge */}
               {isLoading && (

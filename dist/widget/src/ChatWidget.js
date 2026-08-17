@@ -556,31 +556,36 @@ function ChatWidget({ api }) {
                                             lineHeight: '1.5',
                                             fontWeight: '450',
                                             border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
-                                        }, children: renderMarkdownText(msg.text) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'Shop Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time })), msg.id === 'msg_welcome' && messages.length === 1 && !isLoading && ((0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px', maxWidth: '95%' }, children: [
-                                            { label: '💼 View Portfolio', query: 'Show me your portfolio projects' },
+                                        }, children: renderMarkdownText(msg.text) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'Shop Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }, children: [
+                                            { label: '💼 View Projects', query: 'Show me your portfolio projects' },
                                             { label: '🛠️ Our Services', query: 'What services do you provide?' },
-                                            { label: '📩 Contact Details', query: 'How can I contact you?' },
-                                        ].map((chip, i) => ((0, jsx_runtime_1.jsx)("button", { onClick: () => handleSend(chip.query), style: {
-                                                backgroundColor: '#f8fafc',
-                                                color: '#334155',
-                                                border: '1.5px solid #e2e8f0',
-                                                borderRadius: '20px',
-                                                padding: '7px 13px',
-                                                fontSize: '12px',
+                                            { label: '📩 Contact Info', query: 'How can I contact you?' },
+                                        ].map((chip, i) => ((0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => handleSend(chip.query), style: {
+                                                backgroundColor: '#ffffff',
+                                                color: '#0f172a',
+                                                border: '1.5px solid #cbd5e1',
+                                                borderRadius: '16px',
+                                                padding: '8px 14px',
+                                                fontSize: '12.5px',
                                                 fontWeight: '600',
                                                 cursor: 'pointer',
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
-                                                gap: '4px',
-                                                transition: 'all 0.15s ease',
-                                                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                                gap: '6px',
+                                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                                                boxShadow: '0 2px 4px rgba(15, 23, 42, 0.05)',
+                                                userSelect: 'none',
                                             }, onMouseEnter: (e) => {
-                                                e.currentTarget.style.backgroundColor = '#f1f5f9';
-                                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                            }, onMouseLeave: (e) => {
                                                 e.currentTarget.style.backgroundColor = '#f8fafc';
-                                                e.currentTarget.style.borderColor = '#e2e8f0';
-                                            }, children: chip.label }, i))) }))] }, msg.id))), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                                e.currentTarget.style.borderColor = '#0f172a';
+                                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                                e.currentTarget.style.boxShadow = '0 4px 10px rgba(15, 23, 42, 0.1)';
+                                            }, onMouseLeave: (e) => {
+                                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                                e.currentTarget.style.transform = 'none';
+                                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(15, 23, 42, 0.05)';
+                                            }, children: chip.label }, i))) })] })), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '8px',
