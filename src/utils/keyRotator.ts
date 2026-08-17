@@ -162,7 +162,11 @@ export class KeyRotator {
 
           if (resp.ok) {
             const data: any = await resp.json();
-            const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const candidate = data.candidates?.[0];
+            const parts = candidate?.content?.parts || [];
+            // Filter out internal thinking parts to get the final generated text
+            const textParts = parts.filter((p: any) => p.text && !p.thought);
+            const content = (textParts.length > 0 ? textParts.map((p: any) => p.text).join('') : parts[parts.length - 1]?.text || '').trim();
             const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
             if (content) {
               return { content, tokensUsed };

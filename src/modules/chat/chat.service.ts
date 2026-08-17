@@ -344,13 +344,13 @@ Currently, no specific catalog items or knowledge base articles matched this que
   let executionSuccess = false;
   let estimatedTokens = 0;
 
-  // Attempt 1: Primary High-Intelligence Multilingual Provider (Google Gemini AI Studio)
+  // Attempt 1: Primary High-Intelligence Multilingual Provider (Google Gemini AI Studio 3.6 Flash)
   if ((selectedProvider === 'gemini' || keyRotator.hasGeminiKeys()) && !executionSuccess) {
     try {
       const result = await keyRotator.executeGeminiCompletion(
         'gemini-3.6-flash',
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        280
+        800
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
