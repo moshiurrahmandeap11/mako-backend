@@ -75,21 +75,30 @@ function isSimpleGreeting(message) {
     ];
     return commonGreetings.some(g => clean === g || (clean.includes(g) && clean.length <= 15));
 }
-function isCodeOrOutOfScopeRequest(message) {
-    const clean = message.toLowerCase();
-    const codePatterns = [
+function isOutOfScopeRequest(message) {
+    const clean = message.toLowerCase().trim();
+    const offTopicPatterns = [
+        // Essays, compositions, poems, stories, jokes
+        /\b(rochona|rochona\s+likho|essay|composition|paragraph|kobita|poem|story|golpo|joke|chotkula|natok|gaan|song)\b/i,
+        // School / Academic / Homework / Non-business subjects
+        /\b(homework|assignment|exam|math|gonit|physics|podartho|chemistry|roshayon|biology|jibobiggan|science|itihas|history|shongbidhan|geography)\b/i,
+        // Cooking, recipes, food preparation
+        /\b(recipe|cooking|ranna|biryani|cake|khabar|food|diet plan)\b/i,
+        // General world trivia / celebrities / sports / politics
+        /\b(capital of|rajdhani|president|prime minister|messi|ronaldo|cricket|football|cinema|movie|hero alom)\b/i,
+        // General coding / scripts / games / algorithms
         /\b(write|create|make|give|show|generate)\s+(me\s+)?(a\s+)?(code|script|program|game|function|class|algorithm)\b/i,
         /\b(in|using)\s+(c#|c\+\+|python|java|javascript|typescript|rust|go|php|ruby|swift|kotlin|c\b)/i,
         /\b(snake game|tic tac toe|flappy bird|chess game|calculator|sudoku)\b/i,
-        /\b(solve|do)\s+(my\s+)?(homework|math|physics|assignment|exam)\b/i,
     ];
-    return codePatterns.some((p) => p.test(clean)) &&
-        !clean.includes('portfolio') &&
-        !clean.includes('service') &&
-        !clean.includes('hire') &&
-        !clean.includes('project') &&
-        !clean.includes('pricing') &&
-        !clean.includes('contact');
+    const inScopeKeywords = [
+        'portfolio', 'project', 'service', 'hire', 'work', 'experience', 'pricing', 'charge', 'cost',
+        'contact', 'email', 'phone', 'location', 'about', 'who is', 'tech stack', 'react', 'next', 'node',
+        'developer', 'designer', 'case study', 'casestudies', 'abid', 'nirob', 'labto', 'labtobit'
+    ];
+    const hasInScopeKeyword = inScopeKeywords.some((k) => clean.includes(k));
+    const isOffTopic = offTopicPatterns.some((p) => p.test(clean));
+    return isOffTopic && !hasInScopeKeyword;
 }
 function getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, template) {
     if (customPrompt) {
@@ -127,11 +136,15 @@ ${customPrompt}`;
 - Example conversion:
   - WRONG: "Labtobit Studio is an agency. They help build custom apps. Would you like to know more about their services?"
   - RIGHT: "We are Labtobit Studio, a web development agency. We help build custom apps... Would you like to know more about our services or portfolio?"`;
-    const scopeLockRule = `CRITICAL SCOPE LOCK & NO GENERAL CODING (STRICT):
-- You are EXCLUSIVELY the customer assistant and sales representative for "${merchantName}" (${primaryDomain || 'this website'}).
-- You must ONLY assist with questions directly related to ${merchantName}'s services, projects, portfolio, store products, pricing, agency capabilities, contact details, or company information.
-- NEVER write general programming code (e.g. Python/C#/C++/Java scripts, console games like Snake/Tic-Tac-Toe, algorithms, academic homework, or non-business code).
-- If a user asks an out-of-scope query or general coding request, YOU MUST POLITELY DECLINE. State clearly: "I am the AI assistant dedicated to ${merchantName}. I can only help you with questions about our projects, services, and website."`;
+    const scopeLockRule = `CRITICAL STRICT BUSINESS BOUNDARY & ZERO TOLERANCE FOR OFF-TOPIC QUESTIONS (STRICT RULE):
+- You are EXCLUSIVELY the customer support and business sales representative for "${merchantName}" (${primaryDomain || 'this website'}).
+- You must ONLY assist with questions directly related to ${merchantName}'s services, portfolio projects, case studies, pricing, tech stack, skills, or contact info.
+- NEVER write academic essays (e.g. "গরুর রচনা", school homework), general coding scripts (e.g. Python/C# games), poetry, stories, jokes, trivia, recipes, or general knowledge.
+- If a user asks ANY question outside of ${merchantName}'s website, business, or portfolio (e.g. "গরুর রচনা লিখে দাও", "give me snake game code", "tell me a joke", "general trivia"), YOU MUST IMMEDIATELY AND POLITELY DECLINE.
+- Decline response:
+  - Banglish: "Ami sudhu amader portfolio, services ebong company information niye help korte pari. Apni amader kono project ba service somporke jante chan?"
+  - Bengali: "আমি শুধুমাত্র আমাদের প্রজেক্ট, সেবা ও ওয়েবসাইট সম্পর্কিত তথ্যে সাহায্য করতে পারি। আপনি কি আমাদের কোনো কাজ বা সেবা সম্পর্কে জানতে চান?"
+  - English: "I am the dedicated AI assistant for ${merchantName}. I can only assist with questions regarding our projects, services, and company."`;
     const casualGreetingRule = `CASUAL GREETINGS & SHORT CHATS (CRITICAL):
 - When the user sends a greeting or casual phrase:
   - DO NOT output an essay or list multiple questions.
@@ -208,8 +221,8 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
             tokensUsed: 10,
         };
     }
-    // FAST PATH 2: Out of Scope / General Coding Rejection Guard (<10ms, 0 token waste)
-    if (isCodeOrOutOfScopeRequest(userMessage)) {
+    // FAST PATH 2: Out of Scope / Off-Topic / Essay / Academic / Coding Rejection Guard (<10ms, 0 token waste)
+    if (isOutOfScopeRequest(userMessage)) {
         let declineReply = '';
         if (isBengaliScript) {
             declineReply = `আমি ${merchantName}-এর এআই সহকারী। আমি শুধুমাত্র আমাদের প্রজেক্ট, সেবা ও ওয়েবসাইট সম্পর্কিত তথ্যে সাহায্য করতে পারি।`;
