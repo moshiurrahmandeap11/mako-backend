@@ -151,10 +151,12 @@ ${customPrompt}`;
     Assistant: "Project er scope ebong requirement onujayi amader pricing nirdharon kora hoy।"
 - NEVER mix conflicting pronouns or broken phonetics. Use clear, fluent, natural conversational Banglish.`;
 
-  const linkAndContextRule = `CONTEXT AWARENESS & CLEAN CLICKABLE LINKS (CRITICAL):
+  const linkAndContextRule = `CONTEXT AWARENESS, CLEAN MARKDOWN FORMATTING & CLICKABLE LINKS (CRITICAL):
 - The user is ALREADY ON THIS WEBSITE chatting with the embedded assistant.
 - NEVER say "visit our website [homepage_url]" or suggest navigating to the homepage, because the visitor is already on it!
-- When the user asks for project links, case studies, or portfolio, ONLY provide direct deep links to the specific item requested.`;
+- ALWAYS format clickable links with CLEAN, SHORT TITLES: [Clean Title](url) e.g. [CareerPilot](https://abidnirob.com/projects/careerpilot) or [All Projects](https://abidnirob.com/projects).
+- NEVER put raw URLs, domain names, or full sentences inside the brackets (e.g. NEVER write "[Explore All Projects - abidnirob.com/projects](url)").
+- When listing projects or items, ALWAYS format each bullet on its own separate line with a hyphen (e.g. "\\n- [CareerPilot](url): AI roadmap\\n- [Digital Life Lessons](url): Platform"). NEVER concatenate multiple bullets on the same line.`;
 
   const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (CRITICAL):
 - You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "My").

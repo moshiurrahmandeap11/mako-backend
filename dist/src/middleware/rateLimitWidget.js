@@ -25,10 +25,9 @@ async function rateLimitWidget(req, res, next) {
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
-        // Count user messages sent by this merchant's widget in the current calendar month
+        // Count all messages (user + assistant) processed for this merchant in the current calendar month
         const count = await db_1.prisma.message.count({
             where: {
-                role: 'user',
                 conversation: {
                     merchantId: merchant.id,
                 },
