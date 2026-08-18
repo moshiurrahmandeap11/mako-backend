@@ -25,20 +25,18 @@ const app = express();
 app.set('trust proxy', 1);
 
 // CORS Policy
-const allowedOrigins = [env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000', 'https://mako-frontend.vercel.app'];
-
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-        callback(null, true);
-      } else {
-        callback(null, true);
-      }
+      callback(null, true);
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    exposedHeaders: ['Content-Disposition'],
   })
 );
+app.options('*', cors() as any);
 
 // Better Auth route handler (must be mounted before body parsers)
 app.use('/api/auth', toNodeHandler(auth));

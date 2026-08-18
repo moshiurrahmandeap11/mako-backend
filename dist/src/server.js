@@ -26,18 +26,16 @@ const cron_1 = require("./jobs/cron");
 const app = (0, express_1.default)();
 app.set('trust proxy', 1);
 // CORS Policy
-const allowedOrigins = [env_1.env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000', 'https://mako-frontend.vercel.app'];
 app.use((0, cors_1.default)({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-            callback(null, true);
-        }
-        else {
-            callback(null, true);
-        }
+        callback(null, true);
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    exposedHeaders: ['Content-Disposition'],
 }));
+app.options('*', (0, cors_1.default)());
 // Better Auth route handler (must be mounted before body parsers)
 app.use('/api/auth', (0, node_1.toNodeHandler)(auth_1.auth));
 // Mount billing routes before express.json() to allow raw body verification for webhook

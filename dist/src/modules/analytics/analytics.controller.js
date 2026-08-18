@@ -124,6 +124,10 @@ async function exportConversationPdf(req, res) {
         }
         const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 40, size: 'A4' });
+        const reqOrigin = req.headers.origin || '*';
+        res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="conversation_${sessionId.replace(/[^a-zA-Z0-9_-]/g, '')}.pdf"`);
         doc.pipe(res);
