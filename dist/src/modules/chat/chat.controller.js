@@ -104,8 +104,13 @@ async function chat(req, res) {
             res.status(400).json({ error: 'Message or imageUrl field is required.' });
             return;
         }
+        const rawMessage = (message || '').trim();
+        if (rawMessage.length > 250) {
+            res.status(400).json({ error: 'Prompt length exceeds maximum allowed limit of 250 characters.' });
+            return;
+        }
         const effectiveSessionId = sessionId || `sess_${crypto_1.default.randomBytes(16).toString('hex')}`;
-        const response = await (0, chat_service_1.processChatMessage)(merchantId, effectiveSessionId, (message || '').trim(), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl);
+        const response = await (0, chat_service_1.processChatMessage)(merchantId, effectiveSessionId, rawMessage.slice(0, 250), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl);
         res.json(response);
     }
     catch (error) {

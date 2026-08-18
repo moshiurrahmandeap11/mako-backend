@@ -71,12 +71,18 @@ export async function chat(req: WidgetAuthRequest, res: Response): Promise<void>
       return;
     }
 
+    const rawMessage = (message || '').trim();
+    if (rawMessage.length > 250) {
+      res.status(400).json({ error: 'Prompt length exceeds maximum allowed limit of 250 characters.' });
+      return;
+    }
+
     const effectiveSessionId = sessionId || `sess_${crypto.randomBytes(16).toString('hex')}`;
 
     const response = await processChatMessage(
       merchantId,
       effectiveSessionId,
-      (message || '').trim(),
+      rawMessage.slice(0, 250),
       botMode,
       provider,
       req.apiKeyRecord?.systemPrompt,

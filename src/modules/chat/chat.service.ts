@@ -219,6 +219,9 @@ export async function processChatMessage(
   template?: string,
   imageUrl?: string
 ) {
+  // Enforce strict 250 character limit on all prompts
+  userMessage = (userMessage || '').trim().slice(0, 250);
+
   // Fetch merchant profile for branding & domain identity
   const merchant = await prisma.user.findUnique({
     where: { id: merchantId },

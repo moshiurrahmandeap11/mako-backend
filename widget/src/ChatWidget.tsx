@@ -392,7 +392,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   }, [messages, isLoading, isOpeningSkeleton]);
 
   const handleSend = async (queryText?: string) => {
-    const text = (typeof queryText === 'string' ? queryText : inputValue).trim();
+    const text = (typeof queryText === 'string' ? queryText : inputValue).trim().slice(0, 250);
     if (!text || isLoading) return;
 
     const userMsg: MessageItem = {
@@ -886,7 +886,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 type="text"
                 placeholder="Ask about projects, services, or anything..."
                 value={inputValue}
-                onInput={(e: any) => setInputValue(e.target.value)}
+                maxLength={250}
+                onInput={(e: any) => setInputValue((e.target.value || '').slice(0, 250))}
                 style={{
                   flex: 1,
                   padding: '9px 0',
@@ -897,6 +898,11 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   outline: 'none',
                 }}
               />
+              {inputValue.length >= 200 && (
+                <span style={{ fontSize: '10.5px', color: inputValue.length >= 240 ? '#ef4444' : '#64748b', fontWeight: '600', paddingRight: '4px' }}>
+                  {inputValue.length}/250
+                </span>
+              )}
 
               <button
                 type="submit"

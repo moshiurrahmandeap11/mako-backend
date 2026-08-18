@@ -298,7 +298,7 @@ function ChatWidget({ api }) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading, isOpeningSkeleton]);
     const handleSend = async (queryText) => {
-        const text = (typeof queryText === 'string' ? queryText : inputValue).trim();
+        const text = (typeof queryText === 'string' ? queryText : inputValue).trim().slice(0, 250);
         if (!text || isLoading)
             return;
         const userMsg = {
@@ -616,7 +616,7 @@ function ChatWidget({ api }) {
                                     borderRadius: '30px',
                                     padding: '4px 6px 4px 16px',
                                     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                                }, children: [(0, jsx_runtime_1.jsx)("input", { type: "text", placeholder: "Ask about projects, services, or anything...", value: inputValue, onInput: (e) => setInputValue(e.target.value), style: {
+                                }, children: [(0, jsx_runtime_1.jsx)("input", { type: "text", placeholder: "Ask about projects, services, or anything...", value: inputValue, maxLength: 250, onInput: (e) => setInputValue((e.target.value || '').slice(0, 250)), style: {
                                             flex: 1,
                                             padding: '9px 0',
                                             border: 'none',
@@ -624,7 +624,7 @@ function ChatWidget({ api }) {
                                             color: '#0f172a',
                                             fontSize: '14px',
                                             outline: 'none',
-                                        } }), (0, jsx_runtime_1.jsx)("button", { type: "submit", disabled: !inputValue.trim() || isLoading, title: "Send message", style: {
+                                        } }), inputValue.length >= 200 && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '10.5px', color: inputValue.length >= 240 ? '#ef4444' : '#64748b', fontWeight: '600', paddingRight: '4px' }, children: [inputValue.length, "/250"] })), (0, jsx_runtime_1.jsx)("button", { type: "submit", disabled: !inputValue.trim() || isLoading, title: "Send message", style: {
                                             backgroundColor: inputValue.trim() ? '#00684a' : '#cbd5e1',
                                             color: '#ffffff',
                                             border: 'none',

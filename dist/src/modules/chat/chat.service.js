@@ -188,6 +188,8 @@ Strict Rules:
 ${cartRule ? `10. CART ACTION RULE: ${cartRule}` : ''}`.trim();
 }
 async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
+    // Enforce strict 250 character limit on all prompts
+    userMessage = (userMessage || '').trim().slice(0, 250);
     // Fetch merchant profile for branding & domain identity
     const merchant = await db_1.prisma.user.findUnique({
         where: { id: merchantId },
