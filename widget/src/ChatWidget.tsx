@@ -74,6 +74,8 @@ function renderMarkdownText(text: string) {
     .replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '')
     .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '')
     .replace(/#+\s*/g, '')
+    .replace(/^[\t ]*\*[\t ]+/gm, '• ')
+    .replace(/\n[\t ]*\*[\t ]+/g, '\n• ')
     .replace(/(\d+)\.\s+/g, '\n$1. ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

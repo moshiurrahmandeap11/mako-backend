@@ -447,7 +447,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
     if (!executionSuccess && (selectedProvider === 'groq' || keyRotator_1.keyRotator.hasGroqKeys())) {
         try {
             const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
-            const result = await keyRotator_1.keyRotator.executeGroqCompletion(model, [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 650);
+            const result = await keyRotator_1.keyRotator.executeGroqCompletion(model, [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 850);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;
@@ -461,7 +461,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
     // Attempt 3: Fallback to OpenRouter (meta-llama/llama-3.3-70b-instruct)
     if (!executionSuccess && (selectedProvider === 'openrouter' || keyRotator_1.keyRotator.hasOpenRouterKeys())) {
         try {
-            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('meta-llama/llama-3.3-70b-instruct', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 650);
+            const result = await keyRotator_1.keyRotator.executeOpenRouterCompletion('meta-llama/llama-3.3-70b-instruct', [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam], 850);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;
@@ -480,7 +480,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
                 content: m.content || '',
             }));
             anthropicMessages.push({ role: 'user', content: userMessage });
-            const result = await keyRotator_1.keyRotator.executeAnthropicCompletion('claude-3-5-sonnet-20241022', systemPrompt + ragContext, anthropicMessages, 650);
+            const result = await keyRotator_1.keyRotator.executeAnthropicCompletion('claude-3-5-sonnet-20241022', systemPrompt + ragContext, anthropicMessages, 850);
             finalReply = result.content;
             estimatedTokens = result.tokensUsed;
             executionSuccess = true;
@@ -515,13 +515,15 @@ Currently, no specific catalog items or knowledge base articles matched this que
         .replace(/<think>[\s\S]*?<\/think>/gi, '')
         .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
         .trim();
-    // Remove raw markdown hashtags (#, ##, ###) and trailing uncompleted headers
+    // Remove raw markdown hashtags (#, ##, ###), convert raw * bullets to •, and clean trailing fragments
     finalReply = finalReply
         .replace(/#+\s*/g, '')
+        .replace(/^[\t ]*\*[\t ]+/gm, '• ')
+        .replace(/\n[\t ]*\*[\t ]+/g, '\n• ')
         .replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, '')
         .trim();
-    // If output was abruptly cut off mid-sentence without terminal punctuation (. ! ? ] )), trim to last complete sentence
-    if (finalReply && !/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(finalReply)) {
+    // If output was abruptly cut off mid-sentence (ends with unclosed bracket or no terminal punctuation), trim to last complete sentence
+    if (finalReply && (!/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(finalReply) || /\([^\)]*$/.test(finalReply))) {
         const lastPunctIndex = Math.max(finalReply.lastIndexOf('.'), finalReply.lastIndexOf('!'), finalReply.lastIndexOf('?'), finalReply.lastIndexOf('।'));
         if (lastPunctIndex > 50) {
             finalReply = finalReply.substring(0, lastPunctIndex + 1).trim();

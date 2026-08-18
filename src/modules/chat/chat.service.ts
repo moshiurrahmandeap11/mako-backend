@@ -509,7 +509,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeGroqCompletion(
         model,
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        650
+        850
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -527,7 +527,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeOpenRouterCompletion(
         'meta-llama/llama-3.3-70b-instruct',
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        650
+        850
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -552,7 +552,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
         'claude-3-5-sonnet-20241022',
         systemPrompt + ragContext,
         anthropicMessages,
-        650
+        850
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -587,14 +587,16 @@ Currently, no specific catalog items or knowledge base articles matched this que
     .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
     .trim();
 
-  // Remove raw markdown hashtags (#, ##, ###) and trailing uncompleted headers
+  // Remove raw markdown hashtags (#, ##, ###), convert raw * bullets to •, and clean trailing fragments
   finalReply = finalReply
     .replace(/#+\s*/g, '')
+    .replace(/^[\t ]*\*[\t ]+/gm, '• ')
+    .replace(/\n[\t ]*\*[\t ]+/g, '\n• ')
     .replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, '')
     .trim();
 
-  // If output was abruptly cut off mid-sentence without terminal punctuation (. ! ? ] )), trim to last complete sentence
-  if (finalReply && !/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(finalReply)) {
+  // If output was abruptly cut off mid-sentence (ends with unclosed bracket or no terminal punctuation), trim to last complete sentence
+  if (finalReply && (!/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(finalReply) || /\([^\)]*$/.test(finalReply))) {
     const lastPunctIndex = Math.max(
       finalReply.lastIndexOf('.'),
       finalReply.lastIndexOf('!'),
