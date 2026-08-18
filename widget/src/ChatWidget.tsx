@@ -192,6 +192,56 @@ function renderMarkdownText(text: string) {
   return parts;
 }
 
+function TypewriterMessageText({ text, isBot }: { text: string; isBot: boolean }) {
+  const [displayedText, setDisplayedText] = useState(isBot ? '' : text);
+  const [isTyping, setIsTyping] = useState(isBot);
+
+  useEffect(() => {
+    if (!isBot) {
+      setDisplayedText(text);
+      setIsTyping(false);
+      return;
+    }
+
+    const words = (text || '').split(' ');
+    let currentIndex = 0;
+    setDisplayedText('');
+    setIsTyping(true);
+
+    const timer = setInterval(() => {
+      currentIndex++;
+      if (currentIndex <= words.length) {
+        setDisplayedText(words.slice(0, currentIndex).join(' '));
+      } else {
+        setIsTyping(false);
+        clearInterval(timer);
+      }
+    }, 28);
+
+    return () => clearInterval(timer);
+  }, [text, isBot]);
+
+  return (
+    <span>
+      {renderMarkdownText(displayedText)}
+      {isTyping && (
+        <span
+          style={{
+            display: 'inline-block',
+            width: '5px',
+            height: '14px',
+            backgroundColor: '#10b981',
+            marginLeft: '4px',
+            verticalAlign: 'middle',
+            borderRadius: '1px',
+            opacity: 0.85,
+          }}
+        />
+      )}
+    </span>
+  );
+}
+
 export function ChatWidget({ api }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -787,7 +837,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
                     }}
                   >
-                    {renderMarkdownText(msg.text)}
+                    <TypewriterMessageText text={msg.text} isBot={msg.sender === 'bot'} />
                   </div>
 
                   {/* Subtitle / Timestamp under Bot Bubble */}
@@ -823,7 +873,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         style={{
                           backgroundColor: '#ffffff',
                           color: '#0f172a',
-                          border: '1.5px solid #cbd5e1',
+                          border: '1.5px solid #a7f3d0',
                           borderRadius: '16px',
                           padding: '8px 14px',
                           fontSize: '12.5px',
@@ -833,20 +883,20 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                           alignItems: 'center',
                           gap: '6px',
                           transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: '0 2px 4px rgba(15, 23, 42, 0.05)',
+                          boxShadow: '0 2px 4px rgba(16, 185, 129, 0.06)',
                           userSelect: 'none',
                         }}
                         onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLElement).style.backgroundColor = '#f8fafc';
-                          (e.currentTarget as HTMLElement).style.borderColor = '#0f172a';
+                          (e.currentTarget as HTMLElement).style.backgroundColor = '#f0fdf4';
+                          (e.currentTarget as HTMLElement).style.borderColor = '#10b981';
                           (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
-                          (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 10px rgba(15, 23, 42, 0.1)';
+                          (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.18)';
                         }}
                         onMouseLeave={(e) => {
                           (e.currentTarget as HTMLElement).style.backgroundColor = '#ffffff';
-                          (e.currentTarget as HTMLElement).style.borderColor = '#cbd5e1';
+                          (e.currentTarget as HTMLElement).style.borderColor = '#a7f3d0';
                           (e.currentTarget as HTMLElement).style.transform = 'none';
-                          (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 4px rgba(15, 23, 42, 0.05)';
+                          (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.06)';
                         }}
                       >
                         {chip.icon}
