@@ -13,8 +13,8 @@ async function getConfig(req, res) {
                 data: {
                     merchantId,
                     primaryColor: '#111111',
-                    greetingMessage: 'Hi! How can I help you shop today?',
-                    botName: 'Shop Assistant',
+                    greetingMessage: 'Hi! How can I help you today?',
+                    botName: 'AI Assistant',
                     position: 'bottom-right',
                     addToCartEnabled: true,
                 },
@@ -43,8 +43,8 @@ async function updateConfig(req, res) {
             create: {
                 merchantId,
                 primaryColor: primaryColor || '#111111',
-                greetingMessage: greetingMessage || 'Hi! How can I help you shop today?',
-                botName: botName || 'Shop Assistant',
+                greetingMessage: greetingMessage || 'Hi! How can I help you today?',
+                botName: botName || 'AI Assistant',
                 position: position || 'bottom-right',
                 addToCartEnabled: addToCartEnabled !== undefined ? Boolean(addToCartEnabled) : true,
             },

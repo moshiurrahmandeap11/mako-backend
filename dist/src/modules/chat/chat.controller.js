@@ -75,16 +75,16 @@ async function getWidgetConfigPublic(req, res) {
                 id: '',
                 merchantId,
                 primaryColor: '#111111',
-                greetingMessage: 'Hi! How can I help you shop today?',
-                botName: 'Shop Assistant',
+                greetingMessage: 'Hi! How can I help you today?',
+                botName: 'AI Assistant',
                 position: 'bottom-right',
                 addToCartEnabled: true,
             };
         }
         res.json({
             primaryColor: config.primaryColor || '#111111',
-            greetingMessage: config.greetingMessage || 'Hi! How can I help you shop today?',
-            botName: config.botName || 'Shop Assistant',
+            greetingMessage: config.greetingMessage || 'Hi! How can I help you today?',
+            botName: config.botName || 'AI Assistant',
             position: config.position || 'bottom-right',
             addToCartEnabled: config.addToCartEnabled !== undefined ? config.addToCartEnabled : true,
             hideBranding: planTier === 'PRO' || planTier === 'ENTERPRISE',

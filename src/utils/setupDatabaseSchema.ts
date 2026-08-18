@@ -136,8 +136,8 @@ async function setupSchema() {
         "id" TEXT NOT NULL,
         "merchantId" TEXT NOT NULL,
         "primaryColor" TEXT NOT NULL DEFAULT '#111111',
-        "greetingMessage" TEXT NOT NULL DEFAULT 'Hi! How can I help you shop today?',
-        "botName" TEXT NOT NULL DEFAULT 'Shop Assistant',
+        "greetingMessage" TEXT NOT NULL DEFAULT 'Hi! How can I help you today?',
+        "botName" TEXT NOT NULL DEFAULT 'AI Assistant',
         "position" TEXT NOT NULL DEFAULT 'bottom-right',
         "addToCartEnabled" BOOLEAN NOT NULL DEFAULT true,
         CONSTRAINT "WidgetConfig_pkey" PRIMARY KEY ("id")

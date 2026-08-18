@@ -14,8 +14,8 @@ export async function getConfig(req: DashboardAuthRequest, res: Response): Promi
         data: {
           merchantId,
           primaryColor: '#111111',
-          greetingMessage: 'Hi! How can I help you shop today?',
-          botName: 'Shop Assistant',
+          greetingMessage: 'Hi! How can I help you today?',
+          botName: 'AI Assistant',
           position: 'bottom-right',
           addToCartEnabled: true,
         },
@@ -48,8 +48,8 @@ export async function updateConfig(req: DashboardAuthRequest, res: Response): Pr
       create: {
         merchantId,
         primaryColor: primaryColor || '#111111',
-        greetingMessage: greetingMessage || 'Hi! How can I help you shop today?',
-        botName: botName || 'Shop Assistant',
+        greetingMessage: greetingMessage || 'Hi! How can I help you today?',
+        botName: botName || 'AI Assistant',
         position: position || 'bottom-right',
         addToCartEnabled: addToCartEnabled !== undefined ? Boolean(addToCartEnabled) : true,
       },

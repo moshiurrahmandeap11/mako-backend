@@ -70,11 +70,20 @@ function isSimpleGreeting(message: string): boolean {
   const clean = message.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
   const commonGreetings = [
     'hi', 'hello', 'hey', 'yo', 'sup', 'hola', 'hi there', 'hello there', 'hi bro', 'hey bro', 'hello bro',
-    'kemon achis', 'kemon acho', 'kemon aco', 'kire', 'kire bro', 'ki khobor', 'bro', 'vai', 'bhai',
-    'good morning', 'good afternoon', 'good evening', 'thanks', 'thank you', 'thx',
+    'kemon achis', 'kemon acho', 'kemon aco', 'kire', 'kire bro', 'ki khobor',
+    'good morning', 'good afternoon', 'good evening',
     'kemon acis', 'kemne acho', 'kemon', 'assalamu alaikum', 'salam'
   ];
   return commonGreetings.some(g => clean === g || (clean.includes(g) && clean.length <= 15));
+}
+
+function isGratitude(message: string): boolean {
+  const clean = message.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
+  const gratitudePhrases = [
+    'thanks', 'thank you', 'thx', 'thank u', 'dhonnobad', 'many thanks', 'thanks bro', 'thank you bro',
+    'dhonnobad bro', 'shukriya'
+  ];
+  return gratitudePhrases.some(g => clean === g || (clean.includes(g) && clean.length <= 20));
 }
 
 function isRoleHijackingAttempt(message: string): boolean {
@@ -274,6 +283,34 @@ export async function processChatMessage(
       cartAction: undefined,
       recommendedProducts: [],
       tokensUsed: 10,
+    };
+  }
+
+  // FAST PATH 1.5: Instant Gratitude Responses (<10ms)
+  if (isGratitude(userMessage)) {
+    let gratitudeReply = '';
+    if (isBengaliScript) {
+      gratitudeReply = `আপনাকে অনেক ধন্যবাদ! যেকোনো সাহায্যে আমি আছি।`;
+    } else if (isBanglish) {
+      gratitudeReply = `You are most welcome bro! Apnar ar kono sahajjo lagle bolben।`;
+    } else {
+      gratitudeReply = `You are most welcome! Let me know if you need any further assistance.`;
+    }
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: gratitudeReply,
+      },
+    });
+
+    return {
+      reply: gratitudeReply,
+      thoughts: [],
+      cartAction: undefined,
+      recommendedProducts: [],
+      tokensUsed: 8,
     };
   }
 
