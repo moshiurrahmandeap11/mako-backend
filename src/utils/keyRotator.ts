@@ -110,17 +110,16 @@ export class KeyRotator {
    * Execute Google Gemini completion using multi-key pool with automatic model rotation.
    */
   public async executeGeminiCompletion(
-    model: string = 'gemini-3.6-flash',
+    model: string = 'gemini-1.5-flash',
     messages: any[],
-    maxTokens: number = 180
+    maxTokens: number = 850
   ): Promise<{ content: string; tokensUsed: number }> {
     const geminiKeys = env.GEMINI_API_KEYS;
     if (geminiKeys.length === 0) {
       throw new Error('No Gemini API keys available');
     }
 
-    const targetModels = [model, 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash'];
-    const uniqueModels = Array.from(new Set(targetModels));
+    const validModels = ['gemini-1.5-flash', 'gemini-2.0-flash'];
 
     // Convert standard OpenAI messages to Google Generative format
     let systemText = '';
@@ -135,58 +134,46 @@ export class KeyRotator {
       }
     }
 
-    for (const currentModel of uniqueModels) {
-      const attempts = geminiKeys.length;
-      for (let i = 0; i < attempts; i++) {
-        const key = geminiKeys[this.geminiIndex];
-        this.geminiIndex = (this.geminiIndex + 1) % geminiKeys.length;
+    for (const currentModel of validModels) {
+      const key = geminiKeys[this.geminiIndex];
+      this.geminiIndex = (this.geminiIndex + 1) % geminiKeys.length;
 
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${key}`;
-          const bodyPayload: any = {
-            contents,
-            generationConfig: {
-              maxOutputTokens: maxTokens,
-              temperature: 0.3,
-            },
-          };
-          if (systemText) {
-            bodyPayload.systemInstruction = { parts: [{ text: systemText }] };
-          }
-
-          const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bodyPayload),
-          });
-
-          if (resp.ok) {
-            const data: any = await resp.json();
-            const candidate = data.candidates?.[0];
-            const parts = candidate?.content?.parts || [];
-            // Filter out internal thinking parts to get the final generated text
-            const textParts = parts.filter((p: any) => p.text && !p.thought);
-            const content = (textParts.length > 0 ? textParts.map((p: any) => p.text).join('') : parts[parts.length - 1]?.text || '').trim();
-            const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
-            if (content) {
-              return { content, tokensUsed };
-            }
-          }
-
-          const errData: any = await resp.json().catch(() => ({}));
-          const isRateLimit = resp.status === 429 || resp.status === 503;
-          logger.warn(
-            `[KeyRotator] Gemini key (${key.substring(0, 10)}...) on model ${currentModel} returned ${resp.status} ${
-              isRateLimit ? '(Rate Limit/High Demand)' : errData.error?.message || ''
-            }. Trying next key/model...`
-          );
-        } catch (error: any) {
-          logger.warn(
-            `[KeyRotator] Gemini key (${key.substring(0, 10)}...) on model ${currentModel} network error: ${
-              error.message || error
-            }`
-          );
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${key}`;
+        const bodyPayload: any = {
+          contents,
+          generationConfig: {
+            maxOutputTokens: maxTokens || 850,
+            temperature: 0.3,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        };
+        if (systemText) {
+          bodyPayload.systemInstruction = { parts: [{ text: systemText }] };
         }
+
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(3500),
+          body: JSON.stringify(bodyPayload),
+        });
+
+        if (resp.ok) {
+          const data: any = await resp.json();
+          const candidate = data.candidates?.[0];
+          const parts = candidate?.content?.parts || [];
+          const textParts = parts.filter((p: any) => p.text && !p.thought);
+          const content = (textParts.length > 0 ? textParts.map((p: any) => p.text).join('') : parts[parts.length - 1]?.text || '').trim();
+          const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
+          if (content) {
+            return { content, tokensUsed };
+          }
+        }
+      } catch (error: any) {
+        logger.warn(
+          `[KeyRotator] Gemini key (${key.substring(0, 10)}...) model ${currentModel} error: ${error.message || error}`
+        );
       }
     }
 
