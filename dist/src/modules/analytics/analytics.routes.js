@@ -7,4 +7,5 @@ const router = (0, express_1.Router)();
 router.use(authenticateDashboard_1.authenticateDashboard);
 router.get('/summary', analytics_controller_1.getSummary);
 router.get('/conversations', analytics_controller_1.listConversations);
+router.get('/conversations/:sessionId/pdf', analytics_controller_1.exportConversationPdf);
 exports.default = router;

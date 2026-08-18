@@ -67,6 +67,26 @@ const ChevronDownSvg = () => (
   </svg>
 );
 
+const BriefcaseSvg = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.85 }}>
+    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+  </svg>
+);
+
+const ToolsSvg = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.85 }}>
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+  </svg>
+);
+
+const MailSvg = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.85 }}>
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
+  </svg>
+);
+
 function renderMarkdownText(text: string) {
   if (!text) return null;
 
@@ -792,9 +812,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   </span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {[
-                      { label: '💼 View Projects', query: 'Show me your portfolio projects' },
-                      { label: '🛠️ Our Services', query: 'What services do you provide?' },
-                      { label: '📩 Contact Info', query: 'How can I contact you?' },
+                      { label: 'View Projects', icon: <BriefcaseSvg />, query: 'Show me your portfolio projects' },
+                      { label: 'Our Services', icon: <ToolsSvg />, query: 'What services do you provide?' },
+                      { label: 'Contact Info', icon: <MailSvg />, query: 'How can I contact you?' },
                     ].map((chip, i) => (
                       <button
                         key={i}
@@ -829,7 +849,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                           (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 4px rgba(15, 23, 42, 0.05)';
                         }}
                       >
-                        {chip.label}
+                        {chip.icon}
+                        <span>{chip.label}</span>
                       </button>
                     ))}
                   </div>

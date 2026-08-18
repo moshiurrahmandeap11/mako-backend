@@ -11,6 +11,9 @@ const CloseSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "16", height: "1
 const RefreshSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("polyline", { points: "23 4 23 10 17 10" }), (0, jsx_runtime_1.jsx)("polyline", { points: "1 20 1 14 7 14" }), (0, jsx_runtime_1.jsx)("path", { d: "M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" })] }));
 const SendSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("line", { x1: "22", y1: "2", x2: "11", y2: "13" }), (0, jsx_runtime_1.jsx)("polygon", { points: "22 2 15 22 11 13 2 9 22 2", fill: "currentColor", fillOpacity: "0.25" })] }));
 const ChevronDownSvg = () => ((0, jsx_runtime_1.jsx)("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round", children: (0, jsx_runtime_1.jsx)("polyline", { points: "6 9 12 15 18 9" }) }));
+const BriefcaseSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: [(0, jsx_runtime_1.jsx)("rect", { x: "2", y: "7", width: "20", height: "14", rx: "2", ry: "2" }), (0, jsx_runtime_1.jsx)("path", { d: "M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" })] }));
+const ToolsSvg = () => ((0, jsx_runtime_1.jsx)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: (0, jsx_runtime_1.jsx)("path", { d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" }) }));
+const MailSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: [(0, jsx_runtime_1.jsx)("path", { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }), (0, jsx_runtime_1.jsx)("polyline", { points: "22,6 12,13 2,6" })] }));
 function renderMarkdownText(text) {
     if (!text)
         return null;
@@ -564,10 +567,10 @@ function ChatWidget({ api }) {
                                             fontWeight: '450',
                                             border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
                                         }, children: renderMarkdownText(msg.text) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'Shop Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }, children: [
-                                            { label: '💼 View Projects', query: 'Show me your portfolio projects' },
-                                            { label: '🛠️ Our Services', query: 'What services do you provide?' },
-                                            { label: '📩 Contact Info', query: 'How can I contact you?' },
-                                        ].map((chip, i) => ((0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => handleSend(chip.query), style: {
+                                            { label: 'View Projects', icon: (0, jsx_runtime_1.jsx)(BriefcaseSvg, {}), query: 'Show me your portfolio projects' },
+                                            { label: 'Our Services', icon: (0, jsx_runtime_1.jsx)(ToolsSvg, {}), query: 'What services do you provide?' },
+                                            { label: 'Contact Info', icon: (0, jsx_runtime_1.jsx)(MailSvg, {}), query: 'How can I contact you?' },
+                                        ].map((chip, i) => ((0, jsx_runtime_1.jsxs)("button", { type: "button", onClick: () => handleSend(chip.query), style: {
                                                 backgroundColor: '#ffffff',
                                                 color: '#0f172a',
                                                 border: '1.5px solid #cbd5e1',
@@ -592,7 +595,7 @@ function ChatWidget({ api }) {
                                                 e.currentTarget.style.borderColor = '#cbd5e1';
                                                 e.currentTarget.style.transform = 'none';
                                                 e.currentTarget.style.boxShadow = '0 2px 4px rgba(15, 23, 42, 0.05)';
-                                            }, children: chip.label }, i))) })] })), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                            }, children: [chip.icon, (0, jsx_runtime_1.jsx)("span", { children: chip.label })] }, i))) })] })), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '8px',
