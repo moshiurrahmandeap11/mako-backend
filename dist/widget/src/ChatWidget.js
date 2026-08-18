@@ -17,6 +17,7 @@ function renderMarkdownText(text) {
     let clean = text
         .replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '')
         .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '')
+        .replace(/#+\s*/g, '')
         .replace(/(\d+)\.\s+/g, '\n$1. ')
         .replace(/\n{3,}/g, '\n\n')
         .trim();

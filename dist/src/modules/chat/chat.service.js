@@ -185,7 +185,8 @@ Strict Rules:
 7. ${scopeLockRule}
 8. LANGUAGE & SCRIPT MATCHING: ${langRule}
 9. FORMATTING RULE: ${formatRule}
-${cartRule ? `10. CART ACTION RULE: ${cartRule}` : ''}`.trim();
+10. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
+${cartRule ? `11. CART ACTION RULE: ${cartRule}` : ''}`.trim();
 }
 async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
     // Enforce strict 250 character limit on all prompts
@@ -514,8 +515,11 @@ Currently, no specific catalog items or knowledge base articles matched this que
         .replace(/<think>[\s\S]*?<\/think>/gi, '')
         .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
         .trim();
-    // Remove trailing uncompleted headers (e.g. "--- ### Have a project")
-    finalReply = finalReply.replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, '').trim();
+    // Remove raw markdown hashtags (#, ##, ###) and trailing uncompleted headers
+    finalReply = finalReply
+        .replace(/#+\s*/g, '')
+        .replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, '')
+        .trim();
     // If output was abruptly cut off mid-sentence without terminal punctuation (. ! ? ] )), trim to last complete sentence
     if (finalReply && !/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(finalReply)) {
         const lastPunctIndex = Math.max(finalReply.lastIndexOf('.'), finalReply.lastIndexOf('!'), finalReply.lastIndexOf('?'), finalReply.lastIndexOf('।'));
