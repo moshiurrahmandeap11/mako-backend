@@ -104,7 +104,7 @@ export async function listConversations(req: DashboardAuthRequest, res: Response
 export async function exportConversationPdf(req: DashboardAuthRequest, res: Response): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
-    const { sessionId } = req.params;
+    const sessionId = String(req.params.sessionId || '');
 
     if (!sessionId) {
       res.status(400).json({ error: 'Session ID is required.' });
@@ -112,7 +112,7 @@ export async function exportConversationPdf(req: DashboardAuthRequest, res: Resp
     }
 
     // Verify conversation belongs strictly to this merchant (Data Leak Prevention)
-    const conversation = await prisma.conversation.findFirst({
+    const conversation = await (prisma.conversation as any).findFirst({
       where: {
         sessionId,
         merchantId,

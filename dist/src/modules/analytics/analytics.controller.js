@@ -101,7 +101,7 @@ async function listConversations(req, res) {
 async function exportConversationPdf(req, res) {
     try {
         const merchantId = req.merchant?.id;
-        const { sessionId } = req.params;
+        const sessionId = String(req.params.sessionId || '');
         if (!sessionId) {
             res.status(400).json({ error: 'Session ID is required.' });
             return;
