@@ -346,7 +346,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
     }
     // Perform Catalog & Knowledge RAG Search
     try {
-        const ragTimeout = new Promise((resolve) => setTimeout(() => resolve([[], []]), 2500));
+        const ragTimeout = new Promise((resolve) => setTimeout(() => resolve([[], []]), 1200));
         let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
             Promise.all([
                 (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage || 'general', undefined, 6),
@@ -526,6 +526,8 @@ Currently, no specific catalog items or knowledge base articles matched this que
         .replace(/\n[\t ]*\*[\t ]+/g, '\n• ')
         .replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, '')
         .trim();
+    // Strip trailing incomplete bullet item (e.g. "\n5. " or "\n5. E-Commerce" without terminal punctuation)
+    finalReply = finalReply.replace(/(\n|^)\s*(\d+\.|•|-)\s*[^\n.!?।]*$/g, '').trim();
     // If output was abruptly cut off mid-sentence (ends with unclosed bracket or no terminal punctuation), trim to last complete sentence
     if (finalReply && (!/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(finalReply) || /\([^\)]*$/.test(finalReply))) {
         const lastPunctIndex = Math.max(finalReply.lastIndexOf('.'), finalReply.lastIndexOf('!'), finalReply.lastIndexOf('?'), finalReply.lastIndexOf('।'));
