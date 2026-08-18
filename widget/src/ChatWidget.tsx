@@ -83,7 +83,7 @@ function renderMarkdownText(text: string) {
   if (!clean) return null;
 
   const parts = [];
-  const regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*|(https?:\/\/[^\s<>)"]+)/g;
+  const regex = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)|\*\*([^*]+)\*\*|((?:https?:\/\/|mailto:)[^\s<>)"]+)/g;
   let lastIndex = 0;
   let match;
 

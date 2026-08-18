@@ -35,6 +35,7 @@ async function generateEmbedding(text) {
                 const resp = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: AbortSignal.timeout(2500),
                     body: JSON.stringify({
                         content: { parts: [{ text: sanitizedText.substring(0, 8000) }] },
                         outputDimensionality: 1536,

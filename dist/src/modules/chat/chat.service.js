@@ -346,9 +346,13 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
     }
     // Perform Catalog & Knowledge RAG Search
     try {
-        let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
-            (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage || 'general', undefined, 6),
-            (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage || 'general', 8, primaryDomain)
+        const ragTimeout = new Promise((resolve) => setTimeout(() => resolve([[], []]), 2500));
+        let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
+            Promise.all([
+                (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage || 'general', undefined, 6),
+                (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage || 'general', 8, primaryDomain)
+            ]),
+            ragTimeout
         ]);
         retrievedProducts = retrievedProductsRes;
         // Fallback: If query search returned 0 items, fetch top catalog items for context

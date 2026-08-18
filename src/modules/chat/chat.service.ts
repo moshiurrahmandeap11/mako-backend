@@ -393,9 +393,16 @@ export async function processChatMessage(
 
   // Perform Catalog & Knowledge RAG Search
   try {
-    let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.all([
-      searchProductsTool(merchantId, userMessage || 'general', undefined, 6),
-      searchKnowledgeTool(merchantId, userMessage || 'general', 8, primaryDomain)
+    const ragTimeout = new Promise<[any[], any[]]>((resolve) =>
+      setTimeout(() => resolve([[], []]), 2500)
+    );
+
+    let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
+      Promise.all([
+        searchProductsTool(merchantId, userMessage || 'general', undefined, 6),
+        searchKnowledgeTool(merchantId, userMessage || 'general', 8, primaryDomain)
+      ]),
+      ragTimeout
     ]);
 
     retrievedProducts = retrievedProductsRes;
