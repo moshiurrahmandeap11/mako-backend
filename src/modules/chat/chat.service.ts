@@ -508,7 +508,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeGroqCompletion(
         model,
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        280
+        650
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -526,7 +526,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       const result = await keyRotator.executeOpenRouterCompletion(
         'meta-llama/llama-3.3-70b-instruct',
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        280
+        650
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -551,7 +551,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
         'claude-3-5-sonnet-20241022',
         systemPrompt + ragContext,
         anthropicMessages,
-        280
+        650
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
@@ -580,11 +580,27 @@ Currently, no specific catalog items or knowledge base articles matched this que
     }
   }
 
-  // Process Add-to-cart triggers
+  // Process Add-to-cart triggers and sanitize response
   finalReply = finalReply
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
     .trim();
+
+  // Remove trailing uncompleted headers (e.g. "--- ### Have a project")
+  finalReply = finalReply.replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, '').trim();
+
+  // If output was abruptly cut off mid-sentence without terminal punctuation (. ! ? ] )), trim to last complete sentence
+  if (finalReply && !/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(finalReply)) {
+    const lastPunctIndex = Math.max(
+      finalReply.lastIndexOf('.'),
+      finalReply.lastIndexOf('!'),
+      finalReply.lastIndexOf('?'),
+      finalReply.lastIndexOf('।')
+    );
+    if (lastPunctIndex > 50) {
+      finalReply = finalReply.substring(0, lastPunctIndex + 1).trim();
+    }
+  }
 
   const cartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)\]/);
   if (cartMatch) {

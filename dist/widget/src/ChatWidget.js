@@ -17,6 +17,8 @@ function renderMarkdownText(text) {
     let clean = text
         .replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '')
         .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '')
+        .replace(/(\d+)\.\s+/g, '\n$1. ')
+        .replace(/\n{3,}/g, '\n\n')
         .trim();
     if (!clean)
         return null;
@@ -551,6 +553,7 @@ function ChatWidget({ api }) {
                                             borderRadius: msg.sender === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
                                             maxWidth: '85%',
                                             wordBreak: 'break-word',
+                                            whiteSpace: 'pre-wrap',
                                             boxShadow: msg.sender === 'user' ? '0 4px 14px rgba(0,0,0,0.15)' : 'none',
                                             fontSize: '14.5px',
                                             lineHeight: '1.5',
