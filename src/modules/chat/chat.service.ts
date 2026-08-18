@@ -67,23 +67,18 @@ function loadAiPromptsYaml(template?: string): any {
 }
 
 function isSimpleGreeting(message: string): boolean {
-  const clean = message.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
-  const commonGreetings = [
-    'hi', 'hello', 'hey', 'yo', 'sup', 'hola', 'hi there', 'hello there', 'hi bro', 'hey bro', 'hello bro',
-    'kemon achis', 'kemon acho', 'kemon aco', 'kire', 'kire bro', 'ki khobor',
-    'good morning', 'good afternoon', 'good evening',
-    'kemon acis', 'kemne acho', 'kemon', 'assalamu alaikum', 'salam'
-  ];
-  return commonGreetings.some(g => clean === g || (clean.includes(g) && clean.length <= 15));
+  const clean = message.toLowerCase().trim();
+  if (/\b(thanks|thank|thx|dhonnobad|shukriya)\b/i.test(clean)) {
+    return false;
+  }
+  const greetingRegex = /^\s*\b(hi|hello|hey|yo|sup|hola|hi there|hello there|hi bro|hey bro|hello bro|kemon achis|kemon acho|kemon aco|kire|kire bro|ki khobor|good morning|good afternoon|good evening|kemon acis|kemne acho|kemon|assalamu alaikum|salam)\b\s*$/i;
+  return greetingRegex.test(clean) || (clean.length <= 15 && /\b(hi|hello|hey|hola|salam)\b/i.test(clean));
 }
 
 function isGratitude(message: string): boolean {
-  const clean = message.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
-  const gratitudePhrases = [
-    'thanks', 'thank you', 'thx', 'thank u', 'dhonnobad', 'many thanks', 'thanks bro', 'thank you bro',
-    'dhonnobad bro', 'shukriya'
-  ];
-  return gratitudePhrases.some(g => clean === g || (clean.includes(g) && clean.length <= 20));
+  const clean = message.toLowerCase().trim();
+  const gratitudeRegex = /\b(thanks|thank\s*you|thx|thank\s*u|dhonnobad|many\s*thanks|shukriya)\b/i;
+  return gratitudeRegex.test(clean);
 }
 
 function isRoleHijackingAttempt(message: string): boolean {
