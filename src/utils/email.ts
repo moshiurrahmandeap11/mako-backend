@@ -44,7 +44,7 @@ async function sendEmailViaResendOrSmtp({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Labto AI <onboarding@resend.dev>',
+          from: process.env.SMTP_FROM || 'Labto AI <support@ahsanul.dev>',
           to: [to],
           subject,
           html,
