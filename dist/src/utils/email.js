@@ -31,6 +31,7 @@ const resendApiKey = process.env.RESEND_API_KEY || '';
 async function sendEmailViaResendOrSmtp({ to, subject, html, }) {
     if (resendApiKey) {
         try {
+            const textFallback = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
             const res = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: {
@@ -40,8 +41,10 @@ async function sendEmailViaResendOrSmtp({ to, subject, html, }) {
                 body: JSON.stringify({
                     from: process.env.SMTP_FROM || 'Labto AI <support@ahsanul.dev>',
                     to: [to],
+                    reply_to: 'support@ahsanul.dev',
                     subject,
                     html,
+                    text: textFallback,
                 }),
             });
             const data = await res.json();
