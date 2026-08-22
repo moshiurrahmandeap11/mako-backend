@@ -79,12 +79,15 @@ export class KeyRotator {
       this.groqIndex = (this.groqIndex + 1) % this.groqClients.length;
 
       try {
-        const completion = await client.chat.completions.create({
-          model,
-          messages,
-          max_tokens: maxTokens,
-          temperature: 0.3,
-        });
+        const completion = await client.chat.completions.create(
+          {
+            model,
+            messages,
+            max_tokens: maxTokens,
+            temperature: 0.3,
+          },
+          { timeout: 3500 }
+        );
 
         const content = completion.choices[0]?.message?.content || '';
         const tokensUsed = completion.usage?.total_tokens || 0;
@@ -198,12 +201,15 @@ export class KeyRotator {
       this.openRouterIndex = (this.openRouterIndex + 1) % this.openRouterClients.length;
 
       try {
-        const completion = await client.chat.completions.create({
-          model,
-          messages,
-          max_tokens: maxTokens,
-          temperature: 0.3,
-        });
+        const completion = await client.chat.completions.create(
+          {
+            model,
+            messages,
+            max_tokens: maxTokens,
+            temperature: 0.3,
+          },
+          { timeout: 3500 }
+        );
 
         const content = completion.choices[0]?.message?.content || '';
         const tokensUsed = completion.usage?.total_tokens || 0;
@@ -244,13 +250,16 @@ export class KeyRotator {
       this.anthropicIndex = (this.anthropicIndex + 1) % this.anthropicClients.length;
 
       try {
-        const response = await client.messages.create({
-          model,
-          max_tokens: maxTokens,
-          temperature: 0.3,
-          system: systemPrompt,
-          messages,
-        });
+        const response = await client.messages.create(
+          {
+            model,
+            max_tokens: maxTokens,
+            temperature: 0.3,
+            system: systemPrompt,
+            messages,
+          },
+          { timeout: 3500 }
+        );
 
         const textBlock = response.content.find((c) => c.type === 'text');
         const content = textBlock && 'text' in textBlock ? textBlock.text : '';

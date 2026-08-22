@@ -19,7 +19,7 @@ export async function webSearchTool(
 
     // 1. Primary Attempt: DuckDuckGo RelatedTopics / Abstract API
     const apiUrl = `https://api.duckduckgo.com/?q=${cleanQuery}&format=json&no_html=1&no_redirect=1`;
-    const response = await fetch(apiUrl);
+    const response = await fetch(apiUrl, { signal: AbortSignal.timeout(1500) });
     
     if (response.ok) {
       const data = await response.json().catch(() => ({}));
@@ -55,6 +55,7 @@ export async function webSearchTool(
     // 2. Fallback: DuckDuckGo Lite HTML Scraper
     const htmlUrl = `https://html.duckduckgo.com/html/?q=${cleanQuery}`;
     const htmlRes = await fetch(htmlUrl, {
+      signal: AbortSignal.timeout(1500),
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

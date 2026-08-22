@@ -462,9 +462,10 @@ export async function processChatMessage(
         retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
     } else if (userMessage && userMessage.trim().length > 3 && !isSimpleGreeting(userMessage)) {
-      // Trigger Live Web Search fallback if vector memory has 0 matches
+      // Trigger Live Web Search fallback if vector memory has 0 matches (with strict 1.5s timeout cap)
       thoughts.push(`🌐 Executing real-time web search for "${userMessage}"...`);
-      const webResults = await webSearchTool(userMessage, 3);
+      const webSearchTimeout = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 1500));
+      const webResults = await Promise.race([webSearchTool(userMessage, 3), webSearchTimeout]);
       if (webResults.length > 0) {
         thoughts.push(`✨ Retrieved ${webResults.length} real-time internet search results.`);
         ragContext += `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +

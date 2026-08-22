@@ -35,7 +35,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(2500),
+          signal: AbortSignal.timeout(1500),
           body: JSON.stringify({
             content: { parts: [{ text: sanitizedText.substring(0, 8000) }] },
             outputDimensionality: 1536,
@@ -62,11 +62,14 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       openaiIndex = (openaiIndex + 1) % openaiClients.length;
 
       try {
-        const response = await client.embeddings.create({
-          model: 'text-embedding-3-small',
-          input: sanitizedText.substring(0, 8000),
-          dimensions: 1536,
-        });
+        const response = await client.embeddings.create(
+          {
+            model: 'text-embedding-3-small',
+            input: sanitizedText.substring(0, 8000),
+            dimensions: 1536,
+          },
+          { timeout: 1500 }
+        );
 
         if (response.data[0]?.embedding) {
           return response.data[0].embedding;
