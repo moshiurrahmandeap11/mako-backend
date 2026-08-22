@@ -253,34 +253,6 @@ export async function processChatMessage(
   const isBengaliScript = /[\u0980-\u09FF]/.test(textSafe);
   const isBanglish = /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website|bro)\b/i.test(textSafe);
 
-  // FAST PATH 1: Instant Greetings (<10ms, 0 thoughts, instant user response)
-  if (isSimpleGreeting(userMessage)) {
-    let fastGreeting = '';
-    if (isBengaliScript) {
-      fastGreeting = `হ্যালো! কীভাবে আপনাকে সাহায্য করতে পারি?`;
-    } else if (isBanglish) {
-      fastGreeting = `Hello bro! Bolun, kivabe help korte pari?`;
-    } else {
-      fastGreeting = `Hello! How can I help you today?`;
-    }
-
-    await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: 'assistant',
-        content: fastGreeting,
-      },
-    });
-
-    return {
-      reply: fastGreeting,
-      thoughts: [],
-      cartAction: undefined,
-      recommendedProducts: [],
-      tokensUsed: 10,
-    };
-  }
-
   // FAST PATH 1.5: Instant Gratitude Responses (<10ms)
   if (isGratitude(userMessage)) {
     let gratitudeReply = '';
