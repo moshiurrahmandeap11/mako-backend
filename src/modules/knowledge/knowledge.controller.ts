@@ -221,3 +221,22 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
     return res.status(500).json({ error: error.message || 'Failed to perform full rescrape' });
   }
 }
+
+/**
+ * Get real-time background scrape status for merchant
+ */
+export async function getScrapeStatusHandler(req: DashboardAuthRequest, res: Response) {
+  try {
+    const merchantId = req.merchant?.id;
+    if (!merchantId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { getScrapeStatus } = await import('../../services/scraper.service');
+    const status = getScrapeStatus(merchantId);
+    return res.json({ status });
+  } catch (error: any) {
+    logger.error('Error fetching scrape status:', error);
+    return res.status(500).json({ error: 'Failed to fetch background scrape status' });
+  }
+}

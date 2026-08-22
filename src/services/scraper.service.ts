@@ -663,6 +663,12 @@ export async function scrapeWebsite(targetUrl: string, merchantId: string): Prom
       allProductsFound.push(...products);
       totalKnowledgeChunks += chunksCount;
 
+      const currentJob = activeScrapeJobs.get(merchantId);
+      if (currentJob) {
+        currentJob.pagesCrawled = visitedUrls.size;
+        currentJob.lastUpdated = Date.now();
+      }
+
       // Extract new internal routes & links dynamically
       const newRoutes = extractSpaRoutes(html, parsedUrl);
       for (const r of newRoutes) {
@@ -804,5 +810,70 @@ export async function addManualKnowledgeChunk(
   } catch {}
 
   return chunk;
+}
+
+export interface ScrapeJobStatus {
+  isScraping: boolean;
+  domain: string;
+  pagesCrawled: number;
+  maxPages: number;
+  status: 'in_progress' | 'completed' | 'failed';
+  startTime: number;
+  lastUpdated: number;
+}
+
+const activeScrapeJobs = new Map<string, ScrapeJobStatus>();
+
+export function getScrapeStatus(merchantId: string): ScrapeJobStatus {
+  return activeScrapeJobs.get(merchantId) || {
+    isScraping: false,
+    domain: '',
+    pagesCrawled: 0,
+    maxPages: 40,
+    status: 'completed',
+    startTime: 0,
+    lastUpdated: Date.now(),
+  };
+}
+
+export function triggerBackgroundCrawl(domain: string, merchantId: string): void {
+  const jobStatus: ScrapeJobStatus = {
+    isScraping: true,
+    domain,
+    pagesCrawled: 0,
+    maxPages: 40,
+    status: 'in_progress',
+    startTime: Date.now(),
+    lastUpdated: Date.now(),
+  };
+  activeScrapeJobs.set(merchantId, jobStatus);
+
+  logger.info(`[BackgroundScraper] Launching persistent background crawl for merchant ${merchantId} on domain ${domain}`);
+
+  scrapeWebsite(domain, merchantId)
+    .then((result) => {
+      activeScrapeJobs.set(merchantId, {
+        isScraping: false,
+        domain,
+        pagesCrawled: result.pagesCrawledCount || 40,
+        maxPages: 40,
+        status: 'completed',
+        startTime: jobStatus.startTime,
+        lastUpdated: Date.now(),
+      });
+      logger.info(`[BackgroundScraper] Persistent background crawl completed for merchant ${merchantId} on ${domain}`);
+    })
+    .catch((err) => {
+      activeScrapeJobs.set(merchantId, {
+        isScraping: false,
+        domain,
+        pagesCrawled: 0,
+        maxPages: 40,
+        status: 'failed',
+        startTime: jobStatus.startTime,
+        lastUpdated: Date.now(),
+      });
+      logger.error(`[BackgroundScraper] Persistent background crawl failed for ${domain}:`, err);
+    });
 }
 

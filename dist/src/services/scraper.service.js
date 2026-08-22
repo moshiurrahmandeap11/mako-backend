@@ -41,6 +41,8 @@ exports.decodeCloudflareEmail = decodeCloudflareEmail;
 exports.scrapeWebsite = scrapeWebsite;
 exports.scrapeSingleUrl = scrapeSingleUrl;
 exports.addManualKnowledgeChunk = addManualKnowledgeChunk;
+exports.getScrapeStatus = getScrapeStatus;
+exports.triggerBackgroundCrawl = triggerBackgroundCrawl;
 const cheerio = __importStar(require("cheerio"));
 const puppeteer_1 = __importDefault(require("puppeteer"));
 const db_1 = require("../config/db");
@@ -608,6 +610,11 @@ async function scrapeWebsite(targetUrl, merchantId) {
             }
             allProductsFound.push(...products);
             totalKnowledgeChunks += chunksCount;
+            const currentJob = activeScrapeJobs.get(merchantId);
+            if (currentJob) {
+                currentJob.pagesCrawled = visitedUrls.size;
+                currentJob.lastUpdated = Date.now();
+            }
             // Extract new internal routes & links dynamically
             const newRoutes = extractSpaRoutes(html, parsedUrl);
             for (const r of newRoutes) {
@@ -715,4 +722,54 @@ async function addManualKnowledgeChunk(merchantId, title, content, sourceUrl) {
     }
     catch { }
     return chunk;
+}
+const activeScrapeJobs = new Map();
+function getScrapeStatus(merchantId) {
+    return activeScrapeJobs.get(merchantId) || {
+        isScraping: false,
+        domain: '',
+        pagesCrawled: 0,
+        maxPages: 40,
+        status: 'completed',
+        startTime: 0,
+        lastUpdated: Date.now(),
+    };
+}
+function triggerBackgroundCrawl(domain, merchantId) {
+    const jobStatus = {
+        isScraping: true,
+        domain,
+        pagesCrawled: 0,
+        maxPages: 40,
+        status: 'in_progress',
+        startTime: Date.now(),
+        lastUpdated: Date.now(),
+    };
+    activeScrapeJobs.set(merchantId, jobStatus);
+    logger_1.logger.info(`[BackgroundScraper] Launching persistent background crawl for merchant ${merchantId} on domain ${domain}`);
+    scrapeWebsite(domain, merchantId)
+        .then((result) => {
+        activeScrapeJobs.set(merchantId, {
+            isScraping: false,
+            domain,
+            pagesCrawled: result.pagesCrawledCount || 40,
+            maxPages: 40,
+            status: 'completed',
+            startTime: jobStatus.startTime,
+            lastUpdated: Date.now(),
+        });
+        logger_1.logger.info(`[BackgroundScraper] Persistent background crawl completed for merchant ${merchantId} on ${domain}`);
+    })
+        .catch((err) => {
+        activeScrapeJobs.set(merchantId, {
+            isScraping: false,
+            domain,
+            pagesCrawled: 0,
+            maxPages: 40,
+            status: 'failed',
+            startTime: jobStatus.startTime,
+            lastUpdated: Date.now(),
+        });
+        logger_1.logger.error(`[BackgroundScraper] Persistent background crawl failed for ${domain}:`, err);
+    });
 }
