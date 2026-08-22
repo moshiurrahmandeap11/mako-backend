@@ -20,6 +20,7 @@
     "@prisma/client": "^5.22.0",
     "@types/node-cron": "^3.0.11",
     "@types/pdfkit": "^0.17.6",
+    "@types/ssh2": "^1.15.5",
     "bcrypt": "^5.1.1",
     "better-auth": "^1.6.26",
     "cheerio": "^1.2.0",
@@ -38,6 +39,7 @@
     "pdfkit": "^0.19.1",
     "pg": "^8.13.3",
     "puppeteer": "^25.7.0",
+    "ssh2": "^1.17.0",
     "stripe": "^22.4.0",
     "zod": "^3.24.2"
   },

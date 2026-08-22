@@ -11,7 +11,7 @@ import { authenticateDashboard } from '../../middleware/authenticateDashboard';
 
 const router = express.Router();
 
-// Protected dashboard endpoints (using express.json() specifically since mounted before global body parsers)
+// Protected dashboard endpoints
 router.post('/checkout', express.json(), authenticateDashboard, createCheckoutSession);
 router.post('/portal', express.json(), authenticateDashboard, createPortalSession);
 
@@ -19,7 +19,7 @@ router.get('/verify', authenticateDashboard, verifyCheckout);
 router.get('/invoices', authenticateDashboard, getInvoices);
 router.get('/invoices/:invoiceId/download', authenticateDashboard, downloadInvoice);
 
-// Webhook endpoint (requires raw body, so we use express.raw middleware specifically)
-router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+// Webhook endpoint (accept any content type and parse safely in handler)
+router.post('/webhook', express.raw({ type: '*/*' }), handleWebhook);
 
 export default router;

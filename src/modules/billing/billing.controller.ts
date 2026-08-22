@@ -58,7 +58,7 @@ export async function createCheckoutSession(
         merchantId: merchant.id,
         tier: tier,
       },
-      successUrl: `${env.FRONTEND_URL}/dashboard?session_id={CHECKOUT_ID}&tier=${tier}`,
+      successUrl: `${env.FRONTEND_URL}/billing?session_id={CHECKOUT_ID}&tier=${tier}`,
     });
 
     logger.info(`Polar: Created checkout session for Merchant ${merchantId} -> Tier: ${tier} -> URL: ${checkout.url}`);
@@ -90,7 +90,7 @@ export async function createPortalSession(
       return;
     }
 
-    // Polar Customer Portal / Purchases URL
+    // Polar Customer Portal URL
     const portalUrl =
       env.POLAR_SERVER === 'sandbox'
         ? 'https://sandbox.polar.sh/purchases'
@@ -117,33 +117,35 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     }
 
     if (!event || !event.type) {
+      logger.warn('Polar Webhook received with invalid structure or empty event.');
       res.status(400).json({ error: 'Invalid webhook payload structure.' });
       return;
     }
 
-    logger.info(`Polar Webhook received: [${event.type}]`);
+    logger.info(`📢 Polar Webhook received: [${event.type}]`);
+
+    const data = event.data || {};
+    const productId = data.productId || data.product_id || data.product?.id;
+    const customerId = data.customerId || data.customer_id || data.customer?.id;
+    const customerEmail = data.customer?.email || data.customerEmail || data.user?.email || data.email;
+    const metadata = data.metadata || data.custom_field_data || {};
+
+    let merchantId = metadata.merchantId;
+    let resolvedTier: PlanTier = 'FREE';
+
+    if (productId === env.POLAR_STARTER_PRODUCT_ID || String(productId).includes('4bbbaba8')) {
+      resolvedTier = 'STARTER';
+    } else if (productId === env.POLAR_PRO_PRODUCT_ID || String(productId).includes('1ca781e4')) {
+      resolvedTier = 'PRO';
+    }
 
     switch (event.type) {
       case 'subscription.created':
       case 'subscription.active':
-      case 'subscription.updated': {
-        const subscription = event.data;
-        const productId = subscription.productId || subscription.product_id;
-        const customerId = subscription.customerId || subscription.customer_id;
-        const customerEmail = subscription.customer?.email || subscription.user?.email;
-        const metadata = subscription.metadata || {};
-
-        let merchantId = metadata.merchantId;
-        let resolvedTier: PlanTier = 'FREE';
-
-        // Match product ID to PlanTier
-        if (productId === env.POLAR_STARTER_PRODUCT_ID) {
-          resolvedTier = 'STARTER';
-        } else if (productId === env.POLAR_PRO_PRODUCT_ID) {
-          resolvedTier = 'PRO';
-        }
-
-        // Locate merchant user
+      case 'subscription.updated':
+      case 'checkout.updated':
+      case 'order.created': {
+        // Find merchant by ID or Email
         let merchant = merchantId
           ? await prisma.user.findUnique({ where: { id: merchantId } })
           : null;
@@ -153,31 +155,35 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
         }
 
         if (merchant) {
-          const newLimit = TIER_MESSAGE_LIMITS[resolvedTier] || 100;
+          // If event is checkout.updated, verify status
+          if (event.type === 'checkout.updated' && data.status && data.status !== 'succeeded' && data.status !== 'confirmed') {
+            logger.info(`Checkout updated but status is ${data.status}, skipping activation.`);
+            break;
+          }
+
+          const targetTier = resolvedTier !== 'FREE' ? resolvedTier : (metadata.tier as PlanTier) || 'STARTER';
+          const newLimit = TIER_MESSAGE_LIMITS[targetTier] || 500;
 
           await prisma.user.update({
             where: { id: merchant.id },
             data: {
-              planTier: resolvedTier,
+              planTier: targetTier,
               subscriptionStatus: 'active',
               stripeCustomerId: customerId || merchant.stripeCustomerId,
-              stripeSubscriptionId: subscription.id,
+              stripeSubscriptionId: data.id || merchant.stripeSubscriptionId,
             },
           });
 
           clearPlanTierCache(merchant.id);
-          logger.info(`Polar Webhook: Activated Tier [${resolvedTier}] for Merchant [${merchant.id}] (${newLimit} msgs/mo)`);
+          logger.info(`🎉 Polar Webhook Success: Activated Tier [${targetTier}] for Merchant [${merchant.email}] (${newLimit} msgs/mo)`);
+        } else {
+          logger.warn(`Polar Webhook: Could not find merchant for email: ${customerEmail} / merchantId: ${merchantId}`);
         }
         break;
       }
 
       case 'subscription.canceled':
       case 'subscription.revoked': {
-        const subscription = event.data;
-        const customerEmail = subscription.customer?.email || subscription.user?.email;
-        const metadata = subscription.metadata || {};
-
-        let merchantId = metadata.merchantId;
         let merchant = merchantId
           ? await prisma.user.findUnique({ where: { id: merchantId } })
           : null;
@@ -197,25 +203,20 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
           });
 
           clearPlanTierCache(merchant.id);
-          logger.info(`Polar Webhook: Subscription revoked for Merchant [${merchant.id}]. Downgraded to FREE.`);
+          logger.info(`Polar Webhook: Subscription revoked for Merchant [${merchant.email}]. Downgraded to FREE.`);
         }
         break;
       }
 
-      case 'order.created': {
-        const order = event.data;
-        logger.info(`Polar Webhook: Order created ID: ${order.id}`);
-        break;
-      }
-
       default:
+        logger.info(`Polar Webhook [${event.type}] processed.`);
         break;
     }
 
-    res.json({ received: true });
-  } catch (error) {
+    res.json({ received: true, event: event.type });
+  } catch (error: any) {
     logger.error('Polar Webhook event processing error:', error);
-    res.status(500).json({ error: 'Internal processing error.' });
+    res.status(500).json({ error: error.message || 'Internal processing error.' });
   }
 }
 
