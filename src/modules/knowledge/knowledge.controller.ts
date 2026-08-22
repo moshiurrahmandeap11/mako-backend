@@ -240,3 +240,105 @@ export async function getScrapeStatusHandler(req: DashboardAuthRequest, res: Res
     return res.status(500).json({ error: 'Failed to fetch background scrape status' });
   }
 }
+
+/**
+ * Upload and index a document (PDF, DOCX, TXT, MD) into Knowledge Base
+ */
+export async function uploadDoc(req: DashboardAuthRequest, res: Response) {
+  try {
+    const merchantId = req.merchant?.id;
+    if (!merchantId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { filename, fileData, fileType, textContent } = req.body;
+    if (!filename) {
+      return res.status(400).json({ error: 'Filename is required' });
+    }
+
+    let extractedText = textContent || '';
+
+    // If PDF base64 provided, parse with pdf-parse
+    if (fileData && (fileType === 'pdf' || filename.endsWith('.pdf'))) {
+      try {
+        const pdfParse = require('pdf-parse');
+        const base64Clean = fileData.replace(/^data:application\/pdf;base64,/, '').trim();
+        const buffer = Buffer.from(base64Clean, 'base64');
+        const parsed = await pdfParse(buffer);
+        extractedText = parsed.text || '';
+      } catch (err: any) {
+        logger.error('PDF parsing error:', err);
+        return res.status(400).json({ error: `Failed to parse PDF document: ${err.message}` });
+      }
+    } else if (fileData && !extractedText) {
+      // Plain text or base64 text fallback
+      const base64Clean = fileData.replace(/^data:[^;]+;base64,/, '').trim();
+      extractedText = Buffer.from(base64Clean, 'base64').toString('utf-8');
+    }
+
+    extractedText = (extractedText || '').trim();
+    if (!extractedText || extractedText.length < 10) {
+      return res.status(400).json({ error: 'Could not extract meaningful text from document.' });
+    }
+
+    // Split extracted text into semantic chunks (~500 chars)
+    const rawParagraphs = extractedText.split(/\n\s*\n/);
+    const chunks: string[] = [];
+    let currentChunk = '';
+
+    for (const para of rawParagraphs) {
+      const cleanPara = para.replace(/\s+/g, ' ').trim();
+      if (!cleanPara) continue;
+
+      if ((currentChunk + ' ' + cleanPara).length > 600) {
+        if (currentChunk) chunks.push(currentChunk.trim());
+        currentChunk = cleanPara;
+      } else {
+        currentChunk += (currentChunk ? '\n\n' : '') + cleanPara;
+      }
+    }
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+
+    const sourceUrl = `doc:${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const { generateEmbedding } = await import('../../utils/embeddings');
+
+    let createdCount = 0;
+    for (const chunkText of chunks.slice(0, 100)) {
+      const formatted = `# Document: ${filename}\nSource: ${sourceUrl}\n\n${chunkText}`;
+      const chunkRecord = await prisma.knowledgeChunk.create({
+        data: {
+          merchantId,
+          url: sourceUrl,
+          content: formatted,
+        },
+      });
+
+      try {
+        const emb = await generateEmbedding(formatted);
+        if (emb && emb.some((v) => v !== 0)) {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
+            `[${emb.join(',')}]`,
+            chunkRecord.id
+          );
+        }
+      } catch (embErr) {
+        logger.warn('Failed to embed chunk for document:', embErr);
+      }
+
+      createdCount++;
+    }
+
+    return res.json({
+      message: 'Document uploaded and indexed successfully',
+      filename,
+      chunksCreated: createdCount,
+      sourceUrl,
+    });
+  } catch (error: any) {
+    logger.error('Error uploading document:', error);
+    return res.status(500).json({ error: error.message || 'Failed to process document' });
+  }
+}

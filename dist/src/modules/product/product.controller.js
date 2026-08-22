@@ -148,11 +148,12 @@ async function importProducts(req, res) {
         }
         let createdCount = 0;
         let updatedCount = 0;
-        for (const item of products) {
-            if (!item.externalId || !item.title || item.price === undefined || !item.productUrl) {
+        for (const [idx, item] of products.entries()) {
+            if (!item.title || item.price === undefined) {
                 continue;
             }
-            const externalId = String(item.externalId);
+            const externalId = String(item.externalId || item.sku || `item_${Date.now()}_${idx}`);
+            const productUrl = String(item.productUrl || item.url || `/products#${externalId}`);
             const textToEmbed = `${item.title} ${item.description || ''} ${item.category || ''}`;
             const vector = await (0, embeddings_1.generateEmbedding)(textToEmbed);
             const existing = await db_1.prisma.product.findUnique({
