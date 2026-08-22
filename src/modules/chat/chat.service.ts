@@ -233,8 +233,25 @@ export async function processChatMessage(
     select: { name: true, allowedDomains: true, widgetConfig: true },
   });
 
-  const merchantName = merchant?.name || 'our company';
+  // Dynamically resolve clean business identity for multi-tenant storefronts & agencies
+  let merchantName = 'our company';
   const primaryDomain = merchant?.allowedDomains?.[0] || '';
+
+  if (primaryDomain) {
+    const rawDomain = primaryDomain
+      .replace(/^https?:\/\//, '')
+      .split('/')[0]
+      .split(':')[0]
+      .replace(/^www\./, '');
+    if (rawDomain && rawDomain !== 'localhost' && rawDomain !== '127.0.0.1') {
+      const parts = rawDomain.split('.')[0].split(/[-_]/);
+      merchantName = parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+    }
+  }
+
+  if ((!merchantName || merchantName === 'our company') && merchant?.name) {
+    merchantName = merchant.name;
+  }
 
   // 1. Get or create conversation record
   let conversation = await prisma.conversation.findFirst({
