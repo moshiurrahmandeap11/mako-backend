@@ -54,8 +54,11 @@ export const env = {
       .filter((k) => k.length > 0 && !k.includes('...'));
   },
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+  POLAR_SERVER: (process.env.POLAR_SERVER as 'sandbox' | 'production') || 'sandbox',
+  POLAR_ACCESS_TOKEN: process.env.POLAR_ACCESS_TOKEN || '',
+  POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET || '',
+  POLAR_STARTER_PRODUCT_ID: process.env.POLAR_STARTER_PRODUCT_ID || '',
+  POLAR_PRO_PRODUCT_ID: process.env.POLAR_PRO_PRODUCT_ID || '',
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || '',
