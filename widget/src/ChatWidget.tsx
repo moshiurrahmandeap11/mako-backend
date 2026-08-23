@@ -205,55 +205,35 @@ function TypewriterMessageText({
   onType?: () => void;
 }) {
   const [displayedText, setDisplayedText] = useState(!isBot || !shouldAnimate ? text : '');
-  const [isTyping, setIsTyping] = useState(isBot && shouldAnimate);
 
   useEffect(() => {
     if (!isBot || !shouldAnimate) {
       setDisplayedText(text);
-      setIsTyping(false);
       onType?.();
       return;
     }
 
-    const words = (text || '').split(' ');
-    let currentIndex = 0;
+    const fullText = text || '';
+    const charStep = fullText.length > 200 ? 5 : fullText.length > 100 ? 3 : 2;
+    let currentPos = 0;
     setDisplayedText('');
-    setIsTyping(true);
 
     const timer = setInterval(() => {
-      currentIndex++;
-      if (currentIndex <= words.length) {
-        setDisplayedText(words.slice(0, currentIndex).join(' '));
+      currentPos += charStep;
+      if (currentPos < fullText.length) {
+        setDisplayedText(fullText.slice(0, currentPos));
         onType?.();
       } else {
-        setIsTyping(false);
+        setDisplayedText(fullText);
         onType?.();
         clearInterval(timer);
       }
-    }, 22);
+    }, 12);
 
     return () => clearInterval(timer);
   }, [text, isBot, shouldAnimate]);
 
-  return (
-    <span>
-      {renderMarkdownText(displayedText)}
-      {isTyping && (
-        <span
-          style={{
-            display: 'inline-block',
-            width: '5px',
-            height: '14px',
-            backgroundColor: '#10b981',
-            marginLeft: '4px',
-            verticalAlign: 'middle',
-            borderRadius: '1px',
-            opacity: 0.85,
-          }}
-        />
-      )}
-    </span>
-  );
+  return <span>{renderMarkdownText(displayedText)}</span>;
 }
 
 export function ChatWidget({ api }: ChatWidgetProps) {

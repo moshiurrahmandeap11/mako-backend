@@ -99,42 +99,31 @@ function renderMarkdownText(text) {
 }
 function TypewriterMessageText({ text, isBot, shouldAnimate = false, onType, }) {
     const [displayedText, setDisplayedText] = (0, hooks_1.useState)(!isBot || !shouldAnimate ? text : '');
-    const [isTyping, setIsTyping] = (0, hooks_1.useState)(isBot && shouldAnimate);
     (0, hooks_1.useEffect)(() => {
         if (!isBot || !shouldAnimate) {
             setDisplayedText(text);
-            setIsTyping(false);
             onType?.();
             return;
         }
-        const words = (text || '').split(' ');
-        let currentIndex = 0;
+        const fullText = text || '';
+        const charStep = fullText.length > 200 ? 5 : fullText.length > 100 ? 3 : 2;
+        let currentPos = 0;
         setDisplayedText('');
-        setIsTyping(true);
         const timer = setInterval(() => {
-            currentIndex++;
-            if (currentIndex <= words.length) {
-                setDisplayedText(words.slice(0, currentIndex).join(' '));
+            currentPos += charStep;
+            if (currentPos < fullText.length) {
+                setDisplayedText(fullText.slice(0, currentPos));
                 onType?.();
             }
             else {
-                setIsTyping(false);
+                setDisplayedText(fullText);
                 onType?.();
                 clearInterval(timer);
             }
-        }, 22);
+        }, 12);
         return () => clearInterval(timer);
     }, [text, isBot, shouldAnimate]);
-    return ((0, jsx_runtime_1.jsxs)("span", { children: [renderMarkdownText(displayedText), isTyping && ((0, jsx_runtime_1.jsx)("span", { style: {
-                    display: 'inline-block',
-                    width: '5px',
-                    height: '14px',
-                    backgroundColor: '#10b981',
-                    marginLeft: '4px',
-                    verticalAlign: 'middle',
-                    borderRadius: '1px',
-                    opacity: 0.85,
-                } }))] }));
+    return (0, jsx_runtime_1.jsx)("span", { children: renderMarkdownText(displayedText) });
 }
 function ChatWidget({ api }) {
     const [isOpen, setIsOpen] = (0, hooks_1.useState)(false);
