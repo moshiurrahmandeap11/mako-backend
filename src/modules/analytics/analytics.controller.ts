@@ -2,12 +2,28 @@ import { Response } from 'express';
 import { prisma } from '../../config/db';
 import { logger } from '../../utils/logger';
 import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
+import { getPlanConfig, CREDITS_PER_MESSAGE } from '../../config/pricing';
 
 export async function getSummary(req: DashboardAuthRequest, res: Response): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
+    const planTier = req.merchant?.planTier || 'FREE';
+    const plan = getPlanConfig(planTier);
 
-    const [totalProducts, totalConversations, totalApiKeys, totalMessages, totalUniqueVisitors, visitorCountriesRaw] = await Promise.all([
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [
+      totalProducts,
+      totalConversations,
+      totalApiKeys,
+      totalMessages,
+      currentMonthMessages,
+      totalUniqueVisitors,
+      visitorCountriesRaw,
+      dbUser,
+    ] = await Promise.all([
       prisma.product.count({ where: { merchantId } }),
       prisma.conversation.count({
         where: {
@@ -19,6 +35,12 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
       }),
       prisma.apiKey.count({ where: { merchantId, isActive: true } }),
       prisma.message.count({ where: { conversation: { merchantId } } }),
+      prisma.message.count({
+        where: {
+          conversation: { merchantId },
+          createdAt: { gte: startOfMonth },
+        },
+      }),
       prisma.visitor.count({ where: { merchantId } }),
       prisma.visitor.groupBy({
         by: ['country', 'countryCode'],
@@ -26,6 +48,10 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
         take: 6,
+      }),
+      prisma.user.findUnique({
+        where: { id: merchantId },
+        select: { rolloverCredits: true, extraCredits: true },
       }),
     ]);
 
@@ -35,15 +61,35 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
       count: v._count.id,
     }));
 
+    const rolloverCredits = dbUser?.rolloverCredits || 0;
+    const extraCredits = dbUser?.extraCredits || 0;
+    const totalAllowedCredits =
+      plan.monthlyCredits === Infinity
+        ? 999999999
+        : plan.monthlyCredits + rolloverCredits + extraCredits;
+    const creditsUsedThisMonth = currentMonthMessages * CREDITS_PER_MESSAGE;
+    const creditsRemaining = Math.max(0, totalAllowedCredits - creditsUsedThisMonth);
+
     res.json({
       summary: {
         totalProducts,
         totalConversations,
         totalApiKeys,
         totalMessages,
+        currentMonthMessages,
         totalUniqueVisitors,
         visitorCountries,
-        planTier: req.merchant?.planTier,
+        planTier,
+        credits: {
+          planMonthlyGrant: plan.monthlyCredits,
+          rolloverCredits,
+          extraCredits,
+          totalAllowedCredits,
+          creditsUsedThisMonth,
+          creditsRemaining,
+          rolloverEnabled: plan.rolloverEnabled,
+          creditsPerMessage: CREDITS_PER_MESSAGE,
+        },
       },
     });
   } catch (error) {

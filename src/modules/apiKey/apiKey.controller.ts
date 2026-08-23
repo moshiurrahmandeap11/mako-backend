@@ -4,12 +4,7 @@ import { generateApiKey } from '../../utils/apiKeyGenerator';
 import { logger } from '../../utils/logger';
 import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
 
-const API_KEY_LIMITS: Record<string, number> = {
-  FREE: 1,
-  STARTER: 2,
-  PRO: 4,
-  ENTERPRISE: Infinity,
-};
+import { getPlanConfig } from '../../config/pricing';
 
 export async function createKey(req: DashboardAuthRequest, res: Response): Promise<void> {
   try {
@@ -17,7 +12,8 @@ export async function createKey(req: DashboardAuthRequest, res: Response): Promi
     const planTier = req.merchant?.planTier || 'FREE';
     const { name, template, systemPrompt, allowedDomains } = req.body;
 
-    const limit = API_KEY_LIMITS[planTier] !== undefined ? API_KEY_LIMITS[planTier] : 1;
+    const plan = getPlanConfig(planTier);
+    const limit = plan.maxApiKeys;
     const existingCount = await prisma.apiKey.count({
       where: { merchantId, isActive: true },
     });

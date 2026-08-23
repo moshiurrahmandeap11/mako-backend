@@ -6,6 +6,7 @@ import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
 import { normalizeDomain } from '../../utils/domain';
+import { getPlanConfig } from '../../config/pricing';
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -194,14 +195,8 @@ export async function updateDomains(req: DashboardAuthRequest, res: Response): P
 
     const rawSanitized = allowedDomains.map((d) => normalizeDomain(d)).filter(Boolean);
     const sanitizedDomains = [...new Set(rawSanitized)];
-
-    const domainLimits: Record<string, number> = {
-      FREE: 1,
-      STARTER: 2,
-      PRO: 5,
-      ENTERPRISE: Infinity,
-    };
-    const limit = domainLimits[planTier] !== undefined ? domainLimits[planTier] : 1;
+    const plan = getPlanConfig(planTier);
+    const limit = plan.maxDomains;
 
     if (sanitizedDomains.length > limit) {
       res.status(400).json({

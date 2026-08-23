@@ -1,17 +1,12 @@
 import { Response, Request } from 'express';
+import crypto from 'crypto';
 import { prisma } from '../../config/db';
 import { polar } from '../../utils/polar';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { DashboardAuthRequest, clearPlanTierCache } from '../../middleware/authenticateDashboard';
 import { PlanTier } from '@prisma/client';
-
-const TIER_MESSAGE_LIMITS: Record<string, number> = {
-  FREE: 100,
-  STARTER: 500,
-  PRO: 1200,
-  ENTERPRISE: 999999,
-};
+import { getPlanConfig } from '../../config/pricing';
 
 export async function createCheckoutSession(
   req: DashboardAuthRequest,
@@ -86,7 +81,7 @@ export async function createPortalSession(
     });
 
     if (!merchant) {
-      res.status(404).json({ error: 'Merchant not found.' });
+      res.status(404).json({ error: 'Merchant account not found.' });
       return;
     }
 
@@ -100,6 +95,50 @@ export async function createPortalSession(
   } catch (error: any) {
     logger.error('Error creating Polar billing portal session:', error);
     res.status(500).json({ error: 'Failed to access billing portal.' });
+  }
+}
+
+function verifyPolarWebhookSignature(req: Request, rawBody: string | Buffer): boolean {
+  if (!env.POLAR_WEBHOOK_SECRET) {
+    logger.warn('POLAR_WEBHOOK_SECRET not set; skipping webhook HMAC signature check in dev mode.');
+    return true;
+  }
+
+  const webhookId = req.headers['webhook-id'] as string;
+  const webhookTimestamp = req.headers['webhook-timestamp'] as string;
+  const webhookSignature = req.headers['webhook-signature'] as string;
+
+  if (!webhookSignature) {
+    logger.warn('Missing webhook-signature header on Polar webhook.');
+    return false;
+  }
+
+  try {
+    const secret = env.POLAR_WEBHOOK_SECRET.startsWith('whsec_')
+      ? env.POLAR_WEBHOOK_SECRET.substring(6)
+      : env.POLAR_WEBHOOK_SECRET;
+
+    // Standard Webhook HMAC signature format
+    const bodyStr = Buffer.isBuffer(rawBody) ? rawBody.toString('utf-8') : String(rawBody);
+    const toSign = webhookId && webhookTimestamp ? `${webhookId}.${webhookTimestamp}.${bodyStr}` : bodyStr;
+
+    const hmac = crypto.createHmac('sha256', secret).update(toSign).digest('hex');
+    const base64Hmac = crypto.createHmac('sha256', secret).update(toSign).digest('base64');
+
+    const signatureParts = webhookSignature.split(' ');
+    for (const part of signatureParts) {
+      const [version, sig] = part.split(',');
+      const actualSig = sig || version;
+      if (actualSig === hmac || actualSig === `v1,${hmac}` || actualSig === base64Hmac || actualSig === `v1,${base64Hmac}`) {
+        return true;
+      }
+    }
+
+    // Direct match check
+    return webhookSignature.includes(hmac) || webhookSignature.includes(base64Hmac);
+  } catch (err) {
+    logger.error('Error validating Polar webhook signature:', err);
+    return false;
   }
 }
 
@@ -120,6 +159,15 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       logger.warn('Polar Webhook received with invalid structure or empty event.');
       res.status(400).json({ error: 'Invalid webhook payload structure.' });
       return;
+    }
+
+    if (process.env.NODE_ENV === 'production' && env.POLAR_WEBHOOK_SECRET) {
+      const isValid = verifyPolarWebhookSignature(req, rawBody);
+      if (!isValid) {
+        logger.error('Invalid Polar Webhook HMAC signature. Rejecting unauthorized request.');
+        res.status(401).json({ error: 'Invalid webhook signature.' });
+        return;
+      }
     }
 
     logger.info(`📢 Polar Webhook received: [${event.type}]`);
@@ -162,7 +210,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
           }
 
           const targetTier = resolvedTier !== 'FREE' ? resolvedTier : (metadata.tier as PlanTier) || 'STARTER';
-          const newLimit = TIER_MESSAGE_LIMITS[targetTier] || 500;
+          const plan = getPlanConfig(targetTier);
 
           await prisma.user.update({
             where: { id: merchant.id },
@@ -175,7 +223,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
           });
 
           clearPlanTierCache(merchant.id);
-          logger.info(`🎉 Polar Webhook Success: Activated Tier [${targetTier}] for Merchant [${merchant.email}] (${newLimit} msgs/mo)`);
+          logger.info(`🎉 Polar Webhook Success: Activated Tier [${targetTier}] for Merchant [${merchant.email}] (${plan.monthlyCredits.toLocaleString()} credits/mo with rollover)`);
         } else {
           logger.warn(`Polar Webhook: Could not find merchant for email: ${customerEmail} / merchantId: ${merchantId}`);
         }
@@ -199,6 +247,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
               planTier: 'FREE',
               subscriptionStatus: 'canceled',
               stripeSubscriptionId: null,
+              rolloverCredits: 0, // Rollover expires when paid subscription is canceled
             },
           });
 

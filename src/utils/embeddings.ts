@@ -31,7 +31,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       geminiIndex = (geminiIndex + 1) % geminiKeys.length;
 
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${key}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${key}`;
         const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

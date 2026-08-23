@@ -37,7 +37,8 @@ export function executeRawNeonQuery<T = any>(query: string, params: any[] = []):
       } else {
         valStr = String(param);
       }
-      formattedQuery = formattedQuery.replace(new RegExp(`\\$${index + 1}`, 'g'), valStr);
+      // Use word boundary to prevent $1 matching $10, and clean double vector casting
+      formattedQuery = formattedQuery.replace(new RegExp(`\\$${index + 1}(?:::vector)?\\b`, 'g'), valStr);
     });
 
     const endpoint = getNeonSqlEndpoint(connectionString);

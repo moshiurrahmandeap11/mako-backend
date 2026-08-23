@@ -29,6 +29,8 @@ model User {
   subscriptionStatus   String?
 
   // Quota & Email Alert Tracking
+  rolloverCredits              Int       @default(0)
+  extraCredits                 Int       @default(0)
   lastQuotaWarningEmailSentAt  DateTime?
   lastQuotaExceededEmailSentAt DateTime?
 
