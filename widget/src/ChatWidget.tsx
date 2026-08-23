@@ -15,6 +15,7 @@ interface MessageItem {
   products?: ProductCard[];
   thoughts?: string[];
   time: string;
+  shouldAnimate?: boolean;
 }
 
 // Crisp Vector SVGs (No Emojis)
@@ -192,12 +193,12 @@ function renderMarkdownText(text: string) {
   return parts;
 }
 
-function TypewriterMessageText({ text, isBot }: { text: string; isBot: boolean }) {
-  const [displayedText, setDisplayedText] = useState(isBot ? '' : text);
-  const [isTyping, setIsTyping] = useState(isBot);
+function TypewriterMessageText({ text, isBot, shouldAnimate = false }: { text: string; isBot: boolean; shouldAnimate?: boolean }) {
+  const [displayedText, setDisplayedText] = useState(!isBot || !shouldAnimate ? text : '');
+  const [isTyping, setIsTyping] = useState(isBot && shouldAnimate);
 
   useEffect(() => {
-    if (!isBot) {
+    if (!isBot || !shouldAnimate) {
       setDisplayedText(text);
       setIsTyping(false);
       return;
@@ -216,10 +217,10 @@ function TypewriterMessageText({ text, isBot }: { text: string; isBot: boolean }
         setIsTyping(false);
         clearInterval(timer);
       }
-    }, 28);
+    }, 22);
 
     return () => clearInterval(timer);
-  }, [text, isBot]);
+  }, [text, isBot, shouldAnimate]);
 
   return (
     <span>
@@ -264,7 +265,18 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState(0);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = (smooth = true) => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      });
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+  };
 
   const [windowOffset, setWindowOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [launcherOffset, setLauncherOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -287,7 +299,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     setIsOpeningSkeleton(true);
     setTimeout(() => {
       setIsOpeningSkeleton(false);
-    }, 380);
+      scrollToBottom(false);
+    }, 150);
   };
 
   const handleClose = () => {
@@ -450,21 +463,22 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   }, []);
 
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      setMessages([
-        {
-          id: 'msg_welcome',
-          sender: 'bot',
-          text: config.greetingMessage || 'Hi there! How can I help today?',
-          time: 'Just now',
-        },
-      ]);
+    if (isOpen) {
+      scrollToBottom(false);
+      const timer1 = setTimeout(() => scrollToBottom(false), 50);
+      const timer2 = setTimeout(() => scrollToBottom(false), 200);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
-  }, [isOpen, config, messages.length]);
+  }, [isOpen]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading, isOpeningSkeleton]);
+    if (isOpen) {
+      scrollToBottom(true);
+    }
+  }, [messages.length, isLoading, isOpeningSkeleton]);
 
   const handleSend = async (queryText?: string) => {
     const text = (typeof queryText === 'string' ? queryText : inputValue).trim().slice(0, 250);
@@ -495,6 +509,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         products: res.products,
         thoughts: res.thoughts,
         time: 'Just now',
+        shouldAnimate: true,
       };
 
       setMessages((prev) => [...prev, botMsg]);
@@ -744,6 +759,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           ) : (
             /* Messages Body */
             <div
+              ref={messagesContainerRef}
               onWheel={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}
               style={{
@@ -837,7 +853,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
                     }}
                   >
-                    <TypewriterMessageText text={msg.text} isBot={msg.sender === 'bot'} />
+                    <TypewriterMessageText text={msg.text} isBot={msg.sender === 'bot'} shouldAnimate={Boolean(msg.shouldAnimate)} />
                   </div>
 
                   {/* Subtitle / Timestamp under Bot Bubble */}

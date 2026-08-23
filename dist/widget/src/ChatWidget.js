@@ -97,11 +97,11 @@ function renderMarkdownText(text) {
     }
     return parts;
 }
-function TypewriterMessageText({ text, isBot }) {
-    const [displayedText, setDisplayedText] = (0, hooks_1.useState)(isBot ? '' : text);
-    const [isTyping, setIsTyping] = (0, hooks_1.useState)(isBot);
+function TypewriterMessageText({ text, isBot, shouldAnimate = false }) {
+    const [displayedText, setDisplayedText] = (0, hooks_1.useState)(!isBot || !shouldAnimate ? text : '');
+    const [isTyping, setIsTyping] = (0, hooks_1.useState)(isBot && shouldAnimate);
     (0, hooks_1.useEffect)(() => {
-        if (!isBot) {
+        if (!isBot || !shouldAnimate) {
             setDisplayedText(text);
             setIsTyping(false);
             return;
@@ -119,9 +119,9 @@ function TypewriterMessageText({ text, isBot }) {
                 setIsTyping(false);
                 clearInterval(timer);
             }
-        }, 28);
+        }, 22);
         return () => clearInterval(timer);
-    }, [text, isBot]);
+    }, [text, isBot, shouldAnimate]);
     return ((0, jsx_runtime_1.jsxs)("span", { children: [renderMarkdownText(displayedText), isTyping && ((0, jsx_runtime_1.jsx)("span", { style: {
                     display: 'inline-block',
                     width: '5px',
@@ -153,7 +153,17 @@ function ChatWidget({ api }) {
     const [inputValue, setInputValue] = (0, hooks_1.useState)('');
     const [isLoading, setIsLoading] = (0, hooks_1.useState)(false);
     const [thinkingPhase, setThinkingPhase] = (0, hooks_1.useState)(0);
+    const messagesContainerRef = (0, hooks_1.useRef)(null);
     const messagesEndRef = (0, hooks_1.useRef)(null);
+    const scrollToBottom = (smooth = true) => {
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior: smooth ? 'smooth' : 'auto',
+            });
+        }
+        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    };
     const [windowOffset, setWindowOffset] = (0, hooks_1.useState)({ x: 0, y: 0 });
     const [launcherOffset, setLauncherOffset] = (0, hooks_1.useState)({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = (0, hooks_1.useState)(false);
@@ -173,7 +183,8 @@ function ChatWidget({ api }) {
         setIsOpeningSkeleton(true);
         setTimeout(() => {
             setIsOpeningSkeleton(false);
-        }, 380);
+            scrollToBottom(false);
+        }, 150);
     };
     const handleClose = () => {
         setIsClosing(true);
@@ -327,20 +338,21 @@ function ChatWidget({ api }) {
         api.pingVisitor(vid).catch(console.error);
     }, []);
     (0, hooks_1.useEffect)(() => {
-        if (isOpen && messages.length === 0) {
-            setMessages([
-                {
-                    id: 'msg_welcome',
-                    sender: 'bot',
-                    text: config.greetingMessage || 'Hi there! How can I help today?',
-                    time: 'Just now',
-                },
-            ]);
+        if (isOpen) {
+            scrollToBottom(false);
+            const timer1 = setTimeout(() => scrollToBottom(false), 50);
+            const timer2 = setTimeout(() => scrollToBottom(false), 200);
+            return () => {
+                clearTimeout(timer1);
+                clearTimeout(timer2);
+            };
         }
-    }, [isOpen, config, messages.length]);
+    }, [isOpen]);
     (0, hooks_1.useEffect)(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isLoading, isOpeningSkeleton]);
+        if (isOpen) {
+            scrollToBottom(true);
+        }
+    }, [messages.length, isLoading, isOpeningSkeleton]);
     const handleSend = async (queryText) => {
         const text = (typeof queryText === 'string' ? queryText : inputValue).trim().slice(0, 250);
         if (!text || isLoading)
@@ -366,6 +378,7 @@ function ChatWidget({ api }) {
                 products: res.products,
                 thoughts: res.thoughts,
                 time: 'Just now',
+                shouldAnimate: true,
             };
             setMessages((prev) => [...prev, botMsg]);
         }
@@ -545,7 +558,7 @@ function ChatWidget({ api }) {
                                             transition: 'all 0.15s ease',
                                         }, children: (0, jsx_runtime_1.jsx)(CloseSvg, {}) })] })] }), isOpeningSkeleton ? ((0, jsx_runtime_1.jsxs)("div", { style: { flex: '1 1 0%', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }, children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', gap: '12px' }, children: [(0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0 } }), (0, jsx_runtime_1.jsxs)("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }, children: [(0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '75%', height: '44px', borderRadius: '16px' } }), (0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '40%', height: '14px' } })] })] }), (0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', gap: '12px', marginTop: '14px' }, children: [(0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0 } }), (0, jsx_runtime_1.jsx)("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }, children: (0, jsx_runtime_1.jsx)("div", { className: "mbot-skeleton", style: { width: '60%', height: '36px', borderRadius: '16px' } }) })] })] })) : (
                     /* Messages Body */
-                    (0, jsx_runtime_1.jsxs)("div", { onWheel: (e) => e.stopPropagation(), onTouchMove: (e) => e.stopPropagation(), style: {
+                    (0, jsx_runtime_1.jsxs)("div", { ref: messagesContainerRef, onWheel: (e) => e.stopPropagation(), onTouchMove: (e) => e.stopPropagation(), style: {
                             flex: '1 1 0%',
                             minHeight: 0,
                             maxHeight: '100%',
@@ -602,7 +615,7 @@ function ChatWidget({ api }) {
                                             lineHeight: '1.5',
                                             fontWeight: '450',
                                             border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
-                                        }, children: (0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === 'bot' }) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'Shop Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }, children: [
+                                        }, children: (0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === 'bot', shouldAnimate: Boolean(msg.shouldAnimate) }) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'Shop Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }, children: [
                                             { label: 'View Projects', icon: (0, jsx_runtime_1.jsx)(BriefcaseSvg, {}), query: 'Show me your portfolio projects' },
                                             { label: 'Our Services', icon: (0, jsx_runtime_1.jsx)(ToolsSvg, {}), query: 'What services do you provide?' },
                                             { label: 'Contact Info', icon: (0, jsx_runtime_1.jsx)(MailSvg, {}), query: 'How can I contact you?' },
