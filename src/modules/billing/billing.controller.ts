@@ -85,16 +85,61 @@ export async function createPortalSession(
       return;
     }
 
-    // Polar Customer Portal URL
-    const portalUrl =
-      env.POLAR_SERVER === 'sandbox'
-        ? 'https://sandbox.polar.sh/purchases'
-        : 'https://polar.sh/purchases';
+    let customerPortalUrl = '';
 
-    res.json({ url: portalUrl });
+    // 1. Try customerId from database
+    if (merchant.stripeCustomerId) {
+      try {
+        const session = await polar.customerSessions.create({
+          customerId: merchant.stripeCustomerId,
+        });
+        if (session && session.customerPortalUrl) {
+          customerPortalUrl = session.customerPortalUrl;
+        }
+      } catch (err: any) {
+        logger.warn(`Polar customer session error for customerId ${merchant.stripeCustomerId}: ${err.message}`);
+      }
+    }
+
+    // 2. If not found by customerId, lookup customer by email
+    if (!customerPortalUrl && merchant.email) {
+      try {
+        const customersList = await polar.customers.list({
+          email: merchant.email,
+          limit: 1,
+        });
+        const items = (customersList as any).result?.items || (customersList as any).items || [];
+        const customer = items[0];
+        if (customer?.id) {
+          const session = await polar.customerSessions.create({
+            customerId: customer.id,
+          });
+          if (session && session.customerPortalUrl) {
+            customerPortalUrl = session.customerPortalUrl;
+            await prisma.user.update({
+              where: { id: merchant.id },
+              data: { stripeCustomerId: customer.id },
+            });
+          }
+        }
+      } catch (err: any) {
+        logger.warn(`Polar customer lookup error for email ${merchant.email}: ${err.message}`);
+      }
+    }
+
+    // 3. Direct customer portal link fallback
+    if (!customerPortalUrl) {
+      customerPortalUrl =
+        env.POLAR_SERVER === 'sandbox'
+          ? 'https://sandbox.polar.sh/purchases'
+          : 'https://polar.sh/purchases';
+    }
+
+    logger.info(`Polar: Generated billing portal session URL for merchant ${merchant.email}: ${customerPortalUrl}`);
+    res.json({ url: customerPortalUrl });
   } catch (error: any) {
     logger.error('Error creating Polar billing portal session:', error);
-    res.status(500).json({ error: 'Failed to access billing portal.' });
+    res.status(500).json({ error: error.message || 'Failed to access billing portal.' });
   }
 }
 
