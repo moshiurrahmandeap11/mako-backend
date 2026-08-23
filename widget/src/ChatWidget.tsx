@@ -193,7 +193,17 @@ function renderMarkdownText(text: string) {
   return parts;
 }
 
-function TypewriterMessageText({ text, isBot, shouldAnimate = false }: { text: string; isBot: boolean; shouldAnimate?: boolean }) {
+function TypewriterMessageText({
+  text,
+  isBot,
+  shouldAnimate = false,
+  onType,
+}: {
+  text: string;
+  isBot: boolean;
+  shouldAnimate?: boolean;
+  onType?: () => void;
+}) {
   const [displayedText, setDisplayedText] = useState(!isBot || !shouldAnimate ? text : '');
   const [isTyping, setIsTyping] = useState(isBot && shouldAnimate);
 
@@ -201,6 +211,7 @@ function TypewriterMessageText({ text, isBot, shouldAnimate = false }: { text: s
     if (!isBot || !shouldAnimate) {
       setDisplayedText(text);
       setIsTyping(false);
+      onType?.();
       return;
     }
 
@@ -213,8 +224,10 @@ function TypewriterMessageText({ text, isBot, shouldAnimate = false }: { text: s
       currentIndex++;
       if (currentIndex <= words.length) {
         setDisplayedText(words.slice(0, currentIndex).join(' '));
+        onType?.();
       } else {
         setIsTyping(false);
+        onType?.();
         clearInterval(timer);
       }
     }, 22);
@@ -853,7 +866,12 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
                     }}
                   >
-                    <TypewriterMessageText text={msg.text} isBot={msg.sender === 'bot'} shouldAnimate={Boolean(msg.shouldAnimate)} />
+                    <TypewriterMessageText
+                      text={msg.text}
+                      isBot={msg.sender === 'bot'}
+                      shouldAnimate={Boolean(msg.shouldAnimate)}
+                      onType={() => scrollToBottom(false)}
+                    />
                   </div>
 
                   {/* Subtitle / Timestamp under Bot Bubble */}

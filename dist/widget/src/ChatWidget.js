@@ -97,13 +97,14 @@ function renderMarkdownText(text) {
     }
     return parts;
 }
-function TypewriterMessageText({ text, isBot, shouldAnimate = false }) {
+function TypewriterMessageText({ text, isBot, shouldAnimate = false, onType, }) {
     const [displayedText, setDisplayedText] = (0, hooks_1.useState)(!isBot || !shouldAnimate ? text : '');
     const [isTyping, setIsTyping] = (0, hooks_1.useState)(isBot && shouldAnimate);
     (0, hooks_1.useEffect)(() => {
         if (!isBot || !shouldAnimate) {
             setDisplayedText(text);
             setIsTyping(false);
+            onType?.();
             return;
         }
         const words = (text || '').split(' ');
@@ -114,9 +115,11 @@ function TypewriterMessageText({ text, isBot, shouldAnimate = false }) {
             currentIndex++;
             if (currentIndex <= words.length) {
                 setDisplayedText(words.slice(0, currentIndex).join(' '));
+                onType?.();
             }
             else {
                 setIsTyping(false);
+                onType?.();
                 clearInterval(timer);
             }
         }, 22);
@@ -615,7 +618,7 @@ function ChatWidget({ api }) {
                                             lineHeight: '1.5',
                                             fontWeight: '450',
                                             border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
-                                        }, children: (0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === 'bot', shouldAnimate: Boolean(msg.shouldAnimate) }) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'Shop Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }, children: [
+                                        }, children: (0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === 'bot', shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) }) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'Shop Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }, children: [
                                             { label: 'View Projects', icon: (0, jsx_runtime_1.jsx)(BriefcaseSvg, {}), query: 'Show me your portfolio projects' },
                                             { label: 'Our Services', icon: (0, jsx_runtime_1.jsx)(ToolsSvg, {}), query: 'What services do you provide?' },
                                             { label: 'Contact Info', icon: (0, jsx_runtime_1.jsx)(MailSvg, {}), query: 'How can I contact you?' },
