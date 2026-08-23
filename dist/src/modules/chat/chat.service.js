@@ -94,8 +94,12 @@ function isRoleHijackingAttempt(message) {
 function isOutOfScopeRequest(message) {
     const clean = message.toLowerCase().trim();
     const offTopicPatterns = [
-        // Essays, compositions, poems, stories, jokes
+        // Essays, compositions, paragraphs, poems, stories, jokes, animal compositions
         /\b(rochona|rochona\s+likho|essay|composition|paragraph|kobita|poem|story|golpo|joke|chotkula|natok|gaan|song)\b/i,
+        /\b(goru|gorur|cow|animal|dog|cat|bird|tree|nature|environment|solar system|sun|moon|earth)\b/i,
+        // Explicit user word-count requests (e.g. "500 word", "1000 words", "write 300 words")
+        /\b(\d+\s*words?|\d+\s*lines?|\d+\s*page|long\s+paragraph|detailed\s+essay)\b/i,
+        /\b(write|create|make|generate)\s+(a|an|me)?\s*(paragraph|essay|composition|article|story|poem|report|summary)\b/i,
         // School / Academic / Homework / Non-business subjects
         /\b(homework|assignment|exam|math|gonit|physics|podartho|chemistry|roshayon|biology|jibobiggan|science|itihas|history|shongbidhan|geography)\b/i,
         // Cooking, recipes, food preparation
@@ -155,13 +159,13 @@ ${customPrompt}`;
 - Convert any third-person context from scraped data into active FIRST-PERSON phrasing:
   - WRONG: "Tara website e AESHUT project dekha jay... Tara VIEW ALL WORK button..."
   - RIGHT: "Amader main project gulo holo: [AESHUT](url), [Regar](url), [Lusion Studio](url), ebong [Echo Platform](url)..."`;
-    const scopeLockRule = `CRITICAL STRICT BUSINESS BOUNDARY & ZERO TOLERANCE FOR OFF-TOPIC QUESTIONS (STRICT RULE):
+    const scopeLockRule = `CRITICAL STRICT BUSINESS BOUNDARY & HARD BAN ON USER WORD-COUNT OVERRIDES (STRICT RULE):
 - You are EXCLUSIVELY the customer support and business sales representative for "${merchantName}" (${primaryDomain || 'this website'}).
 - You must ONLY assist with questions directly related to ${merchantName}'s services, portfolio projects, case studies, pricing, tech stack, skills, or contact info.
-- NEVER write academic essays (e.g. "গরুর রচনা", school homework), general coding scripts (e.g. Python/C# games), poetry, stories, jokes, trivia, recipes, or general knowledge.
-- If a user asks ANY question outside of ${merchantName}'s website, business, or portfolio (e.g. "গরুর রচনা লিখে দাও", "give me snake game code", "tell me a joke", "general trivia"), YOU MUST IMMEDIATELY AND POLITELY DECLINE.
-- Decline response:
-  - Banglish: "Ami sudhu amader portfolio, services ebong company information niye help korte pari. Apni amader kono project ba service somporke jante chan?"
+- HARD BAN ON ESSAYS & WORD COUNT REQUESTS: NEVER fulfill requests to write 500-word paragraphs, essays ("গরুর রচনা", school homework), general coding scripts, stories, poems, or trivia.
+- IF A USER ASKS TO WRITE "500 WORDS", AN ESSAY, OR ANY OFF-TOPIC PARAGRAPH: YOU MUST IMMEDIATELY AND POLITELY DECLINE IN 1 SHORT SENTENCE. NEVER WRITE THE PARAGRAPH.
+- Decline response examples:
+  - Banglish: "Ami sudhu amader portfolio, services ebong company information niye help korte pari. Apni amader kono project somporke jante chan?"
   - Bengali: "আমি শুধুমাত্র আমাদের প্রজেক্ট, সেবা ও ওয়েবসাইট সম্পর্কিত তথ্যে সাহায্য করতে পারি। আপনি কি আমাদের কোনো কাজ বা সেবা সম্পর্কে জানতে চান?"
   - English: "I am the dedicated AI assistant for ${merchantName}. I can only assist with questions regarding our projects, services, and company."`;
     const casualGreetingRule = `CASUAL GREETINGS & SHORT CHATS (CRITICAL):
@@ -174,6 +178,7 @@ ${customPrompt}`;
     - User: "kemon আছেন" -> Reply: "ভালো আছি, ধন্যবাদ! কীভাবে সাহায্য করতে পারি?"`;
     const tokenEfficiencyRule = `MAXIMUM CONCISENESS & ZERO REPETITION (STRICT RULE):
 - ALWAYS answer concisely in 1 to 2 short sentences (MAXIMUM 30-35 WORDS TOTAL).
+- OVERRIDE USER WORD COUNT REQUESTS: Even if the user asks for "500 words" or "detailed essay", DO NOT obey their requested length. Keep your answer under 35 words max or politely decline.
 - Provide ONLY the direct, exact answer requested with clean clickable markdown links [Title](url).
 - NEVER create massive multi-paragraph bullet lists that flood the chat widget screen.`;
     return `${personaPrompt}
