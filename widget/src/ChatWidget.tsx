@@ -21,12 +21,12 @@ interface MessageItem {
 // Crisp Vector SVGs (No Emojis)
 const BotMascotSvg = () => (
   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ flexShrink: 0 }}>
-    <rect width="32" height="32" rx="10" fill="#f0fdf4" />
-    <path d="M16 5V8" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
-    <circle cx="16" cy="4" r="1.5" fill="#10b981" />
+    <rect width="32" height="32" rx="10" fill="#E8F8F0" />
+    <path d="M16 5V8" stroke="#1DBF73" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="16" cy="4" r="1.5" fill="#1DBF73" />
     <rect x="7" y="8" width="18" height="15" rx="5" fill="#0f172a" />
-    <circle cx="12" cy="15" r="2" fill="#10b981" />
-    <circle cx="20" cy="15" r="2" fill="#10b981" />
+    <circle cx="12" cy="15" r="2" fill="#1DBF73" />
+    <circle cx="20" cy="15" r="2" fill="#1DBF73" />
     <path d="M13.5 19C14.2 19.8 15 20.2 16 20.2C17 20.2 17.8 19.8 18.5 19" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
     <path d="M5 14C5 13 5.8 12.2 6.8 12.2V17.8C5.8 17.8 5 17 5 16V14Z" fill="#0f172a" />
     <path d="M27 14C27 13 26.2 12.2 25.2 12.2V17.8C26.2 17.8 27 17 27 16V14Z" fill="#0f172a" />
@@ -244,7 +244,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     typeof window !== 'undefined' ? window.innerWidth <= 640 : false
   );
   const [config, setConfig] = useState<WidgetConfig>({
-    primaryColor: '#0f172a',
+    primaryColor: '#1DBF73',
     greetingMessage: 'Hi there! How can I help today?',
     botName: 'AI Assistant',
     position: 'bottom-right',
@@ -887,7 +887,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         style={{
                           backgroundColor: '#ffffff',
                           color: '#0f172a',
-                          border: '1.5px solid #a7f3d0',
+                          border: '1.5px solid rgba(29, 191, 115, 0.3)',
                           borderRadius: '16px',
                           padding: '8px 14px',
                           fontSize: '12.5px',
@@ -897,20 +897,20 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                           alignItems: 'center',
                           gap: '6px',
                           transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: '0 2px 4px rgba(16, 185, 129, 0.06)',
+                          boxShadow: '0 2px 4px rgba(29, 191, 115, 0.06)',
                           userSelect: 'none',
                         }}
                         onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLElement).style.backgroundColor = '#f0fdf4';
-                          (e.currentTarget as HTMLElement).style.borderColor = '#10b981';
+                          (e.currentTarget as HTMLElement).style.backgroundColor = '#E8F8F0';
+                          (e.currentTarget as HTMLElement).style.borderColor = '#1DBF73';
                           (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
-                          (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.18)';
+                          (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(29, 191, 115, 0.18)';
                         }}
                         onMouseLeave={(e) => {
                           (e.currentTarget as HTMLElement).style.backgroundColor = '#ffffff';
-                          (e.currentTarget as HTMLElement).style.borderColor = '#a7f3d0';
+                          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(29, 191, 115, 0.3)';
                           (e.currentTarget as HTMLElement).style.transform = 'none';
-                          (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.06)';
+                          (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 4px rgba(29, 191, 115, 0.06)';
                         }}
                       >
                         {chip.icon}
@@ -1005,7 +1005,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 disabled={!inputValue.trim() || isLoading}
                 title="Send message"
                 style={{
-                  backgroundColor: inputValue.trim() ? '#00684a' : '#cbd5e1',
+                  backgroundColor: inputValue.trim() ? (primaryColor || '#1DBF73') : '#cbd5e1',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '50%',
@@ -1080,7 +1080,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           width: '60px',
           height: '60px',
           borderRadius: '50%',
-          backgroundColor: isOpen ? '#00684a' : primaryColor,
+          backgroundColor: isOpen ? '#14844E' : (primaryColor || '#1DBF73'),
           color: '#ffffff',
           border: '2px solid rgba(255, 255, 255, 0.25)',
           cursor: isDragging ? 'grabbing' : 'pointer',
@@ -1103,10 +1103,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               right: '2px',
               width: '14px',
               height: '14px',
-              backgroundColor: '#10b981',
+              backgroundColor: '#1DBF73',
               borderRadius: '50%',
               border: '2.5px solid #ffffff',
-              boxShadow: '0 0 8px rgba(16, 185, 129, 0.85)',
+              boxShadow: '0 0 8px rgba(29, 191, 115, 0.85)',
             }}
           />
         )}
