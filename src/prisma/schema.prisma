@@ -105,7 +105,7 @@ model WidgetConfig {
   launcherBgColor  String   @default("#1DBF73")
   launcherIconColor String  @default("#FFFFFF")
   greetingMessage  String   @default("Hi! How can I help you shop today?")
-  botName          String   @default("Shop Assistant")
+  botName          String   @default("AI Assistant")
   position         String   @default("bottom-right")
   addToCartEnabled Boolean  @default(true)
 }

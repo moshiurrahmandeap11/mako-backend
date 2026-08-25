@@ -679,7 +679,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
 
               <div>
                 <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: config.headerTextColor || '#0f172a', letterSpacing: '-0.2px' }}>
-                  {config.botName || 'Shop Assistant'}
+                  {config.botName || 'AI Assistant'}
                 </h3>
                 <span style={{ fontSize: '12px', color: config.headerTextColor ? `${config.headerTextColor}CC` : '#64748b', display: 'block', marginTop: '1px' }}>
                   The team can also help
@@ -857,7 +857,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   {/* Subtitle / Timestamp under Bot Bubble */}
                   {msg.sender === 'bot' && (
                     <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }}>
-                      {config.botName || 'Shop Assistant'} • AI Agent • {msg.time}
+                      {config.botName || 'AI Assistant'} • AI Agent • {msg.time}
                     </span>
                   )}
                   {msg.sender === 'user' && (

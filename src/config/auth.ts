@@ -45,7 +45,7 @@ export const auth = betterAuth({
                 merchantId: user.id,
                 primaryColor: '#111111',
                 greetingMessage: 'Hi! How can I help you shop today?',
-                botName: 'Shop Assistant',
+                botName: 'AI Assistant',
                 position: 'bottom-right',
                 addToCartEnabled: true,
               },

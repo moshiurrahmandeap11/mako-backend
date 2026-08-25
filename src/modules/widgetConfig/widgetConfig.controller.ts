@@ -94,7 +94,7 @@ export async function resetConfig(req: DashboardAuthRequest, res: Response): Pro
       launcherBgColor: '#1DBF73',
       launcherIconColor: '#FFFFFF',
       greetingMessage: 'Hi! How can I help you shop today?',
-      botName: 'Shop Assistant',
+      botName: 'AI Assistant',
       position: 'bottom-right',
       addToCartEnabled: true,
     };
