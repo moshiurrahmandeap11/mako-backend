@@ -149,22 +149,23 @@ function getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, tem
 - MANDATORY CLICKABLE LINKS: EVERY single project name, portfolio item, service, or product mentioned in your response MUST be formatted as a clickable link badge: [Product / Project Name](url).
 - HARD BAN ON RAW DATABASE OBJECT IDS OR HOSTNAMES AS LINK TITLES: NEVER write link titles containing hexadecimal database IDs (e.g. NEVER write "[691f478fccec252c64981b47](url)") or raw domain strings (e.g. NEVER write "[everwear-frontend](url)").
 - ALWAYS format clickable links with CLEAN, HUMAN-READABLE PRODUCT OR PAGE TITLES e.g. [Electronic Plastic Table ($600)](url), [Generic Steel Pants ($987)](url), or [View Collection](url).`;
-    const addCartInstruction = `DIRECT ADD TO CART & VARIANT INQUIRY (CRITICAL RULE):
-- When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo"):
-  1. CHECK IF THE PRODUCT HAS VARIANTS/OPTIONS (e.g., Sizes like S, M, L, XL or Colors like Red, Black):
-     - If the user HAS NOT specified their size or color yet: YOU MUST ASK THEM for their preferred size/color (e.g. "We have sizes S, M, and L available. Which one would you prefer?").
-     - Also append the cart action tag with the productId so the storefront widget can display the variant picker modal if the user prefers clicking.
-  2. Once the user specifies their size or color (e.g. "L size", "Black color"), match it to the corresponding variant ID and append:
-     \`\`\`json:cart_action
-     { "productId": "<PRODUCT_ID>", "variantId": "<VARIANT_ID>", "quantity": 1, "selectedOptions": { "Size": "<SIZE>", "Color": "<COLOR>" } }
-     \`\`\`
-     or tag: [ADD_TO_CART: productId, variantId]
-  3. If the product has NO variants/options: immediately append:
-     \`\`\`json:cart_action
-     { "productId": "<PRODUCT_ID>", "quantity": 1 }
-     \`\`\`
-     or tag: [ADD_TO_CART: productId]
-- NEVER tell the user to visit a website page manually to add to cart; ALWAYS trigger the cart action tag!`;
+    const addCartInstruction = `DIRECT ADD TO CART & DYNAMIC VARIANT INQUIRY (CRITICAL RULE):
+- You have direct access to the website store catalog and can add items to cart.
+- When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo", "pants ta dao", "bacon ta cart e dao", "2nd ta"):
+  1. IDENTIFY THE EXACT PRODUCT from the Store Catalog:
+     - Match the product the user is referring to (by name, keyword, or context from previous conversation).
+  2. CHECK THE PRODUCT'S OPTIONS (from Catalog data):
+     - If the product HAS options (e.g. Sizes S, M, L or Colors) AND user HAS NOT chosen size yet:
+       - Ask which size/color they prefer (e.g. "We have sizes S, M, and L available for [Product Name](url). Which size would you prefer?").
+       - Append tag: [ADD_TO_CART: productId]
+     - Once the user chooses their size (e.g. "S", "M", "size L", "black"):
+       - Friendly message: Confirm the item with their chosen size (e.g. "[Product Name](url) (Size: S) cart e add kora hoyeche!").
+       - Append tag: [ADD_TO_CART: productId, size: S]
+  3. If the product has NO options:
+     - Friendly message: "[Product Name](url) cart e add kora hoyeche!"
+     - Append tag: [ADD_TO_CART: productId]
+- ALWAYS provide a polite, natural sentence in the user's matching script alongside the tag.
+- NEVER tell the user to manually visit the page to add to cart; ALWAYS trigger the cart tag!`;
     const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (STRICT RULE):
 - You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "Amader", "Amra").
 - HARD BAN ON THIRD-PERSON WORDS: NEVER use third-person words ("Tara", "Tader", "They", "Their", "Them", "${merchantName}'s team", "dekha jay").
@@ -572,9 +573,10 @@ Currently, no specific catalog items or knowledge base articles matched this que
             finalReply = finalReply.substring(0, lastPunctIndex + 1).trim();
         }
     }
-    // 1. Check for ```json:cart_action ... ``` or raw cart json
-    const jsonCartMatch = finalReply.match(/```json:cart_action\s*([\s\S]*?)\s*```/i) || finalReply.match(/\{[\s\S]*?"productId"\s*:\s*"([^"]+)"[\s\S]*?\}/i);
-    const tagCartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)(?:,\s*([a-zA-Z0-9_-]+))?\]/i);
+    // 1. Check for ```json:cart_action ... ``` or raw cart json or [ADD_TO_CART: ...]
+    const jsonCartMatch = finalReply.match(/```json:cart_action\s*([\s\S]*?)\s*```/i) ||
+        finalReply.match(/\{[\s\S]*?"productId"\s*:\s*"([^"]+)"[\s\S]*?\}/i);
+    const tagCartMatch = finalReply.match(/\[ADD_TO_CART:\s*([^\]]+)\]/i);
     if (jsonCartMatch || tagCartMatch) {
         try {
             let targetProdId = '';
@@ -592,50 +594,69 @@ Currently, no specific catalog items or knowledge base articles matched this que
                 else if (jsonCartMatch[1]) {
                     targetProdId = jsonCartMatch[1].trim();
                 }
-                finalReply = finalReply.replace(/```json:cart_action[\s\S]*?```/gi, '').trim();
             }
             else if (tagCartMatch) {
-                targetProdId = tagCartMatch[1];
-                if (tagCartMatch[2]) {
-                    targetVariantId = tagCartMatch[2];
+                const rawContent = tagCartMatch[1].trim();
+                const parts = rawContent.split(',').map((s) => s.trim());
+                targetProdId = parts[0].replace(/^productId:\s*/i, '').trim();
+                if (parts.length > 1) {
+                    const secondPart = parts.slice(1).join(', ');
+                    if (/size:\s*([a-zA-Z0-9]+)/i.test(secondPart)) {
+                        const m = secondPart.match(/size:\s*([a-zA-Z0-9]+)/i);
+                        if (m)
+                            targetOptions = { ...(targetOptions || {}), Size: m[1].toUpperCase() };
+                    }
+                    else if (/color:\s*([a-zA-Z0-9]+)/i.test(secondPart)) {
+                        const m = secondPart.match(/color:\s*([a-zA-Z0-9]+)/i);
+                        if (m)
+                            targetOptions = { ...(targetOptions || {}), Color: m[1] };
+                    }
+                    else if (/^(xs|s|m|l|xl|xxl|\d{2})$/i.test(secondPart)) {
+                        targetOptions = { ...(targetOptions || {}), Size: secondPart.toUpperCase() };
+                    }
+                    else {
+                        targetVariantId = secondPart;
+                    }
                 }
-                finalReply = finalReply.replace(/\[ADD_TO_CART:\s*[a-zA-Z0-9_-]+(?:,\s*[a-zA-Z0-9_-]+)?\]/gi, '').trim();
             }
+            // Hard sanitization: Strip all raw tags and markdown blocks from user-visible reply
+            finalReply = finalReply
+                .replace(/```json:cart_action[\s\S]*?```/gi, '')
+                .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, '')
+                .trim();
             if (targetProdId) {
                 const res = await (0, addToCart_tool_1.addToCartTool)(merchantId, targetProdId, targetQty, targetVariantId, targetOptions);
                 if (res.cartAction)
                     cartAction = res.cartAction;
-                if (res.product)
+                if (res.product && !recommendedProducts.some((p) => p.id === res.product.id)) {
                     recommendedProducts.push(res.product);
+                }
+                // If the reply became empty after stripping tag, provide clean confirmation
+                if (!finalReply || finalReply.length < 3) {
+                    const prodTitle = res.product?.title || 'Product';
+                    const prodUrl = res.product?.productUrl || '#';
+                    const sizeNote = targetOptions?.Size ? ` (Size: ${targetOptions.Size})` : '';
+                    if (isBengaliScript) {
+                        finalReply = `[${prodTitle}](${prodUrl})${sizeNote} কার্টে যোগ করা হয়েছে! 🛍️`;
+                    }
+                    else if (isBanglish) {
+                        finalReply = `[${prodTitle}](${prodUrl})${sizeNote} cart e add kora hoyeche! 🛍️`;
+                    }
+                    else {
+                        finalReply = `[${prodTitle}](${prodUrl})${sizeNote} has been added to your cart! 🛍️`;
+                    }
+                }
             }
         }
         catch (err) {
             logger_1.logger.error('Parsing Add to Cart Tag Error:', err);
         }
     }
-    // Fail-safe: If LLM did not output a tag, but user expressed intent to add to cart
-    const isAddCartIntent = /\b(add\s*to\s*cart|cart\s*e\s*kore?\s*da?w?|cart\s*e\s*da?w?|kinte\s*chai|kina\s*chai|buy\s*this|add\s*it|cart\s*e|kine\s*da?w?)\b/i.test(userMessage);
-    if (!cartAction && isAddCartIntent) {
-        try {
-            let matchedProd = retrievedProducts[0] || recommendedProducts[0];
-            if (!matchedProd) {
-                const prodsInDb = await db_1.prisma.product.findMany({ where: { merchantId }, take: 5 });
-                const userMsgLower = userMessage.toLowerCase();
-                matchedProd = prodsInDb.find((p) => userMsgLower.includes(p.title.toLowerCase()) || p.title.toLowerCase().split(' ').some((w) => w.length > 3 && userMsgLower.includes(w))) || prodsInDb[0];
-            }
-            if (matchedProd) {
-                const res = await (0, addToCart_tool_1.addToCartTool)(merchantId, matchedProd.id, 1);
-                if (res.cartAction)
-                    cartAction = res.cartAction;
-                if (res.product && !recommendedProducts.some((p) => p.id === res.product.id)) {
-                    recommendedProducts.push(res.product);
-                }
-            }
-        }
-        catch (err) {
-            logger_1.logger.error('Fail-safe Add to Cart Error:', err);
-        }
-    }
+    // Safe fallback sanitization (ensure no tag EVER leaks)
+    finalReply = finalReply
+        .replace(/```json:cart_action[\s\S]*?```/gi, '')
+        .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, '')
+        .trim();
     // Bind retrieved RAG products to the assistant response metadata
     if (recommendedProducts.length === 0 && retrievedProducts.length > 0) {
         recommendedProducts = retrievedProducts;

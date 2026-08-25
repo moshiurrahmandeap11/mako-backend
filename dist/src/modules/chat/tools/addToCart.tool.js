@@ -6,7 +6,12 @@ async function addToCartTool(merchantId, productId, quantity = 1, variantId, sel
     const product = await db_1.prisma.product.findFirst({
         where: {
             merchantId,
-            OR: [{ id: productId }, { externalId: productId }],
+            OR: [
+                { id: productId },
+                { externalId: productId },
+                { productUrl: { contains: productId } },
+                { title: { contains: productId, mode: 'insensitive' } },
+            ],
         },
     });
     if (!product) {

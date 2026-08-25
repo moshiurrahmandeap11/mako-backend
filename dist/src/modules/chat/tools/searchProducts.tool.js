@@ -24,17 +24,27 @@ async function searchProductsTool(merchantId, query, category, maxResults = 5) {
         catch (e) {
             logger_1.logger.warn('pgvector search fallback to ILIKE text query:', e);
         }
-        // Fallback: If vector search returns empty, perform ILIKE search
+        // Fallback: If vector search returns empty, perform multi-word tokenized search
         if (products.length === 0) {
+            const words = query
+                .toLowerCase()
+                .replace(/[^a-zA-Z0-9\u0980-\u09FF\s]/g, ' ')
+                .split(/\s+/)
+                .filter((w) => w.length >= 3);
+            const orConditions = [
+                { title: { contains: query, mode: 'insensitive' } },
+                { description: { contains: query, mode: 'insensitive' } },
+                { category: { contains: query, mode: 'insensitive' } },
+            ];
+            for (const w of words) {
+                orConditions.push({ title: { contains: w, mode: 'insensitive' } });
+                orConditions.push({ description: { contains: w, mode: 'insensitive' } });
+            }
             products = await db_1.prisma.product.findMany({
                 where: {
                     merchantId,
                     inStock: true,
-                    OR: [
-                        { title: { contains: query, mode: 'insensitive' } },
-                        { description: { contains: query, mode: 'insensitive' } },
-                        { category: { contains: query, mode: 'insensitive' } },
-                    ],
+                    OR: orConditions,
                 },
                 take: maxResults,
             });
