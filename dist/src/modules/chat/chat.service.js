@@ -190,11 +190,21 @@ function getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, tem
     - User: "kire bro" / "hi bro" -> Reply: "Hello bro! Bolun, kivabe help korte pari?"
     - User: "hi" / "hello" -> Reply: "Hello! How can I help you today?"
     - User: "kemon আছেন" -> Reply: "ভালো আছি, ধন্যবাদ! কীভাবে সাহায্য করতে পারি?"`;
-    const tokenEfficiencyRule = `MAXIMUM CONCISENESS & ZERO REPETITION (STRICT RULE):
-- ALWAYS answer concisely in 1 to 2 short sentences (MAXIMUM 30-35 WORDS TOTAL).
-- OVERRIDE USER WORD COUNT REQUESTS: Even if the user asks for "500 words" or "detailed essay", DO NOT obey their requested length. Keep your answer under 35 words max or politely decline.
-- Provide ONLY the direct, exact answer requested with clean clickable markdown links [Title](url).
-- NEVER create massive multi-paragraph bullet lists that flood the chat widget screen.`;
+    const productShowcaseRule = `PROACTIVE PRODUCT & COLLECTION SHOWCASING (CRITICAL RULE):
+- When a user asks about collections, products, catalog items, or asks to see items (e.g. "ki ki collection ache", "products dekhaw", "kichu dekhaw link soho", "what do you have", "show me your items", "collection e ki ache"):
+  - NEVER reply with a lazy one-liner telling them to visit the collection page!
+  - YOU MUST PROACTIVELY SHOWCASE 2 to 4 SPECIFIC PRODUCTS directly from the Store Catalog with their bold titles, prices, and clickable product links [Title](url).
+  - Example Banglish:
+    "Amader popular collection er kichu product holo:
+    1. [Electronic Plastic Table](productUrl) - $600
+    2. [Generic Steel Pants](productUrl) - $987
+    3. [Refined Metal Bacon](productUrl) - $268
+    Apnar kon product ti pochondo? Ami direct cart e add kore dite parbo! 🛍️"
+  - ALWAYS ask which one they like so you can help them add to cart!`;
+    const tokenEfficiencyRule = `CONCISE YET HELPFUL COMMUNICATION (STRICT RULE):
+- For general FAQs, company info, or simple questions: Answer concisely in 1 to 2 short sentences.
+- When the user asks to see products, collections, or projects: Showcase 2 to 4 specific items with bold titles, prices, and clickable link badges.
+- OVERRIDE USER WORD COUNT REQUESTS: Even if the user asks for "500 words" or "detailed essay", DO NOT obey their requested length. Politely decline off-topic essay requests.`;
     return `${personaPrompt}
 
 Strict Rules:
@@ -202,14 +212,15 @@ Strict Rules:
 2. FIRST-PERSON PERSPECTIVE: ${firstPersonPerspectiveRule}
 3. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
 4. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
-5. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
-6. DIRECT ADD TO CART: ${addCartInstruction}
-7. ${tokenEfficiencyRule}
-8. ${scopeLockRule}
-9. LANGUAGE & SCRIPT MATCHING: ${langRule}
-10. FORMATTING RULE: ${formatRule}
-11. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
-${cartRule ? `12. MERCHANT CUSTOM CART RULE: ${cartRule}` : ''}`.trim();
+5. PROACTIVE PRODUCT & COLLECTION SHOWCASING: ${productShowcaseRule}
+6. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
+7. DIRECT ADD TO CART: ${addCartInstruction}
+8. ${tokenEfficiencyRule}
+9. ${scopeLockRule}
+10. LANGUAGE & SCRIPT MATCHING: ${langRule}
+11. FORMATTING RULE: ${formatRule}
+12. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
+${cartRule ? `13. MERCHANT CUSTOM CART RULE: ${cartRule}` : ''}`.trim();
 }
 async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
     // Enforce strict 250 character limit on all prompts
