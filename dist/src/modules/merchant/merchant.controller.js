@@ -42,12 +42,14 @@ exports.me = me;
 exports.updateDomains = updateDomains;
 exports.logout = logout;
 exports.scrapeUrl = scrapeUrl;
+exports.rescrapeDomain = rescrapeDomain;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = require("../../config/db");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
 const domain_1 = require("../../utils/domain");
+const pricing_1 = require("../../config/pricing");
 async function register(req, res) {
     try {
         const { name, email, password } = req.body;
@@ -71,7 +73,7 @@ async function register(req, res) {
                     create: {
                         primaryColor: '#111111',
                         greetingMessage: 'Hi! How can I help you shop today?',
-                        botName: 'Shop Assistant',
+                        botName: 'AI Assistant',
                         position: 'bottom-right',
                         addToCartEnabled: true,
                     },
@@ -177,9 +179,23 @@ async function me(req, res) {
         }
         const adminEmail = (env_1.env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
         const isAdmin = merchant.role === 'ADMIN' || merchant.email.trim().toLowerCase() === adminEmail;
+        const domainStatuses = await Promise.all((merchant.allowedDomains || []).map(async (domain) => {
+            const chunkCount = await db_1.prisma.knowledgeChunk.count({
+                where: {
+                    merchantId: merchant.id,
+                    url: { contains: domain },
+                },
+            });
+            return {
+                domain,
+                status: chunkCount > 0 ? 'scraped' : 'pending',
+                chunkCount,
+            };
+        }));
         res.json({
             merchant: {
                 ...merchant,
+                domainStatuses,
                 isAdmin,
             },
         });
@@ -205,13 +221,8 @@ async function updateDomains(req, res) {
         }
         const rawSanitized = allowedDomains.map((d) => (0, domain_1.normalizeDomain)(d)).filter(Boolean);
         const sanitizedDomains = [...new Set(rawSanitized)];
-        const domainLimits = {
-            FREE: 1,
-            STARTER: 2,
-            PRO: 5,
-            ENTERPRISE: Infinity,
-        };
-        const limit = domainLimits[planTier] !== undefined ? domainLimits[planTier] : 1;
+        const plan = (0, pricing_1.getPlanConfig)(planTier);
+        const limit = plan.maxDomains;
         if (sanitizedDomains.length > limit) {
             res.status(400).json({
                 error: `Your ${planTier} plan allows whitelisting up to ${limit} domains. Please upgrade to add more domains.`
@@ -262,5 +273,25 @@ async function scrapeUrl(req, res) {
     catch (error) {
         logger_1.logger.error('Scrape URL Error:', error);
         res.status(500).json({ error: error.message || 'Failed to scrape website.' });
+    }
+}
+async function rescrapeDomain(req, res) {
+    try {
+        const merchantId = req.merchant?.id;
+        const { domain } = req.body;
+        if (!domain) {
+            res.status(400).json({ error: 'Domain name is required.' });
+            return;
+        }
+        const { triggerBackgroundCrawl } = await Promise.resolve().then(() => __importStar(require('../../services/scraper.service')));
+        triggerBackgroundCrawl(domain, merchantId);
+        res.json({
+            message: `Background re-scrape initiated for ${domain}`,
+            domain,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Rescrape Domain Error:', error);
+        res.status(500).json({ error: error.message || 'Failed to initiate re-scrape.' });
     }
 }

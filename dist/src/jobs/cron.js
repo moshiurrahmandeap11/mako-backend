@@ -41,13 +41,13 @@ const node_cron_1 = __importDefault(require("node-cron"));
 const db_1 = require("../config/db");
 const logger_1 = require("../utils/logger");
 const scraper_service_1 = require("../services/scraper.service");
-// Run every day at 06:00 UTC (12:00 PM Bangladesh Standard Time)
+const pricing_1 = require("../config/pricing");
 function initCronJobs() {
     logger_1.logger.info('Initializing background cron jobs...');
+    // 1. Run every day at 06:00 UTC (12:00 PM BST) for domain indexing
     node_cron_1.default.schedule('0 6 * * *', async () => {
         logger_1.logger.info('CRON: Starting daily deep crawl for all merchant domains...');
         try {
-            // Fetch all merchants with allowed domains
             const merchants = await db_1.prisma.user.findMany({
                 where: {
                     allowedDomains: {
@@ -76,18 +76,68 @@ function initCronJobs() {
             logger_1.logger.error('CRON: Error fetching merchants for daily crawl:', error);
         }
     }, {
-        timezone: 'UTC' // 06:00 UTC is 12:00 PM BST
+        timezone: 'UTC'
     });
-    // Run every day at 09:00 UTC (03:00 PM BST) to evaluate monthly quotas and alert merchants
-    node_cron_1.default.schedule('0 9 * * *', async () => {
-        logger_1.logger.info('CRON: Checking monthly message quotas for all merchants...');
+    // 2. Monthly Credit Rollover Job (Runs on the 1st of every month at 00:05 UTC)
+    node_cron_1.default.schedule('5 0 1 * *', async () => {
+        logger_1.logger.info('CRON: Executing monthly AI Smart Credit Rollover calculation...');
         try {
-            const PLAN_MONTHLY_LIMITS = {
-                FREE: 100,
-                STARTER: 500,
-                PRO: 1500,
-                ENTERPRISE: Infinity,
-            };
+            // Calculate date range for previous month
+            const now = new Date();
+            const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+            const merchants = await db_1.prisma.user.findMany({
+                select: {
+                    id: true,
+                    email: true,
+                    planTier: true,
+                    rolloverCredits: true,
+                },
+            });
+            for (const m of merchants) {
+                const plan = (0, pricing_1.getPlanConfig)(m.planTier);
+                if (!plan.rolloverEnabled || m.planTier === 'FREE' || m.planTier === 'ENTERPRISE') {
+                    // Free plan resets rollover
+                    if (m.rolloverCredits > 0) {
+                        await db_1.prisma.user.update({
+                            where: { id: m.id },
+                            data: { rolloverCredits: 0 },
+                        });
+                    }
+                    continue;
+                }
+                // Count messages processed in previous month
+                const prevMessagesCount = await db_1.prisma.message.count({
+                    where: {
+                        conversation: { merchantId: m.id },
+                        createdAt: {
+                            gte: prevMonthStart,
+                            lt: prevMonthEnd,
+                        },
+                    },
+                });
+                const prevUsedCredits = prevMessagesCount * pricing_1.CREDITS_PER_MESSAGE;
+                const prevUnusedFromGrant = Math.max(0, plan.monthlyCredits - prevUsedCredits);
+                // Cap maximum accumulated rollover at 100,000 credits to protect infrastructure
+                const newRolloverBalance = Math.min(100000, (m.rolloverCredits || 0) + prevUnusedFromGrant);
+                await db_1.prisma.user.update({
+                    where: { id: m.id },
+                    data: { rolloverCredits: newRolloverBalance },
+                });
+                logger_1.logger.info(`CRON [Rollover]: Merchant ${m.email} (${m.planTier}) rolled over +${prevUnusedFromGrant} credits (New Rollover Bank: ${newRolloverBalance.toLocaleString()})`);
+            }
+            logger_1.logger.info('CRON: Monthly Credit Rollover calculation finished.');
+        }
+        catch (err) {
+            logger_1.logger.error('CRON: Error in monthly credit rollover job:', err);
+        }
+    }, {
+        timezone: 'UTC',
+    });
+    // 3. Run every day at 09:00 UTC (03:00 PM BST) to evaluate credit quotas and alert merchants
+    node_cron_1.default.schedule('0 9 * * *', async () => {
+        logger_1.logger.info('CRON: Checking monthly AI Smart Credit quotas for all merchants...');
+        try {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
             startOfMonth.setHours(0, 0, 0, 0);
@@ -97,31 +147,44 @@ function initCronJobs() {
                     email: true,
                     name: true,
                     planTier: true,
+                    createdAt: true,
+                    subscriptionStart: true,
+                    rolloverCredits: true,
+                    extraCredits: true,
                     lastQuotaWarningEmailSentAt: true,
                     lastQuotaExceededEmailSentAt: true,
                 },
             });
             const { sendQuotaWarningEmail, sendQuotaExceededEmail } = await Promise.resolve().then(() => __importStar(require('../utils/email')));
+            const { getBillingPeriodStart } = await Promise.resolve().then(() => __importStar(require('../config/pricing')));
             for (const m of merchants) {
-                const limit = PLAN_MONTHLY_LIMITS[m.planTier] !== undefined ? PLAN_MONTHLY_LIMITS[m.planTier] : 100;
-                if (limit === Infinity)
+                const plan = (0, pricing_1.getPlanConfig)(m.planTier);
+                if (plan.monthlyCredits === Infinity || m.planTier === 'ENTERPRISE')
                     continue;
+                const cycleStart = getBillingPeriodStart({
+                    planTier: m.planTier,
+                    createdAt: m.createdAt,
+                    subscriptionStart: m.subscriptionStart,
+                });
+                const totalAllowedCredits = plan.monthlyCredits + (m.rolloverCredits || 0) + (m.extraCredits || 0);
                 const count = await db_1.prisma.message.count({
                     where: {
                         conversation: { merchantId: m.id },
-                        createdAt: { gte: startOfMonth },
+                        ...(cycleStart ? { createdAt: { gte: cycleStart } } : {}),
                     },
                 });
-                const percentage = (count / limit) * 100;
+                const usedCredits = count * pricing_1.CREDITS_PER_MESSAGE;
+                const percentage = totalAllowedCredits > 0 ? (usedCredits / totalAllowedCredits) * 100 : 100;
+                const refDate = cycleStart || new Date(0);
                 // 90% Warning
                 if (percentage >= 90 && percentage < 100) {
-                    const needsWarning = !m.lastQuotaWarningEmailSentAt || m.lastQuotaWarningEmailSentAt < startOfMonth;
+                    const needsWarning = !m.lastQuotaWarningEmailSentAt || m.lastQuotaWarningEmailSentAt < refDate;
                     if (needsWarning && m.email) {
                         await sendQuotaWarningEmail({
                             to: m.email,
                             name: m.name,
-                            used: count,
-                            limit,
+                            used: usedCredits,
+                            limit: totalAllowedCredits,
                             tier: m.planTier,
                         });
                         await db_1.prisma.user.update({
@@ -131,14 +194,14 @@ function initCronJobs() {
                     }
                 }
                 // 100% Exceeded
-                if (count >= limit) {
-                    const needsExceededAlert = !m.lastQuotaExceededEmailSentAt || m.lastQuotaExceededEmailSentAt < startOfMonth;
+                if (usedCredits >= totalAllowedCredits) {
+                    const needsExceededAlert = !m.lastQuotaExceededEmailSentAt || m.lastQuotaExceededEmailSentAt < refDate;
                     if (needsExceededAlert && m.email) {
                         await sendQuotaExceededEmail({
                             to: m.email,
                             name: m.name,
-                            used: count,
-                            limit,
+                            used: usedCredits,
+                            limit: totalAllowedCredits,
                             tier: m.planTier,
                         });
                         await db_1.prisma.user.update({

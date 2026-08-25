@@ -121,12 +121,9 @@ function isOutOfScopeRequest(message) {
     return isOffTopic && !hasInScopeKeyword;
 }
 function getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, template) {
-    if (customPrompt) {
-        return `You are the official AI Assistant representing "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}.
-${customPrompt}`;
-    }
     const yamlConfig = loadAiPromptsYaml(template);
-    const basePersona = yamlConfig?.system_instructions?.persona || `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
+    const defaultPersona = yamlConfig?.system_instructions?.persona || `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
+    const basePersona = customPrompt ? `${defaultPersona}\nMerchant Custom Notes: ${customPrompt}` : defaultPersona;
     const personaPrompt = `You are the official AI Assistant for "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}. ${basePersona}`;
     const rules = yamlConfig?.system_instructions?.strict_rules;
     const formatRule = rules?.formatting?.instructions || `Use clean GitHub Flavored Markdown formatting with bold titles and clickable link badges.`;
@@ -146,13 +143,28 @@ ${customPrompt}`;
   - User: "koto charge koro?"
     Assistant: "Project er scope ebong requirement onujayi amader pricing nirdharon kora hoy।"
 - NEVER mix conflicting pronouns, broken phonetics, or passive phrases like "ara" or "dekha jay". Use clear, fluent, natural conversational Banglish.`;
-    const linkAndContextRule = `CONTEXT AWARENESS, MANDATORY CLICKABLE LINKS & MARKDOWN FORMATTING (CRITICAL):
+    const linkAndContextRule = `CONTEXT AWARENESS, MANDATORY CLICKABLE LINKS & CLEAN LINK TITLES (CRITICAL):
 - The user is ALREADY ON THIS WEBSITE chatting with the embedded assistant.
 - NEVER say "visit our website [homepage_url]" or suggest navigating to the homepage, because the visitor is already on it!
-- MANDATORY CLICKABLE LINKS: EVERY single project name, portfolio item, service, or product mentioned in your response MUST be formatted as a clickable link badge: [Project Name](url).
-- NEVER output plain text project names in quotes (e.g. NEVER write '"AESHUT"' or '"Lusion Studio"' without brackets and URLs). ALWAYS write '[AESHUT](url)' or '[Lusion Studio](url)'.
-- ALWAYS format clickable links with CLEAN, SHORT TITLES: [Clean Title](url) e.g. [CareerPilot](https://abidnirob.com/projects/careerpilot) or [All Projects](https://abidnirob.com/projects).
-- NEVER put raw URLs, domain names, or full sentences inside the link brackets (e.g. NEVER write "[Explore All Projects - abidnirob.com/projects](url)").`;
+- MANDATORY CLICKABLE LINKS: EVERY single project name, portfolio item, service, or product mentioned in your response MUST be formatted as a clickable link badge: [Product / Project Name](url).
+- HARD BAN ON RAW DATABASE OBJECT IDS OR HOSTNAMES AS LINK TITLES: NEVER write link titles containing hexadecimal database IDs (e.g. NEVER write "[691f478fccec252c64981b47](url)") or raw domain strings (e.g. NEVER write "[everwear-frontend](url)").
+- ALWAYS format clickable links with CLEAN, HUMAN-READABLE PRODUCT OR PAGE TITLES e.g. [Electronic Plastic Table ($600)](url), [Generic Steel Pants ($987)](url), or [View Collection](url).`;
+    const addCartInstruction = `DIRECT ADD TO CART & VARIANT INQUIRY (CRITICAL RULE):
+- When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo"):
+  1. CHECK IF THE PRODUCT HAS VARIANTS/OPTIONS (e.g., Sizes like S, M, L, XL or Colors like Red, Black):
+     - If the user HAS NOT specified their size or color yet: YOU MUST ASK THEM for their preferred size/color (e.g. "We have sizes S, M, and L available. Which one would you prefer?").
+     - Also append the cart action tag with the productId so the storefront widget can display the variant picker modal if the user prefers clicking.
+  2. Once the user specifies their size or color (e.g. "L size", "Black color"), match it to the corresponding variant ID and append:
+     \`\`\`json:cart_action
+     { "productId": "<PRODUCT_ID>", "variantId": "<VARIANT_ID>", "quantity": 1, "selectedOptions": { "Size": "<SIZE>", "Color": "<COLOR>" } }
+     \`\`\`
+     or tag: [ADD_TO_CART: productId, variantId]
+  3. If the product has NO variants/options: immediately append:
+     \`\`\`json:cart_action
+     { "productId": "<PRODUCT_ID>", "quantity": 1 }
+     \`\`\`
+     or tag: [ADD_TO_CART: productId]
+- NEVER tell the user to visit a website page manually to add to cart; ALWAYS trigger the cart action tag!`;
     const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (STRICT RULE):
 - You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "Amader", "Amra").
 - HARD BAN ON THIRD-PERSON WORDS: NEVER use third-person words ("Tara", "Tader", "They", "Their", "Them", "${merchantName}'s team", "dekha jay").
@@ -189,12 +201,13 @@ Strict Rules:
 3. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
 4. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
 5. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
-6. ${tokenEfficiencyRule}
-7. ${scopeLockRule}
-8. LANGUAGE & SCRIPT MATCHING: ${langRule}
-9. FORMATTING RULE: ${formatRule}
-10. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
-${cartRule ? `11. CART ACTION RULE: ${cartRule}` : ''}`.trim();
+6. DIRECT ADD TO CART: ${addCartInstruction}
+7. ${tokenEfficiencyRule}
+8. ${scopeLockRule}
+9. LANGUAGE & SCRIPT MATCHING: ${langRule}
+10. FORMATTING RULE: ${formatRule}
+11. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
+${cartRule ? `12. MERCHANT CUSTOM CART RULE: ${cartRule}` : ''}`.trim();
 }
 async function processChatMessage(merchantId, sessionId, userMessage, botMode = 'shopping', provider, customPrompt, template, imageUrl) {
     // Enforce strict 250 character limit on all prompts
@@ -471,7 +484,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
             selectedProvider = 'groq';
         }
     }
-    // Attempt 2: High-Speed Groq Pool (llama-3.3-70b-versatile / llama-3.2-11b-vision-preview)
+    // Attempt 2: High-Speed Groq Pool (llama3-70b-8192 / llama-3.2-11b-vision-preview)
     if (!executionSuccess && (selectedProvider === 'groq' || keyRotator_1.keyRotator.hasGroqKeys())) {
         try {
             const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
@@ -559,20 +572,68 @@ Currently, no specific catalog items or knowledge base articles matched this que
             finalReply = finalReply.substring(0, lastPunctIndex + 1).trim();
         }
     }
-    const cartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)\]/);
-    if (cartMatch) {
+    // 1. Check for ```json:cart_action ... ``` or raw cart json
+    const jsonCartMatch = finalReply.match(/```json:cart_action\s*([\s\S]*?)\s*```/i) || finalReply.match(/\{[\s\S]*?"productId"\s*:\s*"([^"]+)"[\s\S]*?\}/i);
+    const tagCartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)(?:,\s*([a-zA-Z0-9_-]+))?\]/i);
+    if (jsonCartMatch || tagCartMatch) {
         try {
-            const productId = cartMatch[1];
-            const res = await (0, addToCart_tool_1.addToCartTool)(merchantId, productId, 1);
-            if (res.cartAction)
-                cartAction = res.cartAction;
-            if (res.product)
-                recommendedProducts.push(res.product);
-            // Strip the tag from the user-facing reply text
-            finalReply = finalReply.replace(/\[ADD_TO_CART:\s*[a-zA-Z0-9_-]+\]/, '').trim();
+            let targetProdId = '';
+            let targetVariantId = undefined;
+            let targetOptions = undefined;
+            let targetQty = 1;
+            if (jsonCartMatch) {
+                if (jsonCartMatch[1] && jsonCartMatch[1].startsWith('{')) {
+                    const parsed = JSON.parse(jsonCartMatch[1]);
+                    targetProdId = parsed.productId || parsed.id || '';
+                    targetVariantId = parsed.variantId;
+                    targetOptions = parsed.selectedOptions || parsed.options;
+                    targetQty = parsed.quantity || 1;
+                }
+                else if (jsonCartMatch[1]) {
+                    targetProdId = jsonCartMatch[1].trim();
+                }
+                finalReply = finalReply.replace(/```json:cart_action[\s\S]*?```/gi, '').trim();
+            }
+            else if (tagCartMatch) {
+                targetProdId = tagCartMatch[1];
+                if (tagCartMatch[2]) {
+                    targetVariantId = tagCartMatch[2];
+                }
+                finalReply = finalReply.replace(/\[ADD_TO_CART:\s*[a-zA-Z0-9_-]+(?:,\s*[a-zA-Z0-9_-]+)?\]/gi, '').trim();
+            }
+            if (targetProdId) {
+                const res = await (0, addToCart_tool_1.addToCartTool)(merchantId, targetProdId, targetQty, targetVariantId, targetOptions);
+                if (res.cartAction)
+                    cartAction = res.cartAction;
+                if (res.product)
+                    recommendedProducts.push(res.product);
+            }
         }
         catch (err) {
             logger_1.logger.error('Parsing Add to Cart Tag Error:', err);
+        }
+    }
+    // Fail-safe: If LLM did not output a tag, but user expressed intent to add to cart
+    const isAddCartIntent = /\b(add\s*to\s*cart|cart\s*e\s*kore?\s*da?w?|cart\s*e\s*da?w?|kinte\s*chai|kina\s*chai|buy\s*this|add\s*it|cart\s*e|kine\s*da?w?)\b/i.test(userMessage);
+    if (!cartAction && isAddCartIntent) {
+        try {
+            let matchedProd = retrievedProducts[0] || recommendedProducts[0];
+            if (!matchedProd) {
+                const prodsInDb = await db_1.prisma.product.findMany({ where: { merchantId }, take: 5 });
+                const userMsgLower = userMessage.toLowerCase();
+                matchedProd = prodsInDb.find((p) => userMsgLower.includes(p.title.toLowerCase()) || p.title.toLowerCase().split(' ').some((w) => w.length > 3 && userMsgLower.includes(w))) || prodsInDb[0];
+            }
+            if (matchedProd) {
+                const res = await (0, addToCart_tool_1.addToCartTool)(merchantId, matchedProd.id, 1);
+                if (res.cartAction)
+                    cartAction = res.cartAction;
+                if (res.product && !recommendedProducts.some((p) => p.id === res.product.id)) {
+                    recommendedProducts.push(res.product);
+                }
+            }
+        }
+        catch (err) {
+            logger_1.logger.error('Fail-safe Add to Cart Error:', err);
         }
     }
     // Bind retrieved RAG products to the assistant response metadata

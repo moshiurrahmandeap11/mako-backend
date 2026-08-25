@@ -5,7 +5,7 @@ const jsx_runtime_1 = require("preact/jsx-runtime");
 const hooks_1 = require("preact/hooks");
 const cartBridge_1 = require("./cartBridge");
 // Crisp Vector SVGs (No Emojis)
-const BotMascotSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "32", height: "32", viewBox: "0 0 32 32", fill: "none", style: { flexShrink: 0 }, children: [(0, jsx_runtime_1.jsx)("rect", { width: "32", height: "32", rx: "10", fill: "#f0fdf4" }), (0, jsx_runtime_1.jsx)("path", { d: "M16 5V8", stroke: "#10b981", strokeWidth: "2", strokeLinecap: "round" }), (0, jsx_runtime_1.jsx)("circle", { cx: "16", cy: "4", r: "1.5", fill: "#10b981" }), (0, jsx_runtime_1.jsx)("rect", { x: "7", y: "8", width: "18", height: "15", rx: "5", fill: "#0f172a" }), (0, jsx_runtime_1.jsx)("circle", { cx: "12", cy: "15", r: "2", fill: "#10b981" }), (0, jsx_runtime_1.jsx)("circle", { cx: "20", cy: "15", r: "2", fill: "#10b981" }), (0, jsx_runtime_1.jsx)("path", { d: "M13.5 19C14.2 19.8 15 20.2 16 20.2C17 20.2 17.8 19.8 18.5 19", stroke: "#ffffff", strokeWidth: "1.5", strokeLinecap: "round" }), (0, jsx_runtime_1.jsx)("path", { d: "M5 14C5 13 5.8 12.2 6.8 12.2V17.8C5.8 17.8 5 17 5 16V14Z", fill: "#0f172a" }), (0, jsx_runtime_1.jsx)("path", { d: "M27 14C27 13 26.2 12.2 25.2 12.2V17.8C26.2 17.8 27 17 27 16V14Z", fill: "#0f172a" })] }));
+const BotMascotSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "32", height: "32", viewBox: "0 0 32 32", fill: "none", style: { flexShrink: 0 }, children: [(0, jsx_runtime_1.jsx)("rect", { width: "32", height: "32", rx: "10", fill: "#E8F8F0" }), (0, jsx_runtime_1.jsx)("path", { d: "M16 5V8", stroke: "#1DBF73", strokeWidth: "2", strokeLinecap: "round" }), (0, jsx_runtime_1.jsx)("circle", { cx: "16", cy: "4", r: "1.5", fill: "#1DBF73" }), (0, jsx_runtime_1.jsx)("rect", { x: "7", y: "8", width: "18", height: "15", rx: "5", fill: "#0f172a" }), (0, jsx_runtime_1.jsx)("circle", { cx: "12", cy: "15", r: "2", fill: "#1DBF73" }), (0, jsx_runtime_1.jsx)("circle", { cx: "20", cy: "15", r: "2", fill: "#1DBF73" }), (0, jsx_runtime_1.jsx)("path", { d: "M13.5 19C14.2 19.8 15 20.2 16 20.2C17 20.2 17.8 19.8 18.5 19", stroke: "#ffffff", strokeWidth: "1.5", strokeLinecap: "round" }), (0, jsx_runtime_1.jsx)("path", { d: "M5 14C5 13 5.8 12.2 6.8 12.2V17.8C5.8 17.8 5 17 5 16V14Z", fill: "#0f172a" }), (0, jsx_runtime_1.jsx)("path", { d: "M27 14C27 13 26.2 12.2 25.2 12.2V17.8C26.2 17.8 27 17 27 16V14Z", fill: "#0f172a" })] }));
 const BrainSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("path", { d: "M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z" }), (0, jsx_runtime_1.jsx)("path", { d: "M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z" })] }));
 const CloseSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), (0, jsx_runtime_1.jsx)("line", { x1: "6", y1: "6", x2: "18", y2: "18" })] }));
 const RefreshSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [(0, jsx_runtime_1.jsx)("polyline", { points: "23 4 23 10 17 10" }), (0, jsx_runtime_1.jsx)("polyline", { points: "1 20 1 14 7 14" }), (0, jsx_runtime_1.jsx)("path", { d: "M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" })] }));
@@ -14,6 +14,7 @@ const ChevronDownSvg = () => ((0, jsx_runtime_1.jsx)("svg", { width: "22", heigh
 const BriefcaseSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: [(0, jsx_runtime_1.jsx)("rect", { x: "2", y: "7", width: "20", height: "14", rx: "2", ry: "2" }), (0, jsx_runtime_1.jsx)("path", { d: "M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" })] }));
 const ToolsSvg = () => ((0, jsx_runtime_1.jsx)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: (0, jsx_runtime_1.jsx)("path", { d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" }) }));
 const MailSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: [(0, jsx_runtime_1.jsx)("path", { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }), (0, jsx_runtime_1.jsx)("polyline", { points: "22,6 12,13 2,6" })] }));
+const MessageSquareSvg = () => ((0, jsx_runtime_1.jsx)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: (0, jsx_runtime_1.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }) }));
 function renderMarkdownText(text) {
     if (!text)
         return null;
@@ -37,8 +38,26 @@ function renderMarkdownText(text) {
             parts.push(clean.substring(lastIndex, match.index));
         }
         if (match[1] && match[2]) {
-            const linkTitle = match[1];
+            let linkTitle = match[1].trim();
             const linkUrl = match[2];
+            // Fix Problem 2: If link title is a raw MongoDB/Prisma object ID or hostname domain, replace with clean title
+            if (/^[a-f0-9]{24}$/i.test(linkTitle) || linkTitle.endsWith('-frontend') || linkTitle.includes('vercel.app')) {
+                try {
+                    const u = new URL(linkUrl);
+                    if (u.pathname && (u.pathname.includes('/products/') || u.pathname.includes('/product/'))) {
+                        linkTitle = 'View Product';
+                    }
+                    else if (u.pathname && (u.pathname.includes('/collection') || u.pathname.includes('/category'))) {
+                        linkTitle = 'View Collection';
+                    }
+                    else {
+                        linkTitle = 'View Item';
+                    }
+                }
+                catch {
+                    linkTitle = 'View Item';
+                }
+            }
             parts.push((0, jsx_runtime_1.jsxs)("a", { href: linkUrl, target: "_blank", rel: "noopener noreferrer", style: {
                     color: '#0284c7',
                     backgroundColor: '#f0f9ff',
@@ -131,7 +150,7 @@ function ChatWidget({ api }) {
     const [isOpeningSkeleton, setIsOpeningSkeleton] = (0, hooks_1.useState)(false);
     const [isMobile, setIsMobile] = (0, hooks_1.useState)(typeof window !== 'undefined' ? window.innerWidth <= 640 : false);
     const [config, setConfig] = (0, hooks_1.useState)({
-        primaryColor: '#0f172a',
+        primaryColor: '#1DBF73',
         greetingMessage: 'Hi there! How can I help today?',
         botName: 'AI Assistant',
         position: 'bottom-right',
@@ -145,6 +164,15 @@ function ChatWidget({ api }) {
     const [inputValue, setInputValue] = (0, hooks_1.useState)('');
     const [isLoading, setIsLoading] = (0, hooks_1.useState)(false);
     const [thinkingPhase, setThinkingPhase] = (0, hooks_1.useState)(0);
+    // Variant Options Selection Modal state
+    const [modalProduct, setModalProduct] = (0, hooks_1.useState)(null);
+    const [selectedOptionsState, setSelectedOptionsState] = (0, hooks_1.useState)({});
+    const [modalQuantity, setModalQuantity] = (0, hooks_1.useState)(1);
+    const [toastMsg, setToastMsg] = (0, hooks_1.useState)(null);
+    const showToast = (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(null), 3000);
+    };
     const messagesContainerRef = (0, hooks_1.useRef)(null);
     const messagesEndRef = (0, hooks_1.useRef)(null);
     const scrollToBottom = (smooth = true) => {
@@ -360,8 +388,34 @@ function ChatWidget({ api }) {
         setIsLoading(true);
         try {
             const res = await api.sendMessage(sessionId, text);
-            if (res.cartAction && config.eventBridgeEnabled) {
-                (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity);
+            if (res.cartAction) {
+                const actionProdId = res.cartAction.productId;
+                const targetProd = (res.products || []).find((p) => p.id === actionProdId || p.externalId === actionProdId) || {
+                    id: actionProdId,
+                    title: 'Selected Item',
+                    price: 0,
+                    currency: 'USD',
+                    productUrl: '#',
+                    inStock: true,
+                    options: res.cartAction.options,
+                    variants: res.cartAction.variants,
+                };
+                if (targetProd.options && targetProd.options.length > 0 && !res.cartAction.variantId) {
+                    const defaultOpts = {};
+                    targetProd.options.forEach((opt) => {
+                        if (opt.values && opt.values.length > 0) {
+                            defaultOpts[opt.name] = opt.values[0];
+                        }
+                    });
+                    setSelectedOptionsState(defaultOpts);
+                    setModalQuantity(res.cartAction.quantity || 1);
+                    setModalProduct(targetProd);
+                }
+                else {
+                    (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, targetProd.productUrl).then((result) => {
+                        showToast(result.message || 'Added to cart!');
+                    });
+                }
             }
             const botMsg = {
                 id: `bot_${Date.now()}`,
@@ -477,11 +531,11 @@ function ChatWidget({ api }) {
                     maxHeight: isMobile ? '100dvh' : 'calc(100vh - 120px)',
                     backgroundColor: '#ffffff',
                     borderRadius: isMobile ? '0px' : '24px',
-                    boxShadow: '0 30px 65px -12px rgba(15, 23, 42, 0.35), 0 14px 28px -6px rgba(15, 23, 42, 0.2), 0 0 0 1.5px rgba(15, 23, 42, 0.08)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
-                    border: isMobile ? 'none' : '1.5px solid #cbd5e1',
+                    border: isMobile ? 'none' : '1px solid #E4E5E7',
                     transform: isMobile
                         ? 'none'
                         : (windowOffset.x !== 0 || windowOffset.y !== 0 ? `translate3d(${windowOffset.x}px, ${windowOffset.y}px, 0)` : 'none'),
@@ -515,7 +569,7 @@ function ChatWidget({ api }) {
                             didDragRef.current = false;
                             setIsDragging(true);
                         }, style: {
-                            backgroundColor: '#ffffff',
+                            backgroundColor: config.headerBgColor || '#ffffff',
                             padding: '18px 20px',
                             display: 'flex',
                             alignItems: 'center',
@@ -524,7 +578,7 @@ function ChatWidget({ api }) {
                             userSelect: 'none',
                             borderBottom: '1.5px solid #f1f5f9',
                             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-                        }, title: "Click and drag to move chat window", children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '12px' }, children: [(0, jsx_runtime_1.jsx)(BotMascotSvg, {}), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: { margin: 0, fontSize: '15px', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.2px' }, children: config.botName || 'Shop Assistant' }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '12px', color: '#64748b', display: 'block', marginTop: '1px' }, children: "The team can also help" })] })] }), (0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' }, children: [(0, jsx_runtime_1.jsx)("button", { onClick: handleResetSession, title: "Restart chat", style: {
+                        }, title: "Click and drag to move chat window", children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '12px' }, children: [(0, jsx_runtime_1.jsx)(BotMascotSvg, {}), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: { margin: 0, fontSize: '15px', fontWeight: '700', color: config.headerTextColor || '#0f172a', letterSpacing: '-0.2px' }, children: config.botName || 'AI Assistant' }), (0, jsx_runtime_1.jsx)("span", { style: { fontSize: '12px', color: config.headerTextColor ? `${config.headerTextColor}CC` : '#64748b', display: 'block', marginTop: '1px' }, children: "The team can also help" })] })] }), (0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' }, children: [(0, jsx_runtime_1.jsx)("button", { onClick: handleResetSession, title: "Restart chat", style: {
                                             background: '#f8fafc',
                                             border: '1.5px solid #e2e8f0',
                                             borderRadius: '50%',
@@ -607,14 +661,16 @@ function ChatWidget({ api }) {
                                             lineHeight: '1.5',
                                             fontWeight: '450',
                                             border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
-                                        }, children: (0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === 'bot', shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) }) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'Shop Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }, children: [
-                                            { label: 'View Projects', icon: (0, jsx_runtime_1.jsx)(BriefcaseSvg, {}), query: 'Show me your portfolio projects' },
-                                            { label: 'Our Services', icon: (0, jsx_runtime_1.jsx)(ToolsSvg, {}), query: 'What services do you provide?' },
-                                            { label: 'Contact Info', icon: (0, jsx_runtime_1.jsx)(MailSvg, {}), query: 'How can I contact you?' },
-                                        ].map((chip, i) => ((0, jsx_runtime_1.jsxs)("button", { type: "button", onClick: () => handleSend(chip.query), style: {
+                                        }, children: (0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === 'bot', shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) }) }), msg.sender === 'bot' && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '5px', paddingLeft: '4px' }, children: [config.botName || 'AI Assistant', " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === 'user' && ((0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11px', color: '#94a3b8', marginTop: '4px', paddingRight: '4px' }, children: msg.time }))] }, msg.id))), messages.length <= 1 && !isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', maxWidth: '100%' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '11.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', paddingLeft: '2px' }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }, children: (config.suggestionChips && config.suggestionChips.length > 0
+                                            ? config.suggestionChips.map((text) => ({ label: text, query: text }))
+                                            : [
+                                                { label: 'View Projects', query: 'Show me your portfolio projects' },
+                                                { label: 'Our Services', query: 'What services do you provide?' },
+                                                { label: 'Contact Info', query: 'How can I contact you?' },
+                                            ]).map((chip, i) => ((0, jsx_runtime_1.jsxs)("button", { type: "button", onClick: () => handleSend(chip.query), style: {
                                                 backgroundColor: '#ffffff',
                                                 color: '#0f172a',
-                                                border: '1.5px solid #a7f3d0',
+                                                border: '1.5px solid rgba(29, 191, 115, 0.3)',
                                                 borderRadius: '16px',
                                                 padding: '8px 14px',
                                                 fontSize: '12.5px',
@@ -624,19 +680,19 @@ function ChatWidget({ api }) {
                                                 alignItems: 'center',
                                                 gap: '6px',
                                                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                                                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.06)',
+                                                boxShadow: '0 2px 4px rgba(29, 191, 115, 0.06)',
                                                 userSelect: 'none',
                                             }, onMouseEnter: (e) => {
-                                                e.currentTarget.style.backgroundColor = '#f0fdf4';
-                                                e.currentTarget.style.borderColor = '#10b981';
+                                                e.currentTarget.style.backgroundColor = '#E8F8F0';
+                                                e.currentTarget.style.borderColor = '#1DBF73';
                                                 e.currentTarget.style.transform = 'translateY(-1px)';
-                                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.18)';
+                                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(29, 191, 115, 0.18)';
                                             }, onMouseLeave: (e) => {
                                                 e.currentTarget.style.backgroundColor = '#ffffff';
-                                                e.currentTarget.style.borderColor = '#a7f3d0';
+                                                e.currentTarget.style.borderColor = 'rgba(29, 191, 115, 0.3)';
                                                 e.currentTarget.style.transform = 'none';
-                                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.06)';
-                                            }, children: [chip.icon, (0, jsx_runtime_1.jsx)("span", { children: chip.label })] }, i))) })] })), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(29, 191, 115, 0.06)';
+                                            }, children: [(0, jsx_runtime_1.jsx)(MessageSquareSvg, {}), (0, jsx_runtime_1.jsx)("span", { children: chip.label })] }, i))) })] })), isLoading && ((0, jsx_runtime_1.jsxs)("div", { style: {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '8px',
@@ -676,7 +732,7 @@ function ChatWidget({ api }) {
                                             fontSize: '14px',
                                             outline: 'none',
                                         } }), inputValue.length >= 200 && ((0, jsx_runtime_1.jsxs)("span", { style: { fontSize: '10.5px', color: inputValue.length >= 240 ? '#ef4444' : '#64748b', fontWeight: '600', paddingRight: '4px' }, children: [inputValue.length, "/250"] })), (0, jsx_runtime_1.jsx)("button", { type: "submit", disabled: !inputValue.trim() || isLoading, title: "Send message", style: {
-                                            backgroundColor: inputValue.trim() ? '#00684a' : '#cbd5e1',
+                                            backgroundColor: inputValue.trim() ? (primaryColor || '#1DBF73') : '#cbd5e1',
                                             color: '#ffffff',
                                             border: 'none',
                                             borderRadius: '50%',
@@ -694,7 +750,83 @@ function ChatWidget({ api }) {
                                     color: '#94a3b8',
                                     letterSpacing: '0.2px',
                                     marginTop: '2px',
-                                }, children: ["Powered by ", (0, jsx_runtime_1.jsx)("strong", { style: { color: '#64748b', fontWeight: '600' }, children: "Labto AI" })] }))] })] })), (0, jsx_runtime_1.jsxs)("button", { onMouseDown: (e) => {
+                                }, children: ["Powered by ", (0, jsx_runtime_1.jsx)("strong", { style: { color: '#64748b', fontWeight: '600' }, children: "Labto AI" })] }))] }), toastMsg && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                            position: 'absolute',
+                            top: '64px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            backgroundColor: '#0f172a',
+                            color: '#ffffff',
+                            padding: '8px 16px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)',
+                            zIndex: 99999,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            animation: 'fadeIn 0.2s ease',
+                        }, children: [(0, jsx_runtime_1.jsx)("span", { children: "\u2713" }), (0, jsx_runtime_1.jsx)("span", { children: toastMsg })] })), modalProduct && ((0, jsx_runtime_1.jsx)("div", { style: {
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                            backdropFilter: 'blur(4px)',
+                            zIndex: 9999,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '16px',
+                        }, children: (0, jsx_runtime_1.jsxs)("div", { style: {
+                                backgroundColor: '#ffffff',
+                                borderRadius: '16px',
+                                padding: '20px',
+                                maxWidth: '310px',
+                                width: '100%',
+                                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
+                                border: '1px solid #e2e8f0',
+                            }, children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }, children: [(0, jsx_runtime_1.jsx)("h4", { style: { margin: 0, fontSize: '14px', fontWeight: '700', color: '#0f172a' }, children: "Select Product Options" }), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setModalProduct(null), style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '16px', fontWeight: '700' }, children: "\u2715" })] }), (0, jsx_runtime_1.jsxs)("div", { style: { marginBottom: '14px', fontSize: '12.5px', color: '#334155' }, children: [(0, jsx_runtime_1.jsx)("div", { style: { fontWeight: '600', color: '#0f172a' }, children: modalProduct.title }), modalProduct.price > 0 && ((0, jsx_runtime_1.jsxs)("div", { style: { fontSize: '13px', fontWeight: '700', color: primaryColor, marginTop: '2px' }, children: ["$", modalProduct.price, " ", modalProduct.currency || 'USD'] }))] }), (modalProduct.options || [
+                                    { name: 'Color', values: ['Black', 'White', 'Navy'] },
+                                    { name: 'Size', values: ['S', 'M', 'L', 'XL'] },
+                                ]).map((opt) => ((0, jsx_runtime_1.jsxs)("div", { style: { marginBottom: '12px' }, children: [(0, jsx_runtime_1.jsxs)("label", { style: { display: 'block', fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }, children: [opt.name, ": ", (0, jsx_runtime_1.jsx)("span", { style: { color: '#0f172a', textTransform: 'none' }, children: selectedOptionsState[opt.name] })] }), (0, jsx_runtime_1.jsx)("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }, children: opt.values.map((val) => {
+                                                const isSelected = selectedOptionsState[opt.name] === val;
+                                                return ((0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setSelectedOptionsState((prev) => ({ ...prev, [opt.name]: val })), style: {
+                                                        padding: '5px 12px',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '600',
+                                                        cursor: 'pointer',
+                                                        border: isSelected ? `2px solid ${primaryColor}` : '1px solid #cbd5e1',
+                                                        backgroundColor: isSelected ? `${primaryColor}15` : '#ffffff',
+                                                        color: isSelected ? primaryColor : '#334155',
+                                                        transition: 'all 0.15s ease',
+                                                    }, children: val }, val));
+                                            }) })] }, opt.name))), (0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', marginBottom: '16px' }, children: [(0, jsx_runtime_1.jsx)("span", { style: { fontSize: '12px', fontWeight: '600', color: '#64748b' }, children: "Quantity:" }), (0, jsx_runtime_1.jsxs)("div", { style: { display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }, children: [(0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setModalQuantity((q) => Math.max(1, q - 1)), style: { width: '28px', height: '28px', border: 'none', backgroundColor: '#f8fafc', cursor: 'pointer', fontWeight: 'bold' }, children: "-" }), (0, jsx_runtime_1.jsx)("span", { style: { padding: '0 10px', fontSize: '12px', fontWeight: '600' }, children: modalQuantity }), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setModalQuantity((q) => q + 1), style: { width: '28px', height: '28px', border: 'none', backgroundColor: '#f8fafc', cursor: 'pointer', fontWeight: 'bold' }, children: "+" })] })] }), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => {
+                                        const selectedVariant = modalProduct.variants?.find((v) => {
+                                            if (!v.options)
+                                                return false;
+                                            return Object.entries(selectedOptionsState).every(([k, val]) => String(v.options?.[k]).toLowerCase() === String(val).toLowerCase());
+                                        });
+                                        (0, cartBridge_1.requestAddToCart)(modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState, modalProduct.productUrl).then((res) => {
+                                            showToast(res.message || `Added '${modalProduct.title}' to cart!`);
+                                        });
+                                        setModalProduct(null);
+                                    }, style: {
+                                        width: '100%',
+                                        padding: '10px',
+                                        backgroundColor: primaryColor,
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '10px',
+                                        fontWeight: '700',
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 12px rgba(29, 191, 115, 0.25)',
+                                    }, children: "Confirm & Add to Cart" })] }) }))] })), (0, jsx_runtime_1.jsxs)("button", { onMouseDown: (e) => {
                     dragStartRef.current = {
                         clientX: e.clientX,
                         clientY: e.clientY,
@@ -729,11 +861,11 @@ function ChatWidget({ api }) {
                     width: '60px',
                     height: '60px',
                     borderRadius: '50%',
-                    backgroundColor: isOpen ? '#00684a' : primaryColor,
-                    color: '#ffffff',
+                    backgroundColor: isOpen ? '#14844E' : (config.launcherBgColor || primaryColor || '#1DBF73'),
+                    color: config.launcherIconColor || '#ffffff',
                     border: '2px solid rgba(255, 255, 255, 0.25)',
                     cursor: isDragging ? 'grabbing' : 'pointer',
-                    boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.38), 0 6px 16px -2px rgba(0, 0, 0, 0.22)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -747,9 +879,9 @@ function ChatWidget({ api }) {
                             right: '2px',
                             width: '14px',
                             height: '14px',
-                            backgroundColor: '#10b981',
+                            backgroundColor: '#1DBF73',
                             borderRadius: '50%',
                             border: '2.5px solid #ffffff',
-                            boxShadow: '0 0 8px rgba(16, 185, 129, 0.85)',
+                            boxShadow: '0 0 8px rgba(29, 191, 115, 0.85)',
                         } })), isOpen ? ((0, jsx_runtime_1.jsx)(ChevronDownSvg, {})) : ((0, jsx_runtime_1.jsx)("svg", { width: "26", height: "26", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round", children: (0, jsx_runtime_1.jsx)("path", { d: "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" }) }))] })] }));
 }

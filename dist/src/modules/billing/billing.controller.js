@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createCheckoutSession = createCheckoutSession;
 exports.createPortalSession = createPortalSession;
@@ -6,17 +9,13 @@ exports.handleWebhook = handleWebhook;
 exports.verifyCheckout = verifyCheckout;
 exports.getInvoices = getInvoices;
 exports.downloadInvoice = downloadInvoice;
+const crypto_1 = __importDefault(require("crypto"));
 const db_1 = require("../../config/db");
 const polar_1 = require("../../utils/polar");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../utils/logger");
 const authenticateDashboard_1 = require("../../middleware/authenticateDashboard");
-const TIER_MESSAGE_LIMITS = {
-    FREE: 100,
-    STARTER: 500,
-    PRO: 1200,
-    ENTERPRISE: 999999,
-};
+const pricing_1 = require("../../config/pricing");
 async function createCheckoutSession(req, res) {
     try {
         const merchantId = req.merchant?.id;
@@ -72,18 +71,100 @@ async function createPortalSession(req, res) {
             where: { id: merchantId },
         });
         if (!merchant) {
-            res.status(404).json({ error: 'Merchant not found.' });
+            res.status(404).json({ error: 'Merchant account not found.' });
             return;
         }
-        // Polar Customer Portal URL
-        const portalUrl = env_1.env.POLAR_SERVER === 'sandbox'
-            ? 'https://sandbox.polar.sh/purchases'
-            : 'https://polar.sh/purchases';
-        res.json({ url: portalUrl });
+        let customerPortalUrl = '';
+        // 1. Try customerId from database
+        if (merchant.stripeCustomerId) {
+            try {
+                const session = await polar_1.polar.customerSessions.create({
+                    customerId: merchant.stripeCustomerId,
+                });
+                if (session && session.customerPortalUrl) {
+                    customerPortalUrl = session.customerPortalUrl;
+                }
+            }
+            catch (err) {
+                logger_1.logger.warn(`Polar customer session error for customerId ${merchant.stripeCustomerId}: ${err.message}`);
+            }
+        }
+        // 2. If not found by customerId, lookup customer by email
+        if (!customerPortalUrl && merchant.email) {
+            try {
+                const customersList = await polar_1.polar.customers.list({
+                    email: merchant.email,
+                    limit: 1,
+                });
+                const items = customersList.result?.items || customersList.items || [];
+                const customer = items[0];
+                if (customer?.id) {
+                    const session = await polar_1.polar.customerSessions.create({
+                        customerId: customer.id,
+                    });
+                    if (session && session.customerPortalUrl) {
+                        customerPortalUrl = session.customerPortalUrl;
+                        await db_1.prisma.user.update({
+                            where: { id: merchant.id },
+                            data: { stripeCustomerId: customer.id },
+                        });
+                    }
+                }
+            }
+            catch (err) {
+                logger_1.logger.warn(`Polar customer lookup error for email ${merchant.email}: ${err.message}`);
+            }
+        }
+        // 3. Direct customer portal link fallback
+        if (!customerPortalUrl) {
+            customerPortalUrl =
+                env_1.env.POLAR_SERVER === 'sandbox'
+                    ? 'https://sandbox.polar.sh/purchases'
+                    : 'https://polar.sh/purchases';
+        }
+        logger_1.logger.info(`Polar: Generated billing portal session URL for merchant ${merchant.email}: ${customerPortalUrl}`);
+        res.json({ url: customerPortalUrl });
     }
     catch (error) {
         logger_1.logger.error('Error creating Polar billing portal session:', error);
-        res.status(500).json({ error: 'Failed to access billing portal.' });
+        res.status(500).json({ error: error.message || 'Failed to access billing portal.' });
+    }
+}
+function verifyPolarWebhookSignature(req, rawBody) {
+    if (!env_1.env.POLAR_WEBHOOK_SECRET) {
+        logger_1.logger.warn('POLAR_WEBHOOK_SECRET not set; skipping webhook HMAC signature check in dev mode.');
+        return true;
+    }
+    const webhookId = req.headers['webhook-id'];
+    const webhookTimestamp = req.headers['webhook-timestamp'];
+    const webhookSignature = req.headers['webhook-signature'];
+    if (!webhookSignature) {
+        logger_1.logger.warn('Missing webhook-signature header on Polar webhook.');
+        return false;
+    }
+    try {
+        const secret = env_1.env.POLAR_WEBHOOK_SECRET.startsWith('whsec_')
+            ? env_1.env.POLAR_WEBHOOK_SECRET.substring(6)
+            : env_1.env.POLAR_WEBHOOK_SECRET;
+        // Standard Webhook HMAC signature format
+        const bodyStr = Buffer.isBuffer(rawBody) ? rawBody.toString('utf-8') : String(rawBody);
+        const toSign = webhookId && webhookTimestamp ? `${webhookId}.${webhookTimestamp}.${bodyStr}` : bodyStr;
+        const hmac = crypto_1.default.createHmac('sha256', secret).update(toSign).digest('hex');
+        const base64Hmac = crypto_1.default.createHmac('sha256', secret).update(toSign).digest('base64');
+        const signatureParts = webhookSignature.split(' ');
+        for (const part of signatureParts) {
+            const [version, sig] = part.split(',');
+            const actualSig = sig || version;
+            if (actualSig === hmac || actualSig === `v1,${hmac}` || actualSig === base64Hmac || actualSig === `v1,${base64Hmac}`) {
+                return true;
+            }
+        }
+        // Direct match check
+        return webhookSignature.includes(hmac) || webhookSignature.includes(base64Hmac);
+    }
+    catch (err) {
+        logger_1.logger.error('Error validating Polar webhook signature:', err);
+        return false;
     }
 }
 async function handleWebhook(req, res) {
@@ -103,6 +184,14 @@ async function handleWebhook(req, res) {
             logger_1.logger.warn('Polar Webhook received with invalid structure or empty event.');
             res.status(400).json({ error: 'Invalid webhook payload structure.' });
             return;
+        }
+        if (process.env.NODE_ENV === 'production' && env_1.env.POLAR_WEBHOOK_SECRET) {
+            const isValid = verifyPolarWebhookSignature(req, rawBody);
+            if (!isValid) {
+                logger_1.logger.error('Invalid Polar Webhook HMAC signature. Rejecting unauthorized request.');
+                res.status(401).json({ error: 'Invalid webhook signature.' });
+                return;
+            }
         }
         logger_1.logger.info(`📢 Polar Webhook received: [${event.type}]`);
         const data = event.data || {};
@@ -138,18 +227,19 @@ async function handleWebhook(req, res) {
                         break;
                     }
                     const targetTier = resolvedTier !== 'FREE' ? resolvedTier : metadata.tier || 'STARTER';
-                    const newLimit = TIER_MESSAGE_LIMITS[targetTier] || 500;
+                    const plan = (0, pricing_1.getPlanConfig)(targetTier);
                     await db_1.prisma.user.update({
                         where: { id: merchant.id },
                         data: {
                             planTier: targetTier,
                             subscriptionStatus: 'active',
+                            subscriptionStart: new Date(),
                             stripeCustomerId: customerId || merchant.stripeCustomerId,
                             stripeSubscriptionId: data.id || merchant.stripeSubscriptionId,
                         },
                     });
                     (0, authenticateDashboard_1.clearPlanTierCache)(merchant.id);
-                    logger_1.logger.info(`🎉 Polar Webhook Success: Activated Tier [${targetTier}] for Merchant [${merchant.email}] (${newLimit} msgs/mo)`);
+                    logger_1.logger.info(`🎉 Polar Webhook Success: Activated Tier [${targetTier}] for Merchant [${merchant.email}] (${plan.monthlyCredits.toLocaleString()} credits/mo with rollover)`);
                 }
                 else {
                     logger_1.logger.warn(`Polar Webhook: Could not find merchant for email: ${customerEmail} / merchantId: ${merchantId}`);
@@ -171,6 +261,7 @@ async function handleWebhook(req, res) {
                             planTier: 'FREE',
                             subscriptionStatus: 'canceled',
                             stripeSubscriptionId: null,
+                            rolloverCredits: 0, // Rollover expires when paid subscription is canceled
                         },
                     });
                     (0, authenticateDashboard_1.clearPlanTierCache)(merchant.id);

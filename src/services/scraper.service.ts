@@ -444,7 +444,7 @@ async function indexPageContent(
     });
   }
 
-  // 2. DOM Product / Portfolio Card extraction
+  // 4. DOM Product / Portfolio Card extraction
   if (productsFound.length === 0) {
     $('.product-card, .product-item, .grid-item, [itemtype*="Product"], .project-card, article').each((idx, el) => {
       const card = $(el);
@@ -467,6 +467,85 @@ async function indexPageContent(
           imageUrl: fullImg,
           productUrl: fullUrl,
           category: 'Showcase & Products',
+          inStock: true,
+        });
+      }
+    });
+  }
+
+  // 5. Single Product Page Extraction (e.g., /product/:id or /products/:slug)
+  if (productsFound.length === 0) {
+    const isSingleProductPage =
+      /\/product[s]?\/|\/item\/|\/p\//i.test(currentUrlStr) ||
+      $('button, input[type="submit"]').filter((_, el) => /add\s*to\s*cart|buy\s*now|order\s*now/i.test($(el).text() || String($(el).val() || ''))).length > 0;
+
+    if (isSingleProductPage) {
+      const singleTitle = $('h1').first().text().trim() || pageTitle.split(/[-–|]/)[0].trim();
+      
+      let singlePrice = 0;
+      const priceMatch = $('body').text().match(/\$\s*(\d+(?:\.\d{1,2})?)/);
+      if (priceMatch) {
+        singlePrice = parseFloat(priceMatch[1]);
+      }
+
+      const singleImg = $('meta[property="og:image"]').attr('content') || $('main img, .product-image img, img').first().attr('src') || ogImage;
+      const fullImg = singleImg ? (singleImg.startsWith('http') ? singleImg : new URL(singleImg, origin).href) : '';
+
+      const extractedOptions: Array<{ name: string; values: string[] }> = [];
+      const sizeButtons = $('button, .size-btn, [data-size]').filter((_, el) => /^(xs|s|m|l|xl|xxl|\d{2})$/i.test($(el).text().trim()));
+      if (sizeButtons.length > 0) {
+        extractedOptions.push({
+          name: 'Size',
+          values: sizeButtons.map((_, el) => $(el).text().trim()).get(),
+        });
+      }
+
+      const urlMatch = currentUrlStr.match(/\/product[s]?\/([^\/\?#]+)/i);
+      const extractedId = urlMatch ? urlMatch[1] : `PROD-${Buffer.from(singleTitle).toString('hex').slice(0, 10)}`;
+
+      if (singleTitle && singleTitle.length > 2) {
+        productsFound.push({
+          externalId: extractedId,
+          title: singleTitle,
+          description: metaDescription || `${singleTitle} - Available at ${currentUrlStr}`,
+          price: singlePrice,
+          currency: 'USD',
+          imageUrl: fullImg,
+          productUrl: currentUrlStr,
+          category: 'Products',
+          inStock: true,
+          options: extractedOptions.length > 0 ? extractedOptions : undefined,
+        });
+      }
+    }
+  }
+
+  // 6. Collection / Catalog Page Link Extraction
+  if (productsFound.length === 0) {
+    $('a[href*="/product/"], a[href*="/products/"]').each((idx, el) => {
+      const link = $(el);
+      const href = link.attr('href');
+      if (!href) return;
+      const fullUrl = href.startsWith('http') ? href : new URL(href, origin).href;
+      
+      const title = link.find('h2, h3, h4, p, span').first().text().trim() || link.text().trim();
+      const img = link.find('img').attr('src') || link.find('img').attr('data-src');
+      const priceText = link.text().match(/\$\s*(\d+(?:\.\d{1,2})?)/);
+      const price = priceText ? parseFloat(priceText[1]) : 0;
+
+      const urlMatch = href.match(/\/product[s]?\/([^\/\?#]+)/i);
+      const extId = urlMatch ? urlMatch[1] : `PROD-${idx + 1}`;
+
+      if (title && title.length > 2 && !productsFound.some((p) => p.productUrl === fullUrl)) {
+        productsFound.push({
+          externalId: extId,
+          title,
+          description: `${title} - Details at ${fullUrl}`,
+          price,
+          currency: 'USD',
+          imageUrl: img ? (img.startsWith('http') ? img : new URL(img, origin).href) : '',
+          productUrl: fullUrl,
+          category: 'Collection',
           inStock: true,
         });
       }

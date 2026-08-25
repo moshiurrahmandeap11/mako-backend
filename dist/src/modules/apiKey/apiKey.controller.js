@@ -7,18 +7,14 @@ exports.deleteKey = deleteKey;
 const db_1 = require("../../config/db");
 const apiKeyGenerator_1 = require("../../utils/apiKeyGenerator");
 const logger_1 = require("../../utils/logger");
-const API_KEY_LIMITS = {
-    FREE: 1,
-    STARTER: 2,
-    PRO: 4,
-    ENTERPRISE: Infinity,
-};
+const pricing_1 = require("../../config/pricing");
 async function createKey(req, res) {
     try {
         const merchantId = req.merchant?.id;
         const planTier = req.merchant?.planTier || 'FREE';
         const { name, template, systemPrompt, allowedDomains } = req.body;
-        const limit = API_KEY_LIMITS[planTier] !== undefined ? API_KEY_LIMITS[planTier] : 1;
+        const plan = (0, pricing_1.getPlanConfig)(planTier);
+        const limit = plan.maxApiKeys;
         const existingCount = await db_1.prisma.apiKey.count({
             where: { merchantId, isActive: true },
         });

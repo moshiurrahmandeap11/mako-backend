@@ -134,13 +134,9 @@ function getSystemPrompt(
   customPrompt?: string,
   template?: string
 ): string {
-  if (customPrompt) {
-    return `You are the official AI Assistant representing "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}.
-${customPrompt}`;
-  }
-
   const yamlConfig = loadAiPromptsYaml(template);
-  const basePersona = yamlConfig?.system_instructions?.persona || `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
+  const defaultPersona = yamlConfig?.system_instructions?.persona || `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
+  const basePersona = customPrompt ? `${defaultPersona}\nMerchant Custom Notes: ${customPrompt}` : defaultPersona;
   const personaPrompt = `You are the official AI Assistant for "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}. ${basePersona}`;
 
   const rules = yamlConfig?.system_instructions?.strict_rules;
@@ -556,7 +552,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
   // Attempt 2: High-Speed Groq Pool (llama3-70b-8192 / llama-3.2-11b-vision-preview)
   if (!executionSuccess && (selectedProvider === 'groq' || keyRotator.hasGroqKeys())) {
     try {
-      const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama3-70b-8192';
+      const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
       const result = await keyRotator.executeGroqCompletion(
         model,
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],

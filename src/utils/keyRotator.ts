@@ -79,9 +79,10 @@ export class KeyRotator {
       this.groqIndex = (this.groqIndex + 1) % this.groqClients.length;
 
       try {
+        const targetModel = model === 'llama3-70b-8192' || model === 'llama-3.3-70b-versatile' ? 'llama-3.1-8b-instant' : model;
         const completion = await client.chat.completions.create(
           {
-            model,
+            model: targetModel,
             messages,
             max_tokens: maxTokens,
             temperature: 0.3,
@@ -148,7 +149,6 @@ export class KeyRotator {
           generationConfig: {
             maxOutputTokens: maxTokens || 850,
             temperature: 0.3,
-            thinkingConfig: { thinkingBudget: 0 },
           },
         };
         if (systemText) {

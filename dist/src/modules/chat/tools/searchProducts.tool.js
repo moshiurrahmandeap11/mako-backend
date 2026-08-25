@@ -8,11 +8,10 @@ async function searchProductsTool(merchantId, query, category, maxResults = 5) {
     try {
         // 1. Generate query embedding
         const queryVector = await (0, embeddings_1.generateEmbedding)(query);
-        // Check if any product has non-zero embedding
         let products = [];
         try {
             // Try pgvector cosine distance search
-            const rawResults = await (0, db_1.executeRawNeonQuery)(`SELECT id, "externalId", title, description, price, currency, "imageUrl", "productUrl", category, "inStock",
+            const rawResults = await (0, db_1.executeRawNeonQuery)(`SELECT id, "externalId", title, description, price, currency, "imageUrl", "productUrl", category, "inStock", "options", "variants",
                 (embedding <=> $1::vector) as distance
          FROM "Product"
          WHERE "merchantId" = $2 AND "inStock" = true
@@ -25,7 +24,7 @@ async function searchProductsTool(merchantId, query, category, maxResults = 5) {
         catch (e) {
             logger_1.logger.warn('pgvector search fallback to ILIKE text query:', e);
         }
-        // Fallback: If vector search returns empty (e.g. no embeddings generated yet), perform ILIKE search
+        // Fallback: If vector search returns empty, perform ILIKE search
         if (products.length === 0) {
             products = await db_1.prisma.product.findMany({
                 where: {
@@ -42,6 +41,7 @@ async function searchProductsTool(merchantId, query, category, maxResults = 5) {
         }
         return products.map((p) => ({
             id: p.id,
+            externalId: p.externalId,
             title: p.title,
             description: p.description,
             price: Number(p.price),
@@ -50,6 +50,8 @@ async function searchProductsTool(merchantId, query, category, maxResults = 5) {
             productUrl: p.productUrl,
             category: p.category,
             inStock: p.inStock,
+            options: p.options || undefined,
+            variants: p.variants || undefined,
         }));
     }
     catch (error) {

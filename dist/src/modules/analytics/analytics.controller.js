@@ -5,10 +5,27 @@ exports.listConversations = listConversations;
 exports.exportConversationPdf = exportConversationPdf;
 const db_1 = require("../../config/db");
 const logger_1 = require("../../utils/logger");
+const pricing_1 = require("../../config/pricing");
 async function getSummary(req, res) {
     try {
         const merchantId = req.merchant?.id;
-        const [totalProducts, totalConversations, totalApiKeys, totalMessages, totalUniqueVisitors, visitorCountriesRaw] = await Promise.all([
+        const planTier = req.merchant?.planTier || 'FREE';
+        const plan = (0, pricing_1.getPlanConfig)(planTier);
+        const dbUser = await db_1.prisma.user.findUnique({
+            where: { id: merchantId },
+            select: {
+                createdAt: true,
+                subscriptionStart: true,
+                rolloverCredits: true,
+                extraCredits: true,
+            },
+        });
+        const cycleStart = (0, pricing_1.getBillingPeriodStart)({
+            planTier,
+            createdAt: dbUser?.createdAt,
+            subscriptionStart: dbUser?.subscriptionStart,
+        });
+        const [totalProducts, totalConversations, totalApiKeys, totalMessages, currentCycleMessages, totalUniqueVisitors, visitorCountriesRaw,] = await Promise.all([
             db_1.prisma.product.count({ where: { merchantId } }),
             db_1.prisma.conversation.count({
                 where: {
@@ -20,6 +37,12 @@ async function getSummary(req, res) {
             }),
             db_1.prisma.apiKey.count({ where: { merchantId, isActive: true } }),
             db_1.prisma.message.count({ where: { conversation: { merchantId } } }),
+            db_1.prisma.message.count({
+                where: {
+                    conversation: { merchantId },
+                    ...(cycleStart ? { createdAt: { gte: cycleStart } } : {}),
+                },
+            }),
             db_1.prisma.visitor.count({ where: { merchantId } }),
             db_1.prisma.visitor.groupBy({
                 by: ['country', 'countryCode'],
@@ -34,15 +57,33 @@ async function getSummary(req, res) {
             countryCode: v.countryCode,
             count: v._count.id,
         }));
+        const rolloverCredits = dbUser?.rolloverCredits || 0;
+        const extraCredits = dbUser?.extraCredits || 0;
+        const totalAllowedCredits = plan.monthlyCredits === Infinity
+            ? 999999999
+            : plan.monthlyCredits + rolloverCredits + extraCredits;
+        const creditsUsedThisCycle = (cycleStart ? currentCycleMessages : totalMessages) * pricing_1.CREDITS_PER_MESSAGE;
+        const creditsRemaining = Math.max(0, totalAllowedCredits - creditsUsedThisCycle);
         res.json({
             summary: {
                 totalProducts,
                 totalConversations,
                 totalApiKeys,
                 totalMessages,
+                currentMonthMessages: currentCycleMessages,
                 totalUniqueVisitors,
                 visitorCountries,
-                planTier: req.merchant?.planTier,
+                planTier,
+                credits: {
+                    planMonthlyGrant: plan.monthlyCredits,
+                    rolloverCredits,
+                    extraCredits,
+                    totalAllowedCredits,
+                    creditsUsedThisMonth: creditsUsedThisCycle,
+                    creditsRemaining,
+                    rolloverEnabled: plan.rolloverEnabled,
+                    creditsPerMessage: pricing_1.CREDITS_PER_MESSAGE,
+                },
             },
         });
     }

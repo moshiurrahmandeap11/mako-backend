@@ -7,4 +7,5 @@ const router = (0, express_1.Router)();
 router.use(authenticateDashboard_1.authenticateDashboard);
 router.get('/', widgetConfig_controller_1.getConfig);
 router.patch('/', widgetConfig_controller_1.updateConfig);
+router.post('/reset', widgetConfig_controller_1.resetConfig);
 exports.default = router;

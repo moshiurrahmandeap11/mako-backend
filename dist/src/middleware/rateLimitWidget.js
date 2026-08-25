@@ -36,12 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.rateLimitWidget = rateLimitWidget;
 const db_1 = require("../config/db");
 const logger_1 = require("../utils/logger");
-const PLAN_MONTHLY_LIMITS = {
-    FREE: 100,
-    STARTER: 500,
-    PRO: 1500,
-    ENTERPRISE: Infinity,
-};
+const pricing_1 = require("../config/pricing");
 async function rateLimitWidget(req, res, next) {
     try {
         const merchant = req.merchant;
@@ -50,76 +45,89 @@ async function rateLimitWidget(req, res, next) {
             return;
         }
         const tier = merchant.planTier || 'FREE';
-        const limit = PLAN_MONTHLY_LIMITS[tier] !== undefined ? PLAN_MONTHLY_LIMITS[tier] : 100;
-        if (limit === Infinity) {
+        const plan = (0, pricing_1.getPlanConfig)(tier);
+        if (plan.monthlyCredits === Infinity || tier === 'ENTERPRISE') {
             return next();
         }
-        // Get the start of the current month in UTC
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        // Count all messages (user + assistant) processed for this merchant in the current calendar month
-        const count = await db_1.prisma.message.count({
+        // Fetch user details with rollover, extra credits & billing dates
+        const dbMerchant = await db_1.prisma.user.findUnique({
+            where: { id: merchant.id },
+            select: {
+                email: true,
+                name: true,
+                createdAt: true,
+                subscriptionStart: true,
+                rolloverCredits: true,
+                extraCredits: true,
+                lastQuotaWarningEmailSentAt: true,
+                lastQuotaExceededEmailSentAt: true,
+            },
+        });
+        const cycleStart = (0, pricing_1.getBillingPeriodStart)({
+            planTier: tier,
+            createdAt: dbMerchant?.createdAt,
+            subscriptionStart: dbMerchant?.subscriptionStart,
+        });
+        const totalAllowedCredits = plan.monthlyCredits + (dbMerchant?.rolloverCredits || 0) + (dbMerchant?.extraCredits || 0);
+        // Count messages: For FREE plan (cycleStart === null) count lifetime messages, for paid plans count from cycleStart
+        const messageCount = await db_1.prisma.message.count({
             where: {
                 conversation: {
                     merchantId: merchant.id,
                 },
-                createdAt: {
-                    gte: startOfMonth,
-                },
+                ...(cycleStart ? { createdAt: { gte: cycleStart } } : {}),
             },
         });
-        // Calculate percentage used
-        const percentage = (count / limit) * 100;
-        // Check if 90% quota warning email should be sent (only once per calendar month)
+        const usedCredits = messageCount * pricing_1.CREDITS_PER_MESSAGE;
+        const percentage = totalAllowedCredits > 0 ? (usedCredits / totalAllowedCredits) * 100 : 100;
+        const refDate = cycleStart || new Date(0);
+        // Check if 90% quota warning email should be sent
         if (percentage >= 90 && percentage < 100) {
-            const dbMerchant = await db_1.prisma.user.findUnique({
-                where: { id: merchant.id },
-                select: { email: true, name: true, lastQuotaWarningEmailSentAt: true },
-            });
-            const needsWarning = !dbMerchant?.lastQuotaWarningEmailSentAt || dbMerchant.lastQuotaWarningEmailSentAt < startOfMonth;
+            const needsWarning = !dbMerchant?.lastQuotaWarningEmailSentAt || dbMerchant.lastQuotaWarningEmailSentAt < refDate;
             if (needsWarning && dbMerchant?.email) {
                 const { sendQuotaWarningEmail } = await Promise.resolve().then(() => __importStar(require('../utils/email')));
                 sendQuotaWarningEmail({
                     to: dbMerchant.email,
                     name: dbMerchant.name,
-                    used: count,
-                    limit,
+                    used: usedCredits,
+                    limit: totalAllowedCredits,
                     tier,
                 }).catch((err) => logger_1.logger.error('Failed to send quota warning email:', err));
-                db_1.prisma.user.update({
+                db_1.prisma.user
+                    .update({
                     where: { id: merchant.id },
                     data: { lastQuotaWarningEmailSentAt: new Date() },
-                }).catch((err) => logger_1.logger.error('Failed to update lastQuotaWarningEmailSentAt:', err));
+                })
+                    .catch((err) => logger_1.logger.error('Failed to update lastQuotaWarningEmailSentAt:', err));
             }
         }
-        if (count >= limit) {
-            logger_1.logger.warn(`Merchant ${merchant.id} (${tier}) reached monthly limit of ${limit} messages.`);
-            // Check if 100% quota exceeded email should be sent (only once per calendar month)
-            const dbMerchant = await db_1.prisma.user.findUnique({
-                where: { id: merchant.id },
-                select: { email: true, name: true, lastQuotaExceededEmailSentAt: true },
-            });
-            const needsExceededAlert = !dbMerchant?.lastQuotaExceededEmailSentAt || dbMerchant.lastQuotaExceededEmailSentAt < startOfMonth;
+        if (usedCredits >= totalAllowedCredits) {
+            logger_1.logger.warn(`Merchant ${merchant.id} (${tier}) exhausted total available credits (${usedCredits}/${totalAllowedCredits}).`);
+            // Check if 100% quota exceeded email should be sent
+            const needsExceededAlert = !dbMerchant?.lastQuotaExceededEmailSentAt || dbMerchant.lastQuotaExceededEmailSentAt < refDate;
             if (needsExceededAlert && dbMerchant?.email) {
                 const { sendQuotaExceededEmail } = await Promise.resolve().then(() => __importStar(require('../utils/email')));
                 sendQuotaExceededEmail({
                     to: dbMerchant.email,
                     name: dbMerchant.name,
-                    used: count,
-                    limit,
+                    used: usedCredits,
+                    limit: totalAllowedCredits,
                     tier,
                 }).catch((err) => logger_1.logger.error('Failed to send quota exceeded email:', err));
-                db_1.prisma.user.update({
+                db_1.prisma.user
+                    .update({
                     where: { id: merchant.id },
                     data: { lastQuotaExceededEmailSentAt: new Date() },
-                }).catch((err) => logger_1.logger.error('Failed to update lastQuotaExceededEmailSentAt:', err));
+                })
+                    .catch((err) => logger_1.logger.error('Failed to update lastQuotaExceededEmailSentAt:', err));
             }
             res.status(429).json({
-                error: `Monthly message limit of ${limit} reached for your ${tier} plan. Please upgrade to continue using Labto AI.`,
-                limit,
-                count,
-                upgradeRequired: true,
+                error: tier === 'FREE'
+                    ? 'Assistant is currently offline due to credit quota limit.'
+                    : `AI Credit limit of ${totalAllowedCredits.toLocaleString()} credits reached for your plan.`,
+                limit: totalAllowedCredits,
+                used: usedCredits,
+                creditsRemaining: 0,
             });
             return;
         }
