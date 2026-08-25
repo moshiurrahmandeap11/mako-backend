@@ -151,17 +151,18 @@ function getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, tem
 - ALWAYS format clickable links with CLEAN, HUMAN-READABLE PRODUCT OR PAGE TITLES e.g. [Electronic Plastic Table ($600)](url), [Generic Steel Pants ($987)](url), or [View Collection](url).`;
     const addCartInstruction = `DIRECT ADD TO CART & DYNAMIC VARIANT INQUIRY (CRITICAL RULE):
 - You have direct access to the website store catalog and can add items to cart.
-- When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo", "pants ta dao", "bacon ta cart e dao", "2nd ta"):
+- When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo", "pants ta dao", "bacon ta cart e dao", "2nd ta", "plastic table ta add kore dao"):
   1. IDENTIFY THE EXACT PRODUCT from the Store Catalog:
      - Match the product the user is referring to (by name, keyword, or context from previous conversation).
-  2. CHECK THE PRODUCT'S OPTIONS (from Catalog data):
-     - If the product HAS options (e.g. Sizes S, M, L or Colors) AND user HAS NOT chosen size yet:
-       - Ask which size/color they prefer (e.g. "We have sizes S, M, and L available for [Product Name](url). Which size would you prefer?").
+  2. CHECK THE PRODUCT'S OPTIONS (from the "Options:" field in Catalog data):
+     - IF Options is NOT "None" (e.g. Size, Storage, Weight, Color) AND user has not chosen their specific option yet:
+       - YOU MUST NEVER claim it was added to cart! DO NOT say "cart e add kora hoyeche".
+       - INSTEAD, YOU MUST ASK THE USER for their preferred option in natural language (e.g. "Amader [Product Name](url) er Size (S, M, L, XL) available ache. Apnar kon size ta lagbe?").
        - Append tag: [ADD_TO_CART: productId]
-     - Once the user chooses their size (e.g. "S", "M", "size L", "black"):
-       - Friendly message: Confirm the item with their chosen size (e.g. "[Product Name](url) (Size: S) cart e add kora hoyeche!").
-       - Append tag: [ADD_TO_CART: productId, size: S]
-  3. If the product has NO options:
+     - ONCE the user specifies their option (e.g. "S", "M", "size L", "1kg", "256GB", "Black"):
+       - Friendly message: Confirm the item with their chosen option (e.g. "[Product Name](url) (Size: S) cart e add kora hoyeche!").
+       - Append tag: [ADD_TO_CART: productId, size: S] (or color / storage value).
+  3. If the product's Options is "None" (no size/color required):
      - Friendly message: "[Product Name](url) cart e add kora hoyeche!"
      - Append tag: [ADD_TO_CART: productId]
 - ALWAYS provide a polite, natural sentence in the user's matching script alongside the tag.
@@ -402,8 +403,13 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
         if (retrievedProducts.length > 0) {
             thoughts.push(`📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`);
             ragContext += `\n\n### Store Catalog & Available Products:\n` +
-                retrievedProducts.map(p => `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`).join('\n') +
-                `\n\nInstructions: Use the catalog items above to recommend items or provide details. Include product page links where appropriate.`;
+                retrievedProducts.map((p) => {
+                    const optStr = p.options && Array.isArray(p.options) && p.options.length > 0
+                        ? p.options.map((o) => `${o.name} (${(o.values || []).join(', ')})`).join('; ')
+                        : 'None';
+                    return `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Options: ${optStr} | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`;
+                }).join('\n') +
+                `\n\nInstructions: Use the catalog items above to recommend items, verify options/sizes, or provide details. Include product page links where appropriate.`;
         }
         if (retrievedKnowledgeRes.length > 0) {
             thoughts.push(`🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`);
