@@ -63,3 +63,30 @@ export function getPlanConfig(tier: string = 'FREE'): PlanConfig {
   const normalized = (tier || 'FREE').toUpperCase();
   return PLAN_CONFIGS[normalized] || PLAN_CONFIGS.FREE;
 }
+
+export function getBillingPeriodStart(merchant: {
+  planTier: string;
+  createdAt?: Date;
+  subscriptionStart?: Date | null;
+}): Date | null {
+  const normalized = (merchant.planTier || 'FREE').toUpperCase();
+
+  // FREE plan is 1500 credits lifetime (no start date boundary, count all lifetime messages)
+  if (normalized === 'FREE') {
+    return null;
+  }
+
+  // For paid plans: calculate start date of current rolling monthly billing cycle
+  const anchorDate = merchant.subscriptionStart || merchant.createdAt || new Date();
+  const now = new Date();
+
+  // Start with anchorDate's day of month in current month
+  let cycleStart = new Date(now.getFullYear(), now.getMonth(), anchorDate.getDate());
+
+  // If current date is before this month's anchor date, cycle started last month
+  if (now < cycleStart) {
+    cycleStart = new Date(now.getFullYear(), now.getMonth() - 1, anchorDate.getDate());
+  }
+
+  return cycleStart;
+}

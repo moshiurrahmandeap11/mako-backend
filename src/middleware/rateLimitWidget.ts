@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import { WidgetAuthRequest } from './authenticateWidget';
 import { prisma } from '../config/db';
 import { logger } from '../utils/logger';
-import { getPlanConfig, CREDITS_PER_MESSAGE } from '../config/pricing';
+import { getPlanConfig, getBillingPeriodStart, CREDITS_PER_MESSAGE } from '../config/pricing';
 
 export async function rateLimitWidget(
   req: WidgetAuthRequest,
@@ -23,17 +23,14 @@ export async function rateLimitWidget(
       return next();
     }
 
-    // Get the start of the current month in UTC
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    // Fetch user details with rollover & extra credits
+    // Fetch user details with rollover, extra credits & billing dates
     const dbMerchant = await prisma.user.findUnique({
       where: { id: merchant.id },
       select: {
         email: true,
         name: true,
+        createdAt: true,
+        subscriptionStart: true,
         rolloverCredits: true,
         extraCredits: true,
         lastQuotaWarningEmailSentAt: true,
@@ -41,27 +38,32 @@ export async function rateLimitWidget(
       },
     });
 
+    const cycleStart = getBillingPeriodStart({
+      planTier: tier,
+      createdAt: dbMerchant?.createdAt,
+      subscriptionStart: dbMerchant?.subscriptionStart,
+    });
+
     const totalAllowedCredits = plan.monthlyCredits + (dbMerchant?.rolloverCredits || 0) + (dbMerchant?.extraCredits || 0);
 
-    // Count all messages processed for this merchant in the current calendar month
+    // Count messages: For FREE plan (cycleStart === null) count lifetime messages, for paid plans count from cycleStart
     const messageCount = await prisma.message.count({
       where: {
         conversation: {
           merchantId: merchant.id,
         },
-        createdAt: {
-          gte: startOfMonth,
-        },
+        ...(cycleStart ? { createdAt: { gte: cycleStart } } : {}),
       },
     });
 
     const usedCredits = messageCount * CREDITS_PER_MESSAGE;
     const percentage = totalAllowedCredits > 0 ? (usedCredits / totalAllowedCredits) * 100 : 100;
+    const refDate = cycleStart || new Date(0);
 
-    // Check if 90% quota warning email should be sent (only once per calendar month)
+    // Check if 90% quota warning email should be sent
     if (percentage >= 90 && percentage < 100) {
       const needsWarning =
-        !dbMerchant?.lastQuotaWarningEmailSentAt || dbMerchant.lastQuotaWarningEmailSentAt < startOfMonth;
+        !dbMerchant?.lastQuotaWarningEmailSentAt || dbMerchant.lastQuotaWarningEmailSentAt < refDate;
       if (needsWarning && dbMerchant?.email) {
         const { sendQuotaWarningEmail } = await import('../utils/email');
         sendQuotaWarningEmail({
@@ -86,9 +88,9 @@ export async function rateLimitWidget(
         `Merchant ${merchant.id} (${tier}) exhausted total available credits (${usedCredits}/${totalAllowedCredits}).`
       );
 
-      // Check if 100% quota exceeded email should be sent (only once per calendar month)
+      // Check if 100% quota exceeded email should be sent
       const needsExceededAlert =
-        !dbMerchant?.lastQuotaExceededEmailSentAt || dbMerchant.lastQuotaExceededEmailSentAt < startOfMonth;
+        !dbMerchant?.lastQuotaExceededEmailSentAt || dbMerchant.lastQuotaExceededEmailSentAt < refDate;
       if (needsExceededAlert && dbMerchant?.email) {
         const { sendQuotaExceededEmail } = await import('../utils/email');
         sendQuotaExceededEmail({
@@ -108,11 +110,12 @@ export async function rateLimitWidget(
       }
 
       res.status(429).json({
-        error: `Monthly AI Smart Credit limit of ${totalAllowedCredits.toLocaleString()} credits reached for your ${tier} plan. Please upgrade to continue using Labto AI.`,
+        error: tier === 'FREE'
+          ? 'Assistant is currently offline due to credit quota limit.'
+          : `AI Credit limit of ${totalAllowedCredits.toLocaleString()} credits reached for your plan.`,
         limit: totalAllowedCredits,
         used: usedCredits,
         creditsRemaining: 0,
-        upgradeRequired: true,
       });
       return;
     }

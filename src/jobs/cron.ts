@@ -123,6 +123,8 @@ export function initCronJobs() {
           email: true,
           name: true,
           planTier: true,
+          createdAt: true,
+          subscriptionStart: true,
           rolloverCredits: true,
           extraCredits: true,
           lastQuotaWarningEmailSentAt: true,
@@ -131,26 +133,34 @@ export function initCronJobs() {
       });
 
       const { sendQuotaWarningEmail, sendQuotaExceededEmail } = await import('../utils/email');
+      const { getBillingPeriodStart } = await import('../config/pricing');
 
       for (const m of merchants) {
         const plan = getPlanConfig(m.planTier);
         if (plan.monthlyCredits === Infinity || m.planTier === 'ENTERPRISE') continue;
+
+        const cycleStart = getBillingPeriodStart({
+          planTier: m.planTier,
+          createdAt: m.createdAt,
+          subscriptionStart: m.subscriptionStart,
+        });
 
         const totalAllowedCredits = plan.monthlyCredits + (m.rolloverCredits || 0) + (m.extraCredits || 0);
 
         const count = await prisma.message.count({
           where: {
             conversation: { merchantId: m.id },
-            createdAt: { gte: startOfMonth },
+            ...(cycleStart ? { createdAt: { gte: cycleStart } } : {}),
           },
         });
 
         const usedCredits = count * CREDITS_PER_MESSAGE;
         const percentage = totalAllowedCredits > 0 ? (usedCredits / totalAllowedCredits) * 100 : 100;
+        const refDate = cycleStart || new Date(0);
 
         // 90% Warning
         if (percentage >= 90 && percentage < 100) {
-          const needsWarning = !m.lastQuotaWarningEmailSentAt || m.lastQuotaWarningEmailSentAt < startOfMonth;
+          const needsWarning = !m.lastQuotaWarningEmailSentAt || m.lastQuotaWarningEmailSentAt < refDate;
           if (needsWarning && m.email) {
             await sendQuotaWarningEmail({
               to: m.email,
@@ -168,7 +178,7 @@ export function initCronJobs() {
 
         // 100% Exceeded
         if (usedCredits >= totalAllowedCredits) {
-          const needsExceededAlert = !m.lastQuotaExceededEmailSentAt || m.lastQuotaExceededEmailSentAt < startOfMonth;
+          const needsExceededAlert = !m.lastQuotaExceededEmailSentAt || m.lastQuotaExceededEmailSentAt < refDate;
           if (needsExceededAlert && m.email) {
             await sendQuotaExceededEmail({
               to: m.email,

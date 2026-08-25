@@ -27,6 +27,7 @@ model User {
   stripeSubscriptionId String?   @unique
   stripePriceId        String?
   subscriptionStatus   String?
+  subscriptionStart    DateTime?
 
   // Quota & Email Alert Tracking
   rolloverCredits              Int       @default(0)

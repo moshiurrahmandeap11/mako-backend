@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { prisma } from '../../config/db';
 import { logger } from '../../utils/logger';
 import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
-import { getPlanConfig, CREDITS_PER_MESSAGE } from '../../config/pricing';
+import { getPlanConfig, getBillingPeriodStart, CREDITS_PER_MESSAGE } from '../../config/pricing';
 
 export async function getSummary(req: DashboardAuthRequest, res: Response): Promise<void> {
   try {
@@ -10,19 +10,30 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
     const planTier = req.merchant?.planTier || 'FREE';
     const plan = getPlanConfig(planTier);
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
+    const dbUser = await prisma.user.findUnique({
+      where: { id: merchantId },
+      select: {
+        createdAt: true,
+        subscriptionStart: true,
+        rolloverCredits: true,
+        extraCredits: true,
+      },
+    });
+
+    const cycleStart = getBillingPeriodStart({
+      planTier,
+      createdAt: dbUser?.createdAt,
+      subscriptionStart: dbUser?.subscriptionStart,
+    });
 
     const [
       totalProducts,
       totalConversations,
       totalApiKeys,
       totalMessages,
-      currentMonthMessages,
+      currentCycleMessages,
       totalUniqueVisitors,
       visitorCountriesRaw,
-      dbUser,
     ] = await Promise.all([
       prisma.product.count({ where: { merchantId } }),
       prisma.conversation.count({
@@ -38,7 +49,7 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
       prisma.message.count({
         where: {
           conversation: { merchantId },
-          createdAt: { gte: startOfMonth },
+          ...(cycleStart ? { createdAt: { gte: cycleStart } } : {}),
         },
       }),
       prisma.visitor.count({ where: { merchantId } }),
@@ -48,10 +59,6 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
         take: 6,
-      }),
-      prisma.user.findUnique({
-        where: { id: merchantId },
-        select: { rolloverCredits: true, extraCredits: true },
       }),
     ]);
 
@@ -67,8 +74,8 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
       plan.monthlyCredits === Infinity
         ? 999999999
         : plan.monthlyCredits + rolloverCredits + extraCredits;
-    const creditsUsedThisMonth = currentMonthMessages * CREDITS_PER_MESSAGE;
-    const creditsRemaining = Math.max(0, totalAllowedCredits - creditsUsedThisMonth);
+    const creditsUsedThisCycle = (cycleStart ? currentCycleMessages : totalMessages) * CREDITS_PER_MESSAGE;
+    const creditsRemaining = Math.max(0, totalAllowedCredits - creditsUsedThisCycle);
 
     res.json({
       summary: {
@@ -76,7 +83,7 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
         totalConversations,
         totalApiKeys,
         totalMessages,
-        currentMonthMessages,
+        currentMonthMessages: currentCycleMessages,
         totalUniqueVisitors,
         visitorCountries,
         planTier,
@@ -85,7 +92,7 @@ export async function getSummary(req: DashboardAuthRequest, res: Response): Prom
           rolloverCredits,
           extraCredits,
           totalAllowedCredits,
-          creditsUsedThisMonth,
+          creditsUsedThisMonth: creditsUsedThisCycle,
           creditsRemaining,
           rolloverEnabled: plan.rolloverEnabled,
           creditsPerMessage: CREDITS_PER_MESSAGE,

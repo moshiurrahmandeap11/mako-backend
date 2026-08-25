@@ -262,6 +262,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
             data: {
               planTier: targetTier,
               subscriptionStatus: 'active',
+              subscriptionStart: new Date(),
               stripeCustomerId: customerId || merchant.stripeCustomerId,
               stripeSubscriptionId: data.id || merchant.stripeSubscriptionId,
             },
