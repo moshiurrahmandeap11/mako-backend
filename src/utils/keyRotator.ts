@@ -79,7 +79,7 @@ export class KeyRotator {
       this.groqIndex = (this.groqIndex + 1) % this.groqClients.length;
 
       try {
-        const targetModel = model === 'llama3-70b-8192' || model === 'llama-3.3-70b-versatile' ? 'llama-3.1-8b-instant' : model;
+        const targetModel = 'llama-3.3-70b-versatile';
         const completion = await client.chat.completions.create(
           {
             model: targetModel,
