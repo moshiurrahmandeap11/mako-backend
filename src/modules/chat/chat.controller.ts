@@ -38,7 +38,11 @@ export async function getWidgetConfigPublic(req: WidgetAuthRequest, res: Respons
       config = {
         id: '',
         merchantId,
-        primaryColor: '#111111',
+        primaryColor: '#1DBF73',
+        headerBgColor: '#FFFFFF',
+        headerTextColor: '#222325',
+        launcherBgColor: '#1DBF73',
+        launcherIconColor: '#FFFFFF',
         greetingMessage: 'Hi! How can I help you today?',
         botName: 'AI Assistant',
         position: 'bottom-right',
@@ -47,11 +51,15 @@ export async function getWidgetConfigPublic(req: WidgetAuthRequest, res: Respons
     }
 
     res.json({
-      primaryColor: config.primaryColor || '#111111',
-      greetingMessage: config.greetingMessage || 'Hi! How can I help you today?',
-      botName: config.botName || 'AI Assistant',
-      position: config.position || 'bottom-right',
-      addToCartEnabled: config.addToCartEnabled !== undefined ? config.addToCartEnabled : true,
+      primaryColor: config?.primaryColor || '#1DBF73',
+      headerBgColor: config?.headerBgColor || '#FFFFFF',
+      headerTextColor: config?.headerTextColor || '#222325',
+      launcherBgColor: config?.launcherBgColor || '#1DBF73',
+      launcherIconColor: config?.launcherIconColor || '#FFFFFF',
+      greetingMessage: config?.greetingMessage || 'Hi! How can I help you today?',
+      botName: config?.botName || 'AI Assistant',
+      position: config?.position || 'bottom-right',
+      addToCartEnabled: config?.addToCartEnabled !== undefined ? config.addToCartEnabled : true,
       hideBranding: planTier === 'PRO' || planTier === 'ENTERPRISE',
       eventBridgeEnabled: planTier === 'PRO' || planTier === 'ENTERPRISE',
     });

@@ -661,7 +661,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               setIsDragging(true);
             }}
             style={{
-              backgroundColor: '#ffffff',
+              backgroundColor: config.headerBgColor || '#ffffff',
               padding: '18px 20px',
               display: 'flex',
               alignItems: 'center',
@@ -678,10 +678,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               <BotMascotSvg />
 
               <div>
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.2px' }}>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: config.headerTextColor || '#0f172a', letterSpacing: '-0.2px' }}>
                   {config.botName || 'Shop Assistant'}
                 </h3>
-                <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginTop: '1px' }}>
+                <span style={{ fontSize: '12px', color: config.headerTextColor ? `${config.headerTextColor}CC` : '#64748b', display: 'block', marginTop: '1px' }}>
                   The team can also help
                 </span>
               </div>
@@ -1080,8 +1080,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           width: '60px',
           height: '60px',
           borderRadius: '50%',
-          backgroundColor: isOpen ? '#14844E' : (primaryColor || '#1DBF73'),
-          color: '#ffffff',
+          backgroundColor: isOpen ? '#14844E' : (config.launcherBgColor || primaryColor || '#1DBF73'),
+          color: config.launcherIconColor || '#ffffff',
           border: '2px solid rgba(255, 255, 255, 0.25)',
           cursor: isDragging ? 'grabbing' : 'pointer',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',

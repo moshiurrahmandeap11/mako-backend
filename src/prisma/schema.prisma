@@ -99,7 +99,11 @@ model WidgetConfig {
   id               String   @id @default(cuid())
   merchantId       String   @unique
   merchant         User     @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  primaryColor     String   @default("#111111")
+  primaryColor     String   @default("#1DBF73")
+  headerBgColor    String   @default("#FFFFFF")
+  headerTextColor  String   @default("#222325")
+  launcherBgColor  String   @default("#1DBF73")
+  launcherIconColor String  @default("#FFFFFF")
   greetingMessage  String   @default("Hi! How can I help you shop today?")
   botName          String   @default("Shop Assistant")
   position         String   @default("bottom-right")

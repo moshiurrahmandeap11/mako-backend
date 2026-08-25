@@ -1,5 +1,9 @@
 export interface WidgetConfig {
   primaryColor: string;
+  headerBgColor?: string;
+  headerTextColor?: string;
+  launcherBgColor?: string;
+  launcherIconColor?: string;
   greetingMessage: string;
   botName: string;
   position: 'bottom-right' | 'bottom-left';
