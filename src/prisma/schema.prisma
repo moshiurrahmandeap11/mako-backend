@@ -108,6 +108,7 @@ model WidgetConfig {
   botName          String   @default("AI Assistant")
   position         String   @default("bottom-right")
   addToCartEnabled Boolean  @default(true)
+  suggestionChips  Json?
 }
 
 model Conversation {

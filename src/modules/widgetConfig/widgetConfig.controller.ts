@@ -47,6 +47,7 @@ export async function updateConfig(req: DashboardAuthRequest, res: Response): Pr
       botName,
       position,
       addToCartEnabled,
+      suggestionChips,
     } = req.body;
 
     const config = await prisma.widgetConfig.upsert({
@@ -62,6 +63,7 @@ export async function updateConfig(req: DashboardAuthRequest, res: Response): Pr
         botName: botName || 'AI Assistant',
         position: position || 'bottom-right',
         addToCartEnabled: addToCartEnabled !== undefined ? Boolean(addToCartEnabled) : true,
+        suggestionChips: suggestionChips !== undefined ? suggestionChips : ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
       },
       update: {
         ...(primaryColor !== undefined && { primaryColor }),
@@ -73,6 +75,7 @@ export async function updateConfig(req: DashboardAuthRequest, res: Response): Pr
         ...(botName !== undefined && { botName }),
         ...(position !== undefined && { position }),
         ...(addToCartEnabled !== undefined && { addToCartEnabled: Boolean(addToCartEnabled) }),
+        ...(suggestionChips !== undefined && { suggestionChips }),
       },
     });
 
@@ -97,6 +100,7 @@ export async function resetConfig(req: DashboardAuthRequest, res: Response): Pro
       botName: 'AI Assistant',
       position: 'bottom-right',
       addToCartEnabled: true,
+      suggestionChips: ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
     };
 
     const config = await prisma.widgetConfig.upsert({

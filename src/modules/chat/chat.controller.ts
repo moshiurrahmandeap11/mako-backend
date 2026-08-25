@@ -47,6 +47,7 @@ export async function getWidgetConfigPublic(req: WidgetAuthRequest, res: Respons
         botName: 'AI Assistant',
         position: 'bottom-right',
         addToCartEnabled: true,
+        suggestionChips: ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
       };
     }
 
@@ -60,6 +61,7 @@ export async function getWidgetConfigPublic(req: WidgetAuthRequest, res: Respons
       botName: config?.botName || 'AI Assistant',
       position: config?.position || 'bottom-right',
       addToCartEnabled: config?.addToCartEnabled !== undefined ? config.addToCartEnabled : true,
+      suggestionChips: (config as any)?.suggestionChips || ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
       hideBranding: planTier === 'PRO' || planTier === 'ENTERPRISE',
       eventBridgeEnabled: planTier === 'PRO' || planTier === 'ENTERPRISE',
     });

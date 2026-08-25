@@ -8,6 +8,7 @@ export interface WidgetConfig {
   botName: string;
   position: 'bottom-right' | 'bottom-left';
   addToCartEnabled: boolean;
+  suggestionChips?: string[];
   hideBranding?: boolean;
   eventBridgeEnabled?: boolean;
 }

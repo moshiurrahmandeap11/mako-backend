@@ -164,9 +164,26 @@ export async function me(req: DashboardAuthRequest, res: Response): Promise<void
     const adminEmail = (env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
     const isAdmin = merchant.role === 'ADMIN' || merchant.email.trim().toLowerCase() === adminEmail;
 
+    const domainStatuses = await Promise.all(
+      (merchant.allowedDomains || []).map(async (domain) => {
+        const chunkCount = await prisma.knowledgeChunk.count({
+          where: {
+            merchantId: merchant.id,
+            url: { contains: domain },
+          },
+        });
+        return {
+          domain,
+          status: chunkCount > 0 ? 'scraped' : 'pending',
+          chunkCount,
+        };
+      })
+    );
+
     res.json({
       merchant: {
         ...merchant,
+        domainStatuses,
         isAdmin,
       },
     });
@@ -254,5 +271,28 @@ export async function scrapeUrl(req: DashboardAuthRequest, res: Response): Promi
   } catch (error: any) {
     logger.error('Scrape URL Error:', error);
     res.status(500).json({ error: error.message || 'Failed to scrape website.' });
+  }
+}
+
+export async function rescrapeDomain(req: DashboardAuthRequest, res: Response): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+    const { domain } = req.body;
+
+    if (!domain) {
+      res.status(400).json({ error: 'Domain name is required.' });
+      return;
+    }
+
+    const { triggerBackgroundCrawl } = await import('../../services/scraper.service');
+    triggerBackgroundCrawl(domain, merchantId);
+
+    res.json({
+      message: `Background re-scrape initiated for ${domain}`,
+      domain,
+    });
+  } catch (error: any) {
+    logger.error('Rescrape Domain Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to initiate re-scrape.' });
   }
 }

@@ -88,6 +88,12 @@ const MailSvg = () => (
   </svg>
 );
 
+const MessageSquareSvg = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.85 }}>
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
 function renderMarkdownText(text: string) {
   if (!text) return null;
 
@@ -875,11 +881,14 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     Suggested Questions
                   </span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {[
-                      { label: 'View Projects', icon: <BriefcaseSvg />, query: 'Show me your portfolio projects' },
-                      { label: 'Our Services', icon: <ToolsSvg />, query: 'What services do you provide?' },
-                      { label: 'Contact Info', icon: <MailSvg />, query: 'How can I contact you?' },
-                    ].map((chip, i) => (
+                    {(config.suggestionChips && config.suggestionChips.length > 0
+                      ? config.suggestionChips.map((text) => ({ label: text, query: text }))
+                      : [
+                          { label: 'View Projects', query: 'Show me your portfolio projects' },
+                          { label: 'Our Services', query: 'What services do you provide?' },
+                          { label: 'Contact Info', query: 'How can I contact you?' },
+                        ]
+                    ).map((chip, i) => (
                       <button
                         key={i}
                         type="button"
@@ -913,7 +922,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                           (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 4px rgba(29, 191, 115, 0.06)';
                         }}
                       >
-                        {chip.icon}
+                        <MessageSquareSvg />
                         <span>{chip.label}</span>
                       </button>
                     ))}
