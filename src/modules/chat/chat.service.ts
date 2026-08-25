@@ -686,6 +686,29 @@ Currently, no specific catalog items or knowledge base articles matched this que
     }
   }
 
+  // Fail-safe: If LLM did not output a tag, but user expressed intent to add to cart
+  const isAddCartIntent = /\b(add\s*to\s*cart|cart\s*e\s*kore?\s*da?w?|cart\s*e\s*da?w?|kinte\s*chai|kina\s*chai|buy\s*this|add\s*it|cart\s*e|kine\s*da?w?)\b/i.test(userMessage);
+  if (!cartAction && isAddCartIntent) {
+    try {
+      let matchedProd = retrievedProducts[0] || recommendedProducts[0];
+      if (!matchedProd) {
+        const prodsInDb = await prisma.product.findMany({ where: { merchantId }, take: 5 });
+        const userMsgLower = userMessage.toLowerCase();
+        matchedProd = (prodsInDb as any[]).find((p) => userMsgLower.includes(p.title.toLowerCase()) || p.title.toLowerCase().split(' ').some((w: string) => w.length > 3 && userMsgLower.includes(w))) || prodsInDb[0];
+      }
+
+      if (matchedProd) {
+        const res = await addToCartTool(merchantId, matchedProd.id, 1);
+        if (res.cartAction) cartAction = res.cartAction;
+        if (res.product && !recommendedProducts.some((p) => p.id === res.product.id)) {
+          recommendedProducts.push(res.product);
+        }
+      }
+    } catch (err) {
+      logger.error('Fail-safe Add to Cart Error:', err);
+    }
+  }
+
   // Bind retrieved RAG products to the assistant response metadata
   if (recommendedProducts.length === 0 && retrievedProducts.length > 0) {
     recommendedProducts = retrievedProducts;
