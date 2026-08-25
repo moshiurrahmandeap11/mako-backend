@@ -767,7 +767,10 @@ Currently, no specific catalog items or knowledge base articles matched this que
   // Fail-safe Smart Action Extractor:
   // If no cartAction was parsed from tags, but the AI confirmed adding a product in finalReply
   if (!cartAction && finalReply) {
-    const isConfirmingAdd = /cart\s*e\s*(add|যুক্ত|যোগ|রাখা|করা)|\b(added\s*to\s*cart|add\s*kora\s*hoyeche)\b/i.test(finalReply);
+    const isQuestionOrOffer = /\b(kore\s*dite\s*parbo|add\s*korte\s*chan|add\s*korbo\s*kina|add\s*kore\s*dibo|lagbe|pochondo|can\s*add\s*it|would\s*you\s*like)\b/i.test(finalReply);
+    const isConfirmingAdd = !isQuestionOrOffer && (
+      /\b(cart\s*e\s*add\s*kora\s*hoyeche|cart\s*e\s*add\s*kore\s*diyechi|cart\s*e\s*jog\s*kora\s*hoyeche|added\s*to\s*(your\s*)?cart|has\s*been\s*added)\b/i.test(finalReply)
+    );
     if (isConfirmingAdd) {
       try {
         const linkMatch = finalReply.match(/\[([^\]]+)\]\(([^)]+)\)/);
