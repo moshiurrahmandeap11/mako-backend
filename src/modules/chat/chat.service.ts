@@ -716,18 +716,30 @@ Currently, no specific catalog items or knowledge base articles matched this que
           recommendedProducts.push(res.product);
         }
 
-        // If the reply became empty after stripping tag, provide clean confirmation
+        // If the reply became empty after stripping tag, provide clean message
         if (!finalReply || finalReply.length < 3) {
           const prodTitle = res.product?.title || 'Product';
           const prodUrl = res.product?.productUrl || '#';
-          const sizeNote = targetOptions?.Size ? ` (Size: ${targetOptions.Size})` : '';
+          const hasUnselectedOptions = res.product?.options && (res.product.options as any[]).length > 0 && (!targetOptions || Object.keys(targetOptions).length === 0);
 
-          if (isBengaliScript) {
-            finalReply = `[${prodTitle}](${prodUrl})${sizeNote} কার্টে যোগ করা হয়েছে! 🛍️`;
-          } else if (isBanglish) {
-            finalReply = `[${prodTitle}](${prodUrl})${sizeNote} cart e add kora hoyeche! 🛍️`;
+          if (hasUnselectedOptions) {
+            const optNames = (res.product?.options as any[])?.map((o: any) => o.name).join(', ') || 'Size';
+            if (isBengaliScript) {
+              finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames || 'সাইজ'}টি পছন্দ?`;
+            } else if (isBanglish) {
+              finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames || 'size'} ta lagbe?`;
+            } else {
+              finalReply = `Which ${optNames || 'size'} would you prefer for [${prodTitle}](${prodUrl})?`;
+            }
           } else {
-            finalReply = `[${prodTitle}](${prodUrl})${sizeNote} has been added to your cart! 🛍️`;
+            const sizeNote = targetOptions?.Size ? ` (Size: ${targetOptions.Size})` : '';
+            if (isBengaliScript) {
+              finalReply = `[${prodTitle}](${prodUrl})${sizeNote} কার্টে যোগ করা হয়েছে! 🛍️`;
+            } else if (isBanglish) {
+              finalReply = `[${prodTitle}](${prodUrl})${sizeNote} cart e add kora hoyeche! 🛍️`;
+            } else {
+              finalReply = `[${prodTitle}](${prodUrl})${sizeNote} has been added to your cart! 🛍️`;
+            }
           }
         }
       }

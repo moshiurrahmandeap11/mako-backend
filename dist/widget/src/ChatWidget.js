@@ -408,9 +408,12 @@ function ChatWidget({ api }) {
                     options: res.cartAction.options,
                     variants: res.cartAction.variants,
                 };
-                if (targetProd.options && targetProd.options.length > 0 && !res.cartAction.variantId) {
+                const hasOptions = targetProd.options && targetProd.options.length > 0;
+                const hasSelectedOpts = res.cartAction.selectedOptions && Object.keys(res.cartAction.selectedOptions).length > 0;
+                // If the product has options BUT neither user nor AI has selected one yet -> Open Modal
+                if (hasOptions && !hasSelectedOpts && !res.cartAction.variantId) {
                     const defaultOpts = {};
-                    targetProd.options.forEach((opt) => {
+                    targetProd.options?.forEach((opt) => {
                         if (opt.values && opt.values.length > 0) {
                             defaultOpts[opt.name] = opt.values[0];
                         }
@@ -420,6 +423,7 @@ function ChatWidget({ api }) {
                     setModalProduct(targetProd);
                 }
                 else {
+                    // Selected options are present (e.g. Size: S) or no options needed -> Trigger Add to Cart directly!
                     (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, targetProd.productUrl).then((result) => {
                         showToast(result.message || 'Added to cart!');
                     });
@@ -816,7 +820,7 @@ function ChatWidget({ api }) {
                                                 return false;
                                             return Object.entries(selectedOptionsState).every(([k, val]) => String(v.options?.[k]).toLowerCase() === String(val).toLowerCase());
                                         });
-                                        (0, cartBridge_1.requestAddToCart)(modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState, modalProduct.productUrl).then((res) => {
+                                        (0, cartBridge_1.requestAddToCart)(modalProduct.externalId || modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState, modalProduct.productUrl).then((res) => {
                                             showToast(res.message || `Added '${modalProduct.title}' to cart!`);
                                         });
                                         setModalProduct(null);

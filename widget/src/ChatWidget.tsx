@@ -548,9 +548,13 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           variants: res.cartAction.variants,
         };
 
-        if (targetProd.options && targetProd.options.length > 0 && !res.cartAction.variantId) {
+        const hasOptions = targetProd.options && targetProd.options.length > 0;
+        const hasSelectedOpts = res.cartAction.selectedOptions && Object.keys(res.cartAction.selectedOptions).length > 0;
+
+        // If the product has options BUT neither user nor AI has selected one yet -> Open Modal
+        if (hasOptions && !hasSelectedOpts && !res.cartAction.variantId) {
           const defaultOpts: Record<string, string> = {};
-          targetProd.options.forEach((opt) => {
+          targetProd.options?.forEach((opt: any) => {
             if (opt.values && opt.values.length > 0) {
               defaultOpts[opt.name] = opt.values[0];
             }
@@ -559,6 +563,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           setModalQuantity(res.cartAction.quantity || 1);
           setModalProduct(targetProd);
         } else {
+          // Selected options are present (e.g. Size: S) or no options needed -> Trigger Add to Cart directly!
           requestAddToCart(
             res.cartAction.productId,
             res.cartAction.quantity || 1,
@@ -1260,7 +1265,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       );
                     });
                     requestAddToCart(
-                      modalProduct.id,
+                      (modalProduct as any).externalId || modalProduct.id,
                       modalQuantity,
                       selectedVariant?.id,
                       selectedOptionsState,

@@ -28,6 +28,7 @@ export interface ProductVariant {
 
 export interface ProductCard {
   id: string;
+  externalId?: string;
   title: string;
   price: number;
   currency: string;

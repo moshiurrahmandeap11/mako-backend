@@ -371,24 +371,29 @@ async function requestAddToCart(productId, quantity = 1, variantId, selectedOpti
             message: 'Item added to cart!',
         };
     }
-    // 4. Cross-Page Navigation for Custom Stores (if user is on /cart or /collection)
-    if (productUrl && productUrl !== '#' && !window.location.href.includes(productUrl)) {
+    // 4. Cross-Page Navigation for Custom Stores (if user is on homepage, /cart, /collection, or different product page)
+    if (productUrl && productUrl !== '#' && typeof window !== 'undefined') {
         try {
-            sessionStorage.setItem('labto_auto_add', JSON.stringify({
-                productId,
-                variantId,
-                options: selectedOptions,
-                quantity: quantity || 1,
-                timestamp: Date.now(),
-            }));
-            window.location.href = productUrl;
-            return {
-                success: true,
-                platform: 'dom_simulation',
-                message: 'Opening product page to add item...',
-            };
+            const targetUrl = new URL(productUrl, window.location.origin);
+            if (targetUrl.pathname !== window.location.pathname) {
+                sessionStorage.setItem('labto_auto_add', JSON.stringify({
+                    productId,
+                    variantId,
+                    options: selectedOptions,
+                    quantity: quantity || 1,
+                    timestamp: Date.now(),
+                }));
+                window.location.href = targetUrl.href;
+                return {
+                    success: true,
+                    platform: 'dom_simulation',
+                    message: 'Opening product page to add item...',
+                };
+            }
         }
-        catch { }
+        catch (err) {
+            console.warn('[Labto AI Cart] Cross page navigation error:', err);
+        }
     }
     // 5. Fallback: Global Event Dispatch & LocalStorage update
     executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
