@@ -619,11 +619,11 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             maxHeight: isMobile ? '100dvh' : 'calc(100vh - 120px)',
             backgroundColor: '#ffffff',
             borderRadius: isMobile ? '0px' : '24px',
-            boxShadow: '0 30px 65px -12px rgba(15, 23, 42, 0.35), 0 14px 28px -6px rgba(15, 23, 42, 0.2), 0 0 0 1.5px rgba(15, 23, 42, 0.08)',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            border: isMobile ? 'none' : '1.5px solid #cbd5e1',
+            border: isMobile ? 'none' : '1px solid #E4E5E7',
             transform: isMobile
               ? 'none'
               : (windowOffset.x !== 0 || windowOffset.y !== 0 ? `translate3d(${windowOffset.x}px, ${windowOffset.y}px, 0)` : 'none'),
@@ -1084,7 +1084,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           color: '#ffffff',
           border: '2px solid rgba(255, 255, 255, 0.25)',
           cursor: isDragging ? 'grabbing' : 'pointer',
-          boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.38), 0 6px 16px -2px rgba(0, 0, 0, 0.22)',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
