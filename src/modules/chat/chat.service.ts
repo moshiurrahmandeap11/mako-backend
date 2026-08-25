@@ -544,10 +544,10 @@ Currently, no specific catalog items or knowledge base articles matched this que
     }
   }
 
-  // Attempt 2: High-Speed Groq Pool (llama-3.3-70b-versatile / llama-3.2-11b-vision-preview)
+  // Attempt 2: High-Speed Groq Pool (llama3-70b-8192 / llama-3.2-11b-vision-preview)
   if (!executionSuccess && (selectedProvider === 'groq' || keyRotator.hasGroqKeys())) {
     try {
-      const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+      const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama3-70b-8192';
       const result = await keyRotator.executeGroqCompletion(
         model,
         [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
