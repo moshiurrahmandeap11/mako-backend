@@ -492,12 +492,75 @@ async function indexPageContent(
       const fullImg = singleImg ? (singleImg.startsWith('http') ? singleImg : new URL(singleImg, origin).href) : '';
 
       const extractedOptions: Array<{ name: string; values: string[] }> = [];
-      const sizeButtons = $('button, .size-btn, [data-size]').filter((_, el) => /^(xs|s|m|l|xl|xxl|\d{2})$/i.test($(el).text().trim()));
-      if (sizeButtons.length > 0) {
+
+      // 1. Generic <select> option extraction (Dropdowns: Storage, Weight, Flavor, Material, Color, Size, etc.)
+      $('select').each((_, sel) => {
+        const selectEl = $(sel);
+        let optName =
+          selectEl.attr('name') ||
+          selectEl.attr('id') ||
+          selectEl.prev('label').text().trim() ||
+          selectEl.parent().find('label').text().trim() ||
+          'Option';
+        optName = optName.replace(/[-_]/g, ' ').replace(/attribute/i, '').replace(/select/i, '').trim();
+        optName = optName.charAt(0).toUpperCase() + optName.slice(1);
+
+        const vals: string[] = [];
+        selectEl.find('option').each((_, opt) => {
+          const t = $(opt).text().trim();
+          if (t && !/choose|select|pick/i.test(t) && t.length > 0 && t.length < 40) {
+            vals.push(t);
+          }
+        });
+
+        if (vals.length > 0 && !extractedOptions.some((o) => o.name.toLowerCase() === optName.toLowerCase())) {
+          extractedOptions.push({ name: optName, values: vals });
+        }
+      });
+
+      // 2. Generic Button Groups, Pills, & Swatches (Sizes, Storage, Weights, Colors)
+      const sizeButtons = $('button, .size-btn, [data-size]').filter((_, el) =>
+        /^(xs|s|m|l|xl|xxl|\d{2})$/i.test($(el).text().trim())
+      );
+      if (sizeButtons.length > 0 && !extractedOptions.some((o) => o.name.toLowerCase() === 'size')) {
         extractedOptions.push({
           name: 'Size',
-          values: sizeButtons.map((_, el) => $(el).text().trim()).get(),
+          values: Array.from(new Set(sizeButtons.map((_, el) => $(el).text().trim()).get())),
         });
+      }
+
+      const storageButtons = $('button, .option-btn, [data-storage]').filter((_, el) =>
+        /^\d+\s*(gb|tb|mb)$/i.test($(el).text().trim())
+      );
+      if (storageButtons.length > 0 && !extractedOptions.some((o) => o.name.toLowerCase() === 'storage')) {
+        extractedOptions.push({
+          name: 'Storage',
+          values: Array.from(new Set(storageButtons.map((_, el) => $(el).text().trim()).get())),
+        });
+      }
+
+      const weightButtons = $('button, .option-btn, [data-weight]').filter((_, el) =>
+        /^\d+\s*(g|kg|lb|oz|ml|l)$/i.test($(el).text().trim())
+      );
+      if (weightButtons.length > 0 && !extractedOptions.some((o) => o.name.toLowerCase() === 'weight')) {
+        extractedOptions.push({
+          name: 'Weight',
+          values: Array.from(new Set(weightButtons.map((_, el) => $(el).text().trim()).get())),
+        });
+      }
+
+      const colorButtons = $('[data-color], .color-swatch, .swatch[data-value]');
+      if (colorButtons.length > 0 && !extractedOptions.some((o) => o.name.toLowerCase() === 'color')) {
+        const colorVals = colorButtons
+          .map((_, el) => $(el).attr('data-color') || $(el).attr('data-value') || $(el).attr('title') || $(el).text().trim())
+          .get()
+          .filter(Boolean);
+        if (colorVals.length > 0) {
+          extractedOptions.push({
+            name: 'Color',
+            values: Array.from(new Set(colorVals)),
+          });
+        }
       }
 
       const urlMatch = currentUrlStr.match(/\/product[s]?\/([^\/\?#]+)/i);

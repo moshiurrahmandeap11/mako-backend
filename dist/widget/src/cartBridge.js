@@ -170,43 +170,53 @@ async function executeWooCommerceAddToCart(productId, quantity = 1, variantId, s
     };
 }
 /**
- * Tier 3: Smart DOM Simulation (For Custom React, Next.js, PHP, Webflow, HTML, Wix, Squarespace)
+ * Tier 3: Smart DOM Simulation (For Custom React, Next.js, Vue, PHP, Webflow, HTML, Wix, Squarespace)
  */
-function executeDomSimulationAddToCart(selectedOptions) {
+async function executeDomSimulationAddToCart(selectedOptions) {
     if (typeof document === 'undefined')
         return false;
     try {
-        // 1. If options like Size/Color were selected, find and click matching options / swatches / buttons
-        if (selectedOptions) {
+        // 1. If options like Size/Storage/Weight/Color were selected, find and click matching options / swatches / buttons
+        if (selectedOptions && Object.keys(selectedOptions).length > 0) {
+            let optionClicked = false;
             Object.entries(selectedOptions).forEach(([optName, optVal]) => {
                 const lowerName = String(optName).toLowerCase().trim();
                 const lowerVal = String(optVal).toLowerCase().trim();
-                // Search selects
+                // A. Search native <select> dropdowns
                 const selects = Array.from(document.querySelectorAll('select'));
                 for (const sel of selects) {
                     const selName = (sel.name || sel.id || sel.getAttribute('data-name') || '').toLowerCase();
-                    if (selName.includes(lowerName) || lowerName.includes('size') || lowerName.includes('color')) {
+                    if (selName.includes(lowerName) || lowerName.includes('size') || lowerName.includes('color') || lowerName.includes('storage') || lowerName.includes('weight')) {
                         for (let i = 0; i < sel.options.length; i++) {
                             const optText = sel.options[i].text.toLowerCase().trim();
                             const optV = sel.options[i].value.toLowerCase().trim();
                             if (optText === lowerVal || optV === lowerVal || optText.includes(lowerVal)) {
                                 sel.selectedIndex = i;
                                 sel.dispatchEvent(new Event('change', { bubbles: true }));
+                                sel.dispatchEvent(new Event('input', { bubbles: true }));
+                                optionClicked = true;
                                 break;
                             }
                         }
                     }
                 }
-                // Search buttons, swatches, radio buttons, spans
-                const clickableOptions = Array.from(document.querySelectorAll('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, [data-size], [data-value]'));
+                // B. Search interactive buttons, swatches, radio buttons, and pill chips
+                const clickableOptions = Array.from(document.querySelectorAll('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, [data-size], [data-value], [data-color], [data-storage], [data-weight]'));
                 for (const el of clickableOptions) {
-                    const text = (el.textContent || el.value || el.getAttribute('data-value') || '').trim().toLowerCase();
+                    const text = (el.textContent || el.value || el.getAttribute('data-value') || el.getAttribute('data-size') || el.getAttribute('data-color') || '').trim().toLowerCase();
                     if (text === lowerVal) {
+                        el.focus();
+                        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
                         el.click();
+                        optionClicked = true;
                         break;
                     }
                 }
             });
+            // If an option was selected, wait 150ms for React/Vue/Svelte/Next.js state hydration
+            if (optionClicked) {
+                await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 180)));
+            }
         }
         // 2. Find and trigger the native Add to Cart Button
         const buttonSelectors = [
@@ -226,6 +236,8 @@ function executeDomSimulationAddToCart(selectedOptions) {
         for (const sel of buttonSelectors) {
             const btn = document.querySelector(sel);
             if (btn && btn.offsetParent !== null && typeof btn.click === 'function') {
+                btn.focus();
+                btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
                 btn.click();
                 return true;
             }
@@ -235,6 +247,8 @@ function executeDomSimulationAddToCart(selectedOptions) {
         for (const b of allButtons) {
             const text = (b.textContent || b.value || '').trim().toLowerCase();
             if (/add\s*to\s*cart|add\s*to\s*bag|buy\s*now/i.test(text) && b.offsetParent !== null) {
+                b.focus();
+                b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
                 b.click();
                 return true;
             }
@@ -262,9 +276,9 @@ function initAutoAddWatcher() {
             return;
         }
         let attempts = 0;
-        const interval = setInterval(() => {
+        const interval = setInterval(async () => {
             attempts++;
-            const clicked = executeDomSimulationAddToCart(data.options);
+            const clicked = await executeDomSimulationAddToCart(data.options);
             if (clicked || attempts > 25) {
                 clearInterval(interval);
                 sessionStorage.removeItem('labto_auto_add');
@@ -348,7 +362,7 @@ async function requestAddToCart(productId, quantity = 1, variantId, selectedOpti
         }
     }
     // 3. Check & Execute Smart DOM Simulation on Current Page
-    const domSuccess = executeDomSimulationAddToCart(selectedOptions);
+    const domSuccess = await executeDomSimulationAddToCart(selectedOptions);
     if (domSuccess) {
         executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
         return {

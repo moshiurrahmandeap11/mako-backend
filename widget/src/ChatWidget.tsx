@@ -1195,10 +1195,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   )}
                 </div>
 
-                {(modalProduct.options || [
-                  { name: 'Color', values: ['Black', 'White', 'Navy'] },
-                  { name: 'Size', values: ['S', 'M', 'L', 'XL'] },
-                ]).map((opt) => (
+                {(modalProduct.options || []).map((opt) => (
                   <div key={opt.name} style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>
                       {opt.name}: <span style={{ color: '#0f172a', textTransform: 'none' }}>{selectedOptionsState[opt.name]}</span>
