@@ -356,6 +356,14 @@ function ChatWidget({ api }) {
             vid = `vid_${Math.random().toString(36).substring(2, 11)}`;
         }
         api.pingVisitor(vid).catch(console.error);
+        // 4. Auto-Add Watcher & Toast Listener
+        (0, cartBridge_1.initAutoAddWatcher)();
+        const handleToastEvent = (e) => {
+            if (e.detail?.message)
+                showToast(e.detail.message);
+        };
+        window.addEventListener('labto:toast', handleToastEvent);
+        return () => window.removeEventListener('labto:toast', handleToastEvent);
     }, []);
     (0, hooks_1.useEffect)(() => {
         if (isOpen) {
@@ -390,9 +398,9 @@ function ChatWidget({ api }) {
             const res = await api.sendMessage(sessionId, text);
             if (res.cartAction) {
                 const actionProdId = res.cartAction.productId;
-                const targetProd = (res.products || []).find((p) => p.id === actionProdId || p.externalId === actionProdId) || {
+                const targetProd = (res.products || []).find((p) => p.id === actionProdId || p.externalId === actionProdId || p.productUrl?.includes(actionProdId)) || {
                     id: actionProdId,
-                    title: 'Selected Item',
+                    title: 'Product',
                     price: 0,
                     currency: 'USD',
                     productUrl: '#',

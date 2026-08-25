@@ -1,7 +1,7 @@
 import { h, Fragment } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { WidgetAPI, WidgetConfig, ProductCard } from './api';
-import { requestAddToCart } from './cartBridge';
+import { requestAddToCart, initAutoAddWatcher } from './cartBridge';
 
 interface ChatWidgetProps {
   api: WidgetAPI;
@@ -487,6 +487,14 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     }
 
     api.pingVisitor(vid).catch(console.error);
+
+    // 4. Auto-Add Watcher & Toast Listener
+    initAutoAddWatcher();
+    const handleToastEvent = (e: any) => {
+      if (e.detail?.message) showToast(e.detail.message);
+    };
+    window.addEventListener('labto:toast', handleToastEvent);
+    return () => window.removeEventListener('labto:toast', handleToastEvent);
   }, []);
 
   useEffect(() => {
@@ -527,9 +535,11 @@ export function ChatWidget({ api }: ChatWidgetProps) {
 
       if (res.cartAction) {
         const actionProdId = res.cartAction.productId;
-        const targetProd = (res.products || []).find((p) => p.id === actionProdId || (p as any).externalId === actionProdId) || {
+        const targetProd = (res.products || []).find(
+          (p) => p.id === actionProdId || (p as any).externalId === actionProdId || p.productUrl?.includes(actionProdId)
+        ) || {
           id: actionProdId,
-          title: 'Selected Item',
+          title: 'Product',
           price: 0,
           currency: 'USD',
           productUrl: '#',

@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isShopifyStore = isShopifyStore;
 exports.isWooCommerceStore = isWooCommerceStore;
+exports.initAutoAddWatcher = initAutoAddWatcher;
 exports.requestAddToCart = requestAddToCart;
 /**
  * Checks if the current host page is running on Shopify
@@ -169,24 +170,26 @@ async function executeWooCommerceAddToCart(productId, quantity = 1, variantId, s
     };
 }
 /**
- * Tier 3: Smart DOM Simulation (For Custom PHP, Webflow, HTML, Wix, Squarespace)
+ * Tier 3: Smart DOM Simulation (For Custom React, Next.js, PHP, Webflow, HTML, Wix, Squarespace)
  */
 function executeDomSimulationAddToCart(selectedOptions) {
     if (typeof document === 'undefined')
         return false;
     try {
-        // 1. If options like Size/Color were selected, find matching selects or radio swatches
+        // 1. If options like Size/Color were selected, find and click matching options / swatches / buttons
         if (selectedOptions) {
             Object.entries(selectedOptions).forEach(([optName, optVal]) => {
-                const lowerName = optName.toLowerCase();
-                const lowerVal = optVal.toLowerCase();
+                const lowerName = String(optName).toLowerCase().trim();
+                const lowerVal = String(optVal).toLowerCase().trim();
                 // Search selects
                 const selects = Array.from(document.querySelectorAll('select'));
                 for (const sel of selects) {
                     const selName = (sel.name || sel.id || sel.getAttribute('data-name') || '').toLowerCase();
                     if (selName.includes(lowerName) || lowerName.includes('size') || lowerName.includes('color')) {
                         for (let i = 0; i < sel.options.length; i++) {
-                            if (sel.options[i].text.toLowerCase().includes(lowerVal) || sel.options[i].value.toLowerCase().includes(lowerVal)) {
+                            const optText = sel.options[i].text.toLowerCase().trim();
+                            const optV = sel.options[i].value.toLowerCase().trim();
+                            if (optText === lowerVal || optV === lowerVal || optText.includes(lowerVal)) {
                                 sel.selectedIndex = i;
                                 sel.dispatchEvent(new Event('change', { bubbles: true }));
                                 break;
@@ -194,12 +197,12 @@ function executeDomSimulationAddToCart(selectedOptions) {
                         }
                     }
                 }
-                // Search radio buttons / buttons / swatches
-                const swatches = Array.from(document.querySelectorAll('input[type="radio"], [role="radio"], button, .swatch, .option-btn'));
-                for (const sw of swatches) {
-                    const text = (sw.textContent || sw.value || '').trim().toLowerCase();
-                    if (text === lowerVal || text.includes(lowerVal)) {
-                        sw.click();
+                // Search buttons, swatches, radio buttons, spans
+                const clickableOptions = Array.from(document.querySelectorAll('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, [data-size], [data-value]'));
+                for (const el of clickableOptions) {
+                    const text = (el.textContent || el.value || el.getAttribute('data-value') || '').trim().toLowerCase();
+                    if (text === lowerVal) {
+                        el.click();
                         break;
                     }
                 }
@@ -227,11 +230,52 @@ function executeDomSimulationAddToCart(selectedOptions) {
                 return true;
             }
         }
+        // 3. Fallback: Search all buttons / submit inputs for Add to Cart text
+        const allButtons = Array.from(document.querySelectorAll('button, input[type="submit"], a[role="button"]'));
+        for (const b of allButtons) {
+            const text = (b.textContent || b.value || '').trim().toLowerCase();
+            if (/add\s*to\s*cart|add\s*to\s*bag|buy\s*now/i.test(text) && b.offsetParent !== null) {
+                b.click();
+                return true;
+            }
+        }
     }
     catch (err) {
         console.warn('[Labto AI Cart] DOM Simulation failed:', err);
     }
     return false;
+}
+/**
+ * Auto-Add Watcher for Cross-Page Navigations (e.g. user clicked Add to Cart from /cart or /collection)
+ */
+function initAutoAddWatcher() {
+    if (typeof window === 'undefined' || typeof document === 'undefined')
+        return;
+    try {
+        const raw = sessionStorage.getItem('labto_auto_add');
+        if (!raw)
+            return;
+        const data = JSON.parse(raw);
+        // Only process if within last 60 seconds
+        if (Date.now() - (data.timestamp || 0) > 60000) {
+            sessionStorage.removeItem('labto_auto_add');
+            return;
+        }
+        let attempts = 0;
+        const interval = setInterval(() => {
+            attempts++;
+            const clicked = executeDomSimulationAddToCart(data.options);
+            if (clicked || attempts > 25) {
+                clearInterval(interval);
+                sessionStorage.removeItem('labto_auto_add');
+                if (clicked) {
+                    executeEventAndLocalStorageAddToCart(data.productId, data.quantity, data.variantId, data.options);
+                    window.dispatchEvent(new CustomEvent('labto:toast', { detail: { message: 'Added to cart successfully!' } }));
+                }
+            }
+        }, 200);
+    }
+    catch { }
 }
 /**
  * Tier 4: Global Event Dispatcher & LocalStorage Fallback (For Custom React / Next.js / Headless Stores)
@@ -303,21 +347,40 @@ async function requestAddToCart(productId, quantity = 1, variantId, selectedOpti
             return wooResult;
         }
     }
-    // 3. Check & Execute Smart DOM Simulation
+    // 3. Check & Execute Smart DOM Simulation on Current Page
     const domSuccess = executeDomSimulationAddToCart(selectedOptions);
     if (domSuccess) {
         executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
         return {
             success: true,
             platform: 'dom_simulation',
-            message: 'Item added via storefront button simulation!',
+            message: 'Item added to cart!',
         };
     }
-    // 4. Fallback: Global Event Dispatch & LocalStorage update
+    // 4. Cross-Page Navigation for Custom Stores (if user is on /cart or /collection)
+    if (productUrl && productUrl !== '#' && !window.location.href.includes(productUrl)) {
+        try {
+            sessionStorage.setItem('labto_auto_add', JSON.stringify({
+                productId,
+                variantId,
+                options: selectedOptions,
+                quantity: quantity || 1,
+                timestamp: Date.now(),
+            }));
+            window.location.href = productUrl;
+            return {
+                success: true,
+                platform: 'dom_simulation',
+                message: 'Opening product page to add item...',
+            };
+        }
+        catch { }
+    }
+    // 5. Fallback: Global Event Dispatch & LocalStorage update
     executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
     return {
         success: true,
         platform: 'custom_event',
-        message: 'Cart action dispatched successfully!',
+        message: 'Added to cart!',
     };
 }
