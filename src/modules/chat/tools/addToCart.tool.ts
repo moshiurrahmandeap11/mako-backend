@@ -18,6 +18,8 @@ export async function addToCartTool(merchantId: string, productId: string, quant
     cartAction: {
       productId: product.externalId || product.id,
       quantity,
+      options: (product as any).options || undefined,
+      variants: (product as any).variants || undefined,
     },
     product: {
       id: product.id,
@@ -26,6 +28,8 @@ export async function addToCartTool(merchantId: string, productId: string, quant
       currency: product.currency,
       imageUrl: product.imageUrl,
       productUrl: product.productUrl,
+      options: (product as any).options || undefined,
+      variants: (product as any).variants || undefined,
     },
   };
 }

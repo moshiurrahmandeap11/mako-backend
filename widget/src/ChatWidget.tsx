@@ -120,8 +120,25 @@ function renderMarkdownText(text: string) {
     }
 
     if (match[1] && match[2]) {
-      const linkTitle = match[1];
+      let linkTitle = match[1].trim();
       const linkUrl = match[2];
+
+      // Fix Problem 2: If link title is a raw MongoDB/Prisma object ID or hostname domain, replace with clean title
+      if (/^[a-f0-9]{24}$/i.test(linkTitle) || linkTitle.endsWith('-frontend') || linkTitle.includes('vercel.app')) {
+        try {
+          const u = new URL(linkUrl);
+          if (u.pathname && (u.pathname.includes('/products/') || u.pathname.includes('/product/'))) {
+            linkTitle = 'View Product';
+          } else if (u.pathname && (u.pathname.includes('/collection') || u.pathname.includes('/category'))) {
+            linkTitle = 'View Collection';
+          } else {
+            linkTitle = 'View Item';
+          }
+        } catch {
+          linkTitle = 'View Item';
+        }
+      }
+
       parts.push(
         <a
           href={linkUrl}
@@ -264,6 +281,17 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState(0);
+
+  // Variant Options Selection Modal state
+  const [modalProduct, setModalProduct] = useState<ProductCard | null>(null);
+  const [selectedOptionsState, setSelectedOptionsState] = useState<Record<string, string>>({});
+  const [modalQuantity, setModalQuantity] = useState<number>(1);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -498,7 +526,35 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       const res = await api.sendMessage(sessionId, text);
 
       if (res.cartAction && config.eventBridgeEnabled) {
-        requestAddToCart(res.cartAction.productId, res.cartAction.quantity);
+        const actionProdId = res.cartAction.productId;
+        const targetProd = (res.products || []).find((p) => p.id === actionProdId) || {
+          id: actionProdId,
+          title: 'Selected Item',
+          price: 0,
+          currency: 'USD',
+          productUrl: '#',
+          inStock: true,
+          options: res.cartAction.options || [
+            { name: 'Color', values: ['Black', 'White', 'Navy'] },
+            { name: 'Size', values: ['S', 'M', 'L', 'XL'] },
+          ],
+          variants: res.cartAction.variants,
+        };
+
+        if (targetProd.options && targetProd.options.length > 0) {
+          const defaultOpts: Record<string, string> = {};
+          targetProd.options.forEach((opt) => {
+            if (opt.values && opt.values.length > 0) {
+              defaultOpts[opt.name] = opt.values[0];
+            }
+          });
+          setSelectedOptionsState(defaultOpts);
+          setModalQuantity(res.cartAction.quantity || 1);
+          setModalProduct(targetProd);
+        } else {
+          requestAddToCart(res.cartAction.productId, res.cartAction.quantity);
+          showToast(`Added to cart!`);
+        }
       }
 
       const botMsg: MessageItem = {
@@ -1047,6 +1103,171 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               </div>
             )}
           </div>
+
+          {/* Toast Notification Banner */}
+          {toastMsg && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '64px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: '#0f172a',
+                color: '#ffffff',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: '600',
+                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)',
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                animation: 'fadeIn 0.2s ease',
+              }}
+            >
+              <span>✓</span>
+              <span>{toastMsg}</span>
+            </div>
+          )}
+
+          {/* Product Variant Options Selection Modal */}
+          {modalProduct && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                backdropFilter: 'blur(4px)',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  maxWidth: '310px',
+                  width: '100%',
+                  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
+                  border: '1px solid #e2e8f0',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>Select Product Options</h4>
+                  <button
+                    type="button"
+                    onClick={() => setModalProduct(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '16px', fontWeight: '700' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ marginBottom: '14px', fontSize: '12.5px', color: '#334155' }}>
+                  <div style={{ fontWeight: '600', color: '#0f172a' }}>{modalProduct.title}</div>
+                  {modalProduct.price > 0 && (
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: primaryColor, marginTop: '2px' }}>
+                      ${modalProduct.price} {modalProduct.currency || 'USD'}
+                    </div>
+                  )}
+                </div>
+
+                {(modalProduct.options || [
+                  { name: 'Color', values: ['Black', 'White', 'Navy'] },
+                  { name: 'Size', values: ['S', 'M', 'L', 'XL'] },
+                ]).map((opt) => (
+                  <div key={opt.name} style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>
+                      {opt.name}: <span style={{ color: '#0f172a', textTransform: 'none' }}>{selectedOptionsState[opt.name]}</span>
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {opt.values.map((val) => {
+                        const isSelected = selectedOptionsState[opt.name] === val;
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setSelectedOptionsState((prev) => ({ ...prev, [opt.name]: val }))}
+                            style={{
+                              padding: '5px 12px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              border: isSelected ? `2px solid ${primaryColor}` : '1px solid #cbd5e1',
+                              backgroundColor: isSelected ? `${primaryColor}15` : '#ffffff',
+                              color: isSelected ? primaryColor : '#334155',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            {val}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Quantity Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Quantity:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
+                    <button
+                      type="button"
+                      onClick={() => setModalQuantity((q) => Math.max(1, q - 1))}
+                      style={{ width: '28px', height: '28px', border: 'none', backgroundColor: '#f8fafc', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      -
+                    </button>
+                    <span style={{ padding: '0 10px', fontSize: '12px', fontWeight: '600' }}>{modalQuantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => setModalQuantity((q) => q + 1)}
+                      style={{ width: '28px', height: '28px', border: 'none', backgroundColor: '#f8fafc', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const selectedVariant = modalProduct.variants?.find((v) => {
+                      if (!v.options) return false;
+                      return Object.entries(selectedOptionsState).every(([k, val]) => v.options?.[k] === val);
+                    });
+                    requestAddToCart(modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState);
+                    showToast(`Added '${modalProduct.title}' to cart!`);
+                    setModalProduct(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    backgroundColor: primaryColor,
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(29, 191, 115, 0.25)',
+                  }}
+                >
+                  Confirm & Add to Cart
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

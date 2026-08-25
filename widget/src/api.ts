@@ -13,6 +13,19 @@ export interface WidgetConfig {
   eventBridgeEnabled?: boolean;
 }
 
+export interface ProductOption {
+  name: string;
+  values: string[];
+}
+
+export interface ProductVariant {
+  id: string;
+  title?: string;
+  price?: number;
+  inStock?: boolean;
+  options?: Record<string, string>;
+}
+
 export interface ProductCard {
   id: string;
   title: string;
@@ -21,6 +34,8 @@ export interface ProductCard {
   imageUrl?: string;
   productUrl: string;
   inStock: boolean;
+  options?: ProductOption[];
+  variants?: ProductVariant[];
 }
 
 export interface ChatResponse {
@@ -30,6 +45,8 @@ export interface ChatResponse {
   cartAction?: {
     productId: string;
     quantity: number;
+    options?: ProductOption[];
+    variants?: ProductVariant[];
   };
   thoughts?: string[];
 }

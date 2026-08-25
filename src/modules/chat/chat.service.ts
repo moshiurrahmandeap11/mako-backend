@@ -163,13 +163,20 @@ ${customPrompt}`;
     Assistant: "Project er scope ebong requirement onujayi amader pricing nirdharon kora hoy।"
 - NEVER mix conflicting pronouns, broken phonetics, or passive phrases like "ara" or "dekha jay". Use clear, fluent, natural conversational Banglish.`;
 
-  const linkAndContextRule = `CONTEXT AWARENESS, MANDATORY CLICKABLE LINKS & MARKDOWN FORMATTING (CRITICAL):
+  const linkAndContextRule = `CONTEXT AWARENESS, MANDATORY CLICKABLE LINKS & CLEAN LINK TITLES (CRITICAL):
 - The user is ALREADY ON THIS WEBSITE chatting with the embedded assistant.
 - NEVER say "visit our website [homepage_url]" or suggest navigating to the homepage, because the visitor is already on it!
-- MANDATORY CLICKABLE LINKS: EVERY single project name, portfolio item, service, or product mentioned in your response MUST be formatted as a clickable link badge: [Project Name](url).
-- NEVER output plain text project names in quotes (e.g. NEVER write '"AESHUT"' or '"Lusion Studio"' without brackets and URLs). ALWAYS write '[AESHUT](url)' or '[Lusion Studio](url)'.
-- ALWAYS format clickable links with CLEAN, SHORT TITLES: [Clean Title](url) e.g. [CareerPilot](https://abidnirob.com/projects/careerpilot) or [All Projects](https://abidnirob.com/projects).
-- NEVER put raw URLs, domain names, or full sentences inside the link brackets (e.g. NEVER write "[Explore All Projects - abidnirob.com/projects](url)").`;
+- MANDATORY CLICKABLE LINKS: EVERY single project name, portfolio item, service, or product mentioned in your response MUST be formatted as a clickable link badge: [Product / Project Name](url).
+- HARD BAN ON RAW DATABASE OBJECT IDS OR HOSTNAMES AS LINK TITLES: NEVER write link titles containing hexadecimal database IDs (e.g. NEVER write "[691f478fccec252c64981b47](url)") or raw domain strings (e.g. NEVER write "[everwear-frontend](url)").
+- ALWAYS format clickable links with CLEAN, HUMAN-READABLE PRODUCT OR PAGE TITLES e.g. [Electronic Plastic Table ($600)](url), [Generic Steel Pants ($987)](url), or [View Collection](url).`;
+
+  const addCartInstruction = `DIRECT ADD TO CART & VARIANT SELECTION:
+- When a user asks to add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami kina chai") or confirms buying a product, DO NOT reply with text telling them to visit a website page manually.
+- Instead, ALWAYS append a JSON cart action block at the very end of your reply:
+\`\`\`json:cart_action
+{ "productId": "<PRODUCT_ID_OR_SLUG>", "quantity": 1 }
+\`\`\`
+or tag format: [ADD_TO_CART: PRODUCT_ID]`;
 
   const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (STRICT RULE):
 - You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "Amader", "Amra").
@@ -211,12 +218,13 @@ Strict Rules:
 3. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
 4. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
 5. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
-6. ${tokenEfficiencyRule}
-7. ${scopeLockRule}
-8. LANGUAGE & SCRIPT MATCHING: ${langRule}
-9. FORMATTING RULE: ${formatRule}
-10. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
-${cartRule ? `11. CART ACTION RULE: ${cartRule}` : ''}`.trim();
+6. DIRECT ADD TO CART: ${addCartInstruction}
+7. ${tokenEfficiencyRule}
+8. ${scopeLockRule}
+9. LANGUAGE & SCRIPT MATCHING: ${langRule}
+10. FORMATTING RULE: ${formatRule}
+11. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
+${cartRule ? `12. MERCHANT CUSTOM CART RULE: ${cartRule}` : ''}`.trim();
 }
 
 export async function processChatMessage(
@@ -645,15 +653,34 @@ Currently, no specific catalog items or knowledge base articles matched this que
     }
   }
 
-  const cartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)\]/);
-  if (cartMatch) {
+  // 1. Check for ```json:cart_action ... ``` or raw cart json
+  const jsonCartMatch = finalReply.match(/```json:cart_action\s*([\s\S]*?)\s*```/i) || finalReply.match(/\{[\s\S]*?"productId"\s*:\s*"([^"]+)"[\s\S]*?\}/i);
+  const tagCartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)\]/i);
+
+  if (jsonCartMatch || tagCartMatch) {
     try {
-      const productId = cartMatch[1];
-      const res = await addToCartTool(merchantId, productId, 1);
-      if (res.cartAction) cartAction = res.cartAction;
-      if (res.product) recommendedProducts.push(res.product);
-      // Strip the tag from the user-facing reply text
-      finalReply = finalReply.replace(/\[ADD_TO_CART:\s*[a-zA-Z0-9_-]+\]/, '').trim();
+      let targetProdId = '';
+      let targetQty = 1;
+
+      if (jsonCartMatch) {
+        if (jsonCartMatch[1] && jsonCartMatch[1].startsWith('{')) {
+          const parsed = JSON.parse(jsonCartMatch[1]);
+          targetProdId = parsed.productId || parsed.id || '';
+          targetQty = parsed.quantity || 1;
+        } else if (jsonCartMatch[1]) {
+          targetProdId = jsonCartMatch[1].trim();
+        }
+        finalReply = finalReply.replace(/```json:cart_action[\s\S]*?```/gi, '').trim();
+      } else if (tagCartMatch) {
+        targetProdId = tagCartMatch[1];
+        finalReply = finalReply.replace(/\[ADD_TO_CART:\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
+      }
+
+      if (targetProdId) {
+        const res = await addToCartTool(merchantId, targetProdId, targetQty);
+        if (res.cartAction) cartAction = res.cartAction;
+        if (res.product) recommendedProducts.push(res.product);
+      }
     } catch (err) {
       logger.error('Parsing Add to Cart Tag Error:', err);
     }
