@@ -14,6 +14,15 @@ export interface ScrapedProduct {
   productUrl: string;
   category: string;
   inStock: boolean;
+  options?: Array<{ name: string; values: string[] }>;
+  variants?: Array<{
+    id: string;
+    title?: string;
+    price?: number;
+    available?: boolean;
+    sku?: string;
+    options?: Record<string, string>;
+  }>;
 }
 
 export interface ScrapeResult {
@@ -294,41 +303,146 @@ async function indexPageContent(
 
   const productsFound: ScrapedProduct[] = [];
 
-  // 1. JSON-LD structured product metadata
-  $('script[type="application/ld+json"]').each((_, element) => {
+  // 1. Shopify Embedded Product JSON extraction (Highest fidelity variant mapping)
+  $('script[type="application/json"][id*="ProductJson"], script[type="application/json"][data-product-json], script[id*="product-json"]').each((_, el) => {
     try {
-      const jsonText = $(element).html();
+      const jsonText = $(el).html();
       if (!jsonText) return;
-      const data = JSON.parse(jsonText);
-      const items = Array.isArray(data) ? data : [data];
+      const pData = JSON.parse(jsonText);
+      if (pData && (pData.title || pData.name) && (pData.variants || pData.options)) {
+        const pTitle = pData.title || pData.name;
+        const pDesc = pData.description || metaDescription || pTitle;
+        const pPrice = pData.price ? (typeof pData.price === 'number' ? (pData.price > 1000 ? pData.price / 100 : pData.price) : parseFloat(pData.price)) : 0;
+        const pImg = pData.featured_image || (Array.isArray(pData.images) ? pData.images[0] : '') || ogImage;
+        const pUrl = pData.url ? new URL(pData.url, origin).href : currentUrlStr;
+        const pId = String(pData.id || `SHOPIFY-${Date.now()}`);
 
-      for (const item of items) {
-        if (item['@type'] === 'Product' || item['@type'] === 'http://schema.org/Product') {
-          const title = item.name || pageTitle;
-          const description = item.description || metaDescription || title;
-          const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers || {};
-          const price = parseFloat(offer.price || offer.lowPrice || '0') || 0;
-          const currency = offer.priceCurrency || 'USD';
-          const imageUrl = Array.isArray(item.image) ? item.image[0] : item.image || ogImage || '';
-          const productUrl = item.url ? new URL(item.url, origin).href : currentUrlStr;
-          const category = item.category || 'General';
-          const sku = item.sku || item.mpn || `SCRAPE-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+        const extractedOptions = Array.isArray(pData.options)
+          ? pData.options.map((opt: any) => (typeof opt === 'string' ? { name: opt, values: [] } : { name: opt.name || 'Option', values: opt.values || [] }))
+          : [];
 
-          productsFound.push({
-            externalId: String(sku),
-            title: String(title).trim(),
-            description: String(description).trim(),
-            price,
-            currency,
-            imageUrl: String(imageUrl),
-            productUrl: String(productUrl),
-            category: String(category),
-            inStock: true,
-          });
+        const extractedVariants = Array.isArray(pData.variants)
+          ? pData.variants.map((v: any) => ({
+              id: String(v.id),
+              title: v.title || v.name,
+              price: v.price ? (typeof v.price === 'number' ? (v.price > 1000 ? v.price / 100 : v.price) : parseFloat(v.price)) : pPrice,
+              available: v.available !== undefined ? Boolean(v.available) : true,
+              sku: v.sku,
+              options: v.options ? (Array.isArray(v.options) ? Object.fromEntries(v.options.map((val: string, idx: number) => [extractedOptions[idx]?.name || `Option ${idx + 1}`, val])) : v.options) : {},
+            }))
+          : [];
+
+        productsFound.push({
+          externalId: pId,
+          title: String(pTitle).trim(),
+          description: String(pDesc).trim(),
+          price: pPrice,
+          currency: 'USD',
+          imageUrl: String(pImg),
+          productUrl: pUrl,
+          category: pData.type || 'Product',
+          inStock: true,
+          options: extractedOptions.length > 0 ? extractedOptions : undefined,
+          variants: extractedVariants.length > 0 ? extractedVariants : undefined,
+        });
+      }
+    } catch {}
+  });
+
+  // 2. WooCommerce Variations Form extraction
+  $('form.variations_form[data-product_variations]').each((_, el) => {
+    try {
+      const rawVariations = $(el).attr('data-product_variations');
+      if (!rawVariations) return;
+      const vData = JSON.parse(rawVariations);
+      if (Array.isArray(vData) && vData.length > 0) {
+        const firstVar = vData[0];
+        const pPrice = parseFloat(firstVar.display_price || firstVar.price || '0') || 0;
+        const pUrl = currentUrlStr;
+        const pId = String(firstVar.variation_id || `WOO-${Date.now()}`);
+
+        const extractedVariants = vData.map((v: any) => ({
+          id: String(v.variation_id || v.id),
+          price: parseFloat(v.display_price || v.price || '0') || pPrice,
+          available: v.is_in_stock !== undefined ? Boolean(v.is_in_stock) : true,
+          sku: v.sku,
+          options: v.attributes || {},
+        }));
+
+        const optionsMap: Record<string, Set<string>> = {};
+        vData.forEach((v: any) => {
+          if (v.attributes) {
+            Object.entries(v.attributes).forEach(([k, val]) => {
+              const cleanKey = k.replace(/^attribute_pa_|^attribute_/i, '');
+              if (!optionsMap[cleanKey]) optionsMap[cleanKey] = new Set();
+              if (val) optionsMap[cleanKey].add(String(val));
+            });
+          }
+        });
+
+        const extractedOptions = Object.entries(optionsMap).map(([name, set]) => ({
+          name,
+          values: Array.from(set),
+        }));
+
+        if (productsFound.length > 0) {
+          productsFound[0].options = extractedOptions;
+          productsFound[0].variants = extractedVariants;
         }
       }
     } catch {}
   });
+
+  // 3. JSON-LD structured product metadata
+  if (productsFound.length === 0) {
+    $('script[type="application/ld+json"]').each((_, element) => {
+      try {
+        const jsonText = $(element).html();
+        if (!jsonText) return;
+        const data = JSON.parse(jsonText);
+        const items = Array.isArray(data) ? data : [data];
+
+        for (const item of items) {
+          if (item['@type'] === 'Product' || item['@type'] === 'http://schema.org/Product') {
+            const title = item.name || pageTitle;
+            const description = item.description || metaDescription || title;
+            const offers = Array.isArray(item.offers) ? item.offers : [item.offers || {}];
+            const primaryOffer = offers[0] || {};
+            const price = parseFloat(primaryOffer.price || primaryOffer.lowPrice || '0') || 0;
+            const currency = primaryOffer.priceCurrency || 'USD';
+            const imageUrl = Array.isArray(item.image) ? item.image[0] : item.image || ogImage || '';
+            const productUrl = item.url ? new URL(item.url, origin).href : currentUrlStr;
+            const category = item.category || 'General';
+            const sku = item.sku || item.mpn || `SCRAPE-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+
+            let parsedVariants: any[] | undefined = undefined;
+            if (offers.length > 1) {
+              parsedVariants = offers.map((off: any, idx: number) => ({
+                id: String(off.sku || off.identifier || `VAR-${idx + 1}`),
+                title: off.name || `Option ${idx + 1}`,
+                price: parseFloat(off.price || '0') || price,
+                available: off.availability ? !off.availability.includes('OutOfStock') : true,
+                sku: off.sku,
+              }));
+            }
+
+            productsFound.push({
+              externalId: String(sku),
+              title: String(title).trim(),
+              description: String(description).trim(),
+              price,
+              currency,
+              imageUrl: String(imageUrl),
+              productUrl: String(productUrl),
+              category: String(category),
+              inStock: true,
+              variants: parsedVariants,
+            });
+          }
+        }
+      } catch {}
+    });
+  }
 
   // 2. DOM Product / Portfolio Card extraction
   if (productsFound.length === 0) {
@@ -463,6 +577,8 @@ async function indexPageContent(
           productUrl: prod.productUrl,
           category: prod.category,
           inStock: prod.inStock,
+          options: prod.options ? (prod.options as any) : undefined,
+          variants: prod.variants ? (prod.variants as any) : undefined,
         },
         update: {
           title: prod.title,
@@ -473,6 +589,8 @@ async function indexPageContent(
           productUrl: prod.productUrl,
           category: prod.category,
           inStock: prod.inStock,
+          ...(prod.options ? { options: prod.options as any } : {}),
+          ...(prod.variants ? { variants: prod.variants as any } : {}),
         },
       });
 

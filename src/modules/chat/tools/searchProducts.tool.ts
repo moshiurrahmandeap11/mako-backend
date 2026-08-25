@@ -12,13 +12,12 @@ export async function searchProductsTool(
     // 1. Generate query embedding
     const queryVector = await generateEmbedding(query);
 
-    // Check if any product has non-zero embedding
     let products: any[] = [];
 
     try {
       // Try pgvector cosine distance search
       const rawResults = await executeRawNeonQuery(
-        `SELECT id, "externalId", title, description, price, currency, "imageUrl", "productUrl", category, "inStock",
+        `SELECT id, "externalId", title, description, price, currency, "imageUrl", "productUrl", category, "inStock", "options", "variants",
                 (embedding <=> $1::vector) as distance
          FROM "Product"
          WHERE "merchantId" = $2 AND "inStock" = true
@@ -34,7 +33,7 @@ export async function searchProductsTool(
       logger.warn('pgvector search fallback to ILIKE text query:', e);
     }
 
-    // Fallback: If vector search returns empty (e.g. no embeddings generated yet), perform ILIKE search
+    // Fallback: If vector search returns empty, perform ILIKE search
     if (products.length === 0) {
       products = await prisma.product.findMany({
         where: {
@@ -52,6 +51,7 @@ export async function searchProductsTool(
 
     return products.map((p) => ({
       id: p.id,
+      externalId: p.externalId,
       title: p.title,
       description: p.description,
       price: Number(p.price),
@@ -60,6 +60,8 @@ export async function searchProductsTool(
       productUrl: p.productUrl,
       category: p.category,
       inStock: p.inStock,
+      options: p.options || undefined,
+      variants: p.variants || undefined,
     }));
   } catch (error) {
     logger.error('Error in searchProductsTool:', error);

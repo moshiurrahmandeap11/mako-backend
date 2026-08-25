@@ -525,23 +525,20 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     try {
       const res = await api.sendMessage(sessionId, text);
 
-      if (res.cartAction && config.eventBridgeEnabled) {
+      if (res.cartAction) {
         const actionProdId = res.cartAction.productId;
-        const targetProd = (res.products || []).find((p) => p.id === actionProdId) || {
+        const targetProd = (res.products || []).find((p) => p.id === actionProdId || (p as any).externalId === actionProdId) || {
           id: actionProdId,
           title: 'Selected Item',
           price: 0,
           currency: 'USD',
           productUrl: '#',
           inStock: true,
-          options: res.cartAction.options || [
-            { name: 'Color', values: ['Black', 'White', 'Navy'] },
-            { name: 'Size', values: ['S', 'M', 'L', 'XL'] },
-          ],
+          options: res.cartAction.options,
           variants: res.cartAction.variants,
         };
 
-        if (targetProd.options && targetProd.options.length > 0) {
+        if (targetProd.options && targetProd.options.length > 0 && !res.cartAction.variantId) {
           const defaultOpts: Record<string, string> = {};
           targetProd.options.forEach((opt) => {
             if (opt.values && opt.values.length > 0) {
@@ -552,8 +549,15 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           setModalQuantity(res.cartAction.quantity || 1);
           setModalProduct(targetProd);
         } else {
-          requestAddToCart(res.cartAction.productId, res.cartAction.quantity);
-          showToast(`Added to cart!`);
+          requestAddToCart(
+            res.cartAction.productId,
+            res.cartAction.quantity || 1,
+            res.cartAction.variantId,
+            res.cartAction.selectedOptions,
+            targetProd.productUrl
+          ).then((result) => {
+            showToast(result.message || 'Added to cart!');
+          });
         }
       }
 
@@ -1244,10 +1248,19 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   onClick={() => {
                     const selectedVariant = modalProduct.variants?.find((v) => {
                       if (!v.options) return false;
-                      return Object.entries(selectedOptionsState).every(([k, val]) => v.options?.[k] === val);
+                      return Object.entries(selectedOptionsState).every(
+                        ([k, val]) => String(v.options?.[k]).toLowerCase() === String(val).toLowerCase()
+                      );
                     });
-                    requestAddToCart(modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState);
-                    showToast(`Added '${modalProduct.title}' to cart!`);
+                    requestAddToCart(
+                      modalProduct.id,
+                      modalQuantity,
+                      selectedVariant?.id,
+                      selectedOptionsState,
+                      modalProduct.productUrl
+                    ).then((res) => {
+                      showToast(res.message || `Added '${modalProduct.title}' to cart!`);
+                    });
                     setModalProduct(null);
                   }}
                   style={{

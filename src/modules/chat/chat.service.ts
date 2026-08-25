@@ -170,13 +170,22 @@ ${customPrompt}`;
 - HARD BAN ON RAW DATABASE OBJECT IDS OR HOSTNAMES AS LINK TITLES: NEVER write link titles containing hexadecimal database IDs (e.g. NEVER write "[691f478fccec252c64981b47](url)") or raw domain strings (e.g. NEVER write "[everwear-frontend](url)").
 - ALWAYS format clickable links with CLEAN, HUMAN-READABLE PRODUCT OR PAGE TITLES e.g. [Electronic Plastic Table ($600)](url), [Generic Steel Pants ($987)](url), or [View Collection](url).`;
 
-  const addCartInstruction = `DIRECT ADD TO CART & VARIANT SELECTION:
-- When a user asks to add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami kina chai") or confirms buying a product, DO NOT reply with text telling them to visit a website page manually.
-- Instead, ALWAYS append a JSON cart action block at the very end of your reply:
-\`\`\`json:cart_action
-{ "productId": "<PRODUCT_ID_OR_SLUG>", "quantity": 1 }
-\`\`\`
-or tag format: [ADD_TO_CART: PRODUCT_ID]`;
+  const addCartInstruction = `DIRECT ADD TO CART & VARIANT INQUIRY (CRITICAL RULE):
+- When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo"):
+  1. CHECK IF THE PRODUCT HAS VARIANTS/OPTIONS (e.g., Sizes like S, M, L, XL or Colors like Red, Black):
+     - If the user HAS NOT specified their size or color yet: YOU MUST ASK THEM for their preferred size/color (e.g. "We have sizes S, M, and L available. Which one would you prefer?").
+     - Also append the cart action tag with the productId so the storefront widget can display the variant picker modal if the user prefers clicking.
+  2. Once the user specifies their size or color (e.g. "L size", "Black color"), match it to the corresponding variant ID and append:
+     \`\`\`json:cart_action
+     { "productId": "<PRODUCT_ID>", "variantId": "<VARIANT_ID>", "quantity": 1, "selectedOptions": { "Size": "<SIZE>", "Color": "<COLOR>" } }
+     \`\`\`
+     or tag: [ADD_TO_CART: productId, variantId]
+  3. If the product has NO variants/options: immediately append:
+     \`\`\`json:cart_action
+     { "productId": "<PRODUCT_ID>", "quantity": 1 }
+     \`\`\`
+     or tag: [ADD_TO_CART: productId]
+- NEVER tell the user to visit a website page manually to add to cart; ALWAYS trigger the cart action tag!`;
 
   const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (STRICT RULE):
 - You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "Amader", "Amra").
@@ -655,17 +664,21 @@ Currently, no specific catalog items or knowledge base articles matched this que
 
   // 1. Check for ```json:cart_action ... ``` or raw cart json
   const jsonCartMatch = finalReply.match(/```json:cart_action\s*([\s\S]*?)\s*```/i) || finalReply.match(/\{[\s\S]*?"productId"\s*:\s*"([^"]+)"[\s\S]*?\}/i);
-  const tagCartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)\]/i);
+  const tagCartMatch = finalReply.match(/\[ADD_TO_CART:\s*([a-zA-Z0-9_-]+)(?:,\s*([a-zA-Z0-9_-]+))?\]/i);
 
   if (jsonCartMatch || tagCartMatch) {
     try {
       let targetProdId = '';
+      let targetVariantId: string | undefined = undefined;
+      let targetOptions: Record<string, string> | undefined = undefined;
       let targetQty = 1;
 
       if (jsonCartMatch) {
         if (jsonCartMatch[1] && jsonCartMatch[1].startsWith('{')) {
           const parsed = JSON.parse(jsonCartMatch[1]);
           targetProdId = parsed.productId || parsed.id || '';
+          targetVariantId = parsed.variantId;
+          targetOptions = parsed.selectedOptions || parsed.options;
           targetQty = parsed.quantity || 1;
         } else if (jsonCartMatch[1]) {
           targetProdId = jsonCartMatch[1].trim();
@@ -673,11 +686,14 @@ Currently, no specific catalog items or knowledge base articles matched this que
         finalReply = finalReply.replace(/```json:cart_action[\s\S]*?```/gi, '').trim();
       } else if (tagCartMatch) {
         targetProdId = tagCartMatch[1];
-        finalReply = finalReply.replace(/\[ADD_TO_CART:\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
+        if (tagCartMatch[2]) {
+          targetVariantId = tagCartMatch[2];
+        }
+        finalReply = finalReply.replace(/\[ADD_TO_CART:\s*[a-zA-Z0-9_-]+(?:,\s*[a-zA-Z0-9_-]+)?\]/gi, '').trim();
       }
 
       if (targetProdId) {
-        const res = await addToCartTool(merchantId, targetProdId, targetQty);
+        const res = await addToCartTool(merchantId, targetProdId, targetQty, targetVariantId, targetOptions);
         if (res.cartAction) cartAction = res.cartAction;
         if (res.product) recommendedProducts.push(res.product);
       }

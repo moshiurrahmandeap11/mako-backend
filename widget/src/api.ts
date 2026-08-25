@@ -45,6 +45,8 @@ export interface ChatResponse {
   cartAction?: {
     productId: string;
     quantity: number;
+    variantId?: string;
+    selectedOptions?: Record<string, string>;
     options?: ProductOption[];
     variants?: ProductVariant[];
   };
