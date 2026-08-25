@@ -408,24 +408,29 @@ function ChatWidget({ api }) {
                     options: res.cartAction.options,
                     variants: res.cartAction.variants,
                 };
-                const hasOptions = targetProd.options && targetProd.options.length > 0;
-                const hasSelectedOpts = res.cartAction.selectedOptions && Object.keys(res.cartAction.selectedOptions).length > 0;
-                // If the product has options BUT neither user nor AI has selected one yet -> Open Modal
+                const allOptions = res.cartAction.options || targetProd.options || [];
+                const hasOptions = Array.isArray(allOptions) && allOptions.length > 0;
+                const hasSelectedOpts = res.cartAction.selectedOptions &&
+                    typeof res.cartAction.selectedOptions === 'object' &&
+                    Object.keys(res.cartAction.selectedOptions).length > 0;
+                // If the product has options BUT neither user nor AI has selected one yet -> Open Modal ONLY
                 if (hasOptions && !hasSelectedOpts && !res.cartAction.variantId) {
                     const defaultOpts = {};
-                    targetProd.options?.forEach((opt) => {
+                    allOptions.forEach((opt) => {
                         if (opt.values && opt.values.length > 0) {
                             defaultOpts[opt.name] = opt.values[0];
                         }
                     });
                     setSelectedOptionsState(defaultOpts);
                     setModalQuantity(res.cartAction.quantity || 1);
-                    setModalProduct(targetProd);
+                    setModalProduct({ ...targetProd, options: allOptions });
                 }
                 else {
-                    // Selected options are present (e.g. Size: S) or no options needed -> Trigger Add to Cart directly!
+                    // Selected options are present (e.g. Size: S) or product has NO options -> Call Add to Cart!
                     (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, targetProd.productUrl).then((result) => {
-                        showToast(result.message || 'Added to cart!');
+                        if (result.message && !result.platform?.includes('cross_page')) {
+                            showToast(result.message);
+                        }
                     });
                 }
             }

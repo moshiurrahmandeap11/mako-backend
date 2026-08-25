@@ -684,6 +684,53 @@ Currently, no specific catalog items or knowledge base articles matched this que
             logger_1.logger.error('Parsing Add to Cart Tag Error:', err);
         }
     }
+    // Fail-safe Smart Action Extractor:
+    // If no cartAction was parsed from tags, but the AI confirmed adding a product in finalReply
+    if (!cartAction && finalReply) {
+        const isConfirmingAdd = /cart\s*e\s*(add|যুক্ত|যোগ|রাখা|করা)|\b(added\s*to\s*cart|add\s*kora\s*hoyeche)\b/i.test(finalReply);
+        if (isConfirmingAdd) {
+            try {
+                const linkMatch = finalReply.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                let targetProdId = '';
+                if (linkMatch && linkMatch[2]) {
+                    const urlIdMatch = linkMatch[2].match(/\/product[s]?\/([^\/\?#]+)/i);
+                    if (urlIdMatch) {
+                        targetProdId = urlIdMatch[1];
+                    }
+                }
+                let matchedProd = null;
+                if (targetProdId) {
+                    matchedProd = await db_1.prisma.product.findFirst({
+                        where: {
+                            merchantId,
+                            OR: [{ externalId: targetProdId }, { id: targetProdId }, { productUrl: { contains: targetProdId } }],
+                        },
+                    });
+                }
+                else if (linkMatch && linkMatch[1]) {
+                    matchedProd = await db_1.prisma.product.findFirst({
+                        where: { merchantId, title: { contains: linkMatch[1].trim(), mode: 'insensitive' } },
+                    });
+                }
+                if (matchedProd) {
+                    let targetOptions = undefined;
+                    const sizeMatch = finalReply.match(/Size:\s*([a-zA-Z0-9]+)/i) || userMessage.match(/^(xs|s|m|l|xl|xxl|\d{2})$/i);
+                    if (sizeMatch) {
+                        targetOptions = { Size: (sizeMatch[1] || sizeMatch[0]).toUpperCase() };
+                    }
+                    const res = await (0, addToCart_tool_1.addToCartTool)(merchantId, matchedProd.externalId || matchedProd.id, 1, undefined, targetOptions);
+                    if (res.cartAction)
+                        cartAction = res.cartAction;
+                    if (res.product && !recommendedProducts.some((p) => p.id === res.product.id)) {
+                        recommendedProducts.push(res.product);
+                    }
+                }
+            }
+            catch (err) {
+                logger_1.logger.error('Smart Action Extractor Error:', err);
+            }
+        }
+    }
     // Safe fallback sanitization (ensure no tag EVER leaks)
     finalReply = finalReply
         .replace(/```json:cart_action[\s\S]*?```/gi, '')

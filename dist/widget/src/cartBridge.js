@@ -259,6 +259,7 @@ async function executeDomSimulationAddToCart(selectedOptions) {
     }
     return false;
 }
+let isAutoAdding = false;
 /**
  * Auto-Add Watcher for Cross-Page Navigations (e.g. user clicked Add to Cart from /cart or /collection)
  */
@@ -269,27 +270,36 @@ function initAutoAddWatcher() {
         const raw = sessionStorage.getItem('labto_auto_add');
         if (!raw)
             return;
+        // Immediately remove from sessionStorage to prevent concurrent readers
+        sessionStorage.removeItem('labto_auto_add');
+        if (isAutoAdding)
+            return;
         const data = JSON.parse(raw);
         // Only process if within last 60 seconds
         if (Date.now() - (data.timestamp || 0) > 60000) {
-            sessionStorage.removeItem('labto_auto_add');
             return;
         }
+        isAutoAdding = true;
         let attempts = 0;
         const interval = setInterval(async () => {
             attempts++;
-            const clicked = await executeDomSimulationAddToCart(data.options);
-            if (clicked || attempts > 25) {
+            if (attempts > 20) {
                 clearInterval(interval);
-                sessionStorage.removeItem('labto_auto_add');
-                if (clicked) {
-                    executeEventAndLocalStorageAddToCart(data.productId, data.quantity, data.variantId, data.options);
-                    window.dispatchEvent(new CustomEvent('labto:toast', { detail: { message: 'Added to cart successfully!' } }));
-                }
+                isAutoAdding = false;
+                return;
             }
-        }, 200);
+            const clicked = await executeDomSimulationAddToCart(data.options);
+            if (clicked) {
+                clearInterval(interval);
+                isAutoAdding = false;
+                executeEventAndLocalStorageAddToCart(data.productId, data.quantity, data.variantId, data.options);
+                window.dispatchEvent(new CustomEvent('labto:toast', { detail: { message: 'Added to cart successfully!' } }));
+            }
+        }, 300);
     }
-    catch { }
+    catch {
+        isAutoAdding = false;
+    }
 }
 /**
  * Tier 4: Global Event Dispatcher & LocalStorage Fallback (For Custom React / Next.js / Headless Stores)
