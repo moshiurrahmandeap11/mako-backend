@@ -1063,7 +1063,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             height: isMobile ? "100dvh" : "580px",
             maxHeight: isMobile ? "100dvh" : "calc(100vh - 120px)",
             backgroundColor: "#ffffff",
-            borderRadius: isMobile ? "0px" : "24px",
+            borderRadius: isMobile ? "0px" : "8px",
             boxShadow:
               "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
             display: "flex",
@@ -1425,8 +1425,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         padding: "13px 17px",
                         borderRadius:
                           msg.sender === "user"
-                            ? "18px 18px 4px 18px"
-                            : "18px 18px 18px 4px",
+                            ? "8px 8px 2px 8px"
+                            : "8px 8px 8px 2px",
                         maxWidth: "85%",
                         wordBreak: "break-word",
                         whiteSpace: "pre-wrap",
@@ -1456,7 +1456,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     </div>
                   )}
 
-                  {/* Subtitle / Timestamp under Bot Bubble */}
+                  {/* Timestamp under Bot Bubble */}
                   {msg.sender === "bot" && (
                     <span
                       style={{
@@ -1466,7 +1466,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         paddingLeft: "4px",
                       }}
                     >
-                      {config.botName || "AI Assistant"} • AI Agent • {msg.time}
+                      {msg.time}
                     </span>
                   )}
                   {msg.sender === "user" && (
@@ -1497,15 +1497,13 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 >
                   <span
                     style={{
-                      fontSize: "11.5px",
+                      fontSize: "12px",
                       color: "#64748b",
-                      fontWeight: "600",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
+                      fontWeight: "500",
                       paddingLeft: "2px",
                     }}
                   >
-                    Suggested Questions
+                    Suggested questions
                   </span>
                   <div
                     style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
@@ -1539,16 +1537,16 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                           backgroundColor: "#ffffff",
                           color: "#0f172a",
                           border: "1.5px solid rgba(29, 191, 115, 0.3)",
-                          borderRadius: "16px",
-                          padding: "8px 14px",
+                          borderRadius: "8px",
+                          padding: "7px 13px",
                           fontSize: "12.5px",
-                          fontWeight: "600",
+                          fontWeight: "400",
                           cursor: "pointer",
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "6px",
                           transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                          boxShadow: "0 2px 4px rgba(29, 191, 115, 0.06)",
+                          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
                           userSelect: "none",
                         }}
                         onMouseEnter={(e) => {
@@ -1608,8 +1606,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 alignItems: "center",
                 backgroundColor: "#ffffff",
                 border: "1.5px solid #cbd5e1",
-                borderRadius: "30px",
-                padding: "4px 6px 4px 16px",
+                borderRadius: "8px",
+                padding: "4px 6px 4px 14px",
                 boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
               }}
             >

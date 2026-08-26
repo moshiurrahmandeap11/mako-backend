@@ -700,7 +700,7 @@ function ChatWidget({ api }) {
                     height: isMobile ? "100dvh" : "580px",
                     maxHeight: isMobile ? "100dvh" : "calc(100vh - 120px)",
                     backgroundColor: "#ffffff",
-                    borderRadius: isMobile ? "0px" : "24px",
+                    borderRadius: isMobile ? "0px" : "8px",
                     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
                     display: "flex",
                     flexDirection: "column",
@@ -912,8 +912,8 @@ function ChatWidget({ api }) {
                                             color: msg.sender === "user" ? "#ffffff" : "#1e293b",
                                             padding: "13px 17px",
                                             borderRadius: msg.sender === "user"
-                                                ? "18px 18px 4px 18px"
-                                                : "18px 18px 18px 4px",
+                                                ? "8px 8px 2px 8px"
+                                                : "8px 8px 8px 2px",
                                             maxWidth: "85%",
                                             wordBreak: "break-word",
                                             whiteSpace: "pre-wrap",
@@ -925,12 +925,12 @@ function ChatWidget({ api }) {
                                             fontWeight: "400",
                                             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
                                             border: msg.sender === "user" ? "none" : "1px solid #e2e8f0",
-                                        }, children: msg.isStreaming ? (renderMarkdownText(msg.text)) : ((0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === "bot", shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) })) })), msg.sender === "bot" && ((0, jsx_runtime_1.jsxs)("span", { style: {
+                                        }, children: msg.isStreaming ? (renderMarkdownText(msg.text)) : ((0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === "bot", shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) })) })), msg.sender === "bot" && ((0, jsx_runtime_1.jsx)("span", { style: {
                                             fontSize: "11px",
                                             color: "#94a3b8",
                                             marginTop: "5px",
                                             paddingLeft: "4px",
-                                        }, children: [config.botName || "AI Assistant", " \u2022 AI Agent \u2022 ", msg.time] })), msg.sender === "user" && ((0, jsx_runtime_1.jsx)("span", { style: {
+                                        }, children: msg.time })), msg.sender === "user" && ((0, jsx_runtime_1.jsx)("span", { style: {
                                             fontSize: "11px",
                                             color: "#94a3b8",
                                             marginTop: "4px",
@@ -942,13 +942,11 @@ function ChatWidget({ api }) {
                                     marginTop: "6px",
                                     maxWidth: "100%",
                                 }, children: [(0, jsx_runtime_1.jsx)("span", { style: {
-                                            fontSize: "11.5px",
+                                            fontSize: "12px",
                                             color: "#64748b",
-                                            fontWeight: "600",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.04em",
+                                            fontWeight: "500",
                                             paddingLeft: "2px",
-                                        }, children: "Suggested Questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px" }, children: (config.suggestionChips &&
+                                        }, children: "Suggested questions" }), (0, jsx_runtime_1.jsx)("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px" }, children: (config.suggestionChips &&
                                             config.suggestionChips.length > 0
                                             ? config.suggestionChips.map((text) => ({
                                                 label: text,
@@ -971,16 +969,16 @@ function ChatWidget({ api }) {
                                                 backgroundColor: "#ffffff",
                                                 color: "#0f172a",
                                                 border: "1.5px solid rgba(29, 191, 115, 0.3)",
-                                                borderRadius: "16px",
-                                                padding: "8px 14px",
+                                                borderRadius: "8px",
+                                                padding: "7px 13px",
                                                 fontSize: "12.5px",
-                                                fontWeight: "600",
+                                                fontWeight: "400",
                                                 cursor: "pointer",
                                                 display: "inline-flex",
                                                 alignItems: "center",
                                                 gap: "6px",
                                                 transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                                                boxShadow: "0 2px 4px rgba(29, 191, 115, 0.06)",
+                                                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
                                                 userSelect: "none",
                                             }, onMouseEnter: (e) => {
                                                 e.currentTarget.style.backgroundColor = "#E8F8F0";
@@ -1014,8 +1012,8 @@ function ChatWidget({ api }) {
                                     alignItems: "center",
                                     backgroundColor: "#ffffff",
                                     border: "1.5px solid #cbd5e1",
-                                    borderRadius: "30px",
-                                    padding: "4px 6px 4px 16px",
+                                    borderRadius: "8px",
+                                    padding: "4px 6px 4px 14px",
                                     boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
                                 }, children: [(0, jsx_runtime_1.jsx)("input", { type: "text", placeholder: "Ask about projects, services, or anything...", value: inputValue, maxLength: 250, onInput: (e) => setInputValue((e.target.value || "").slice(0, 250)), style: {
                                             flex: 1,
