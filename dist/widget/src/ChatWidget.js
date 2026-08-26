@@ -216,14 +216,50 @@ function ChatWidget({ api }) {
     const [isDragging, setIsDragging] = (0, hooks_1.useState)(false);
     const dragStartRef = (0, hooks_1.useRef)(null);
     const didDragRef = (0, hooks_1.useRef)(false);
-    // Resize listener
+    const [viewportHeight, setViewportHeight] = (0, hooks_1.useState)(null);
+    const [viewportTop, setViewportTop] = (0, hooks_1.useState)(0);
+    // Mobile VisualViewport listener for Virtual Keyboard handling
     (0, hooks_1.useEffect)(() => {
-        const handleResize = () => {
-            setIsMobile(window.innerWidth <= 640);
+        if (typeof window === "undefined")
+            return;
+        const updateViewport = () => {
+            const mobile = window.innerWidth <= 640;
+            setIsMobile(mobile);
+            if (mobile && window.visualViewport) {
+                setViewportHeight(window.visualViewport.height);
+                setViewportTop(window.visualViewport.offsetTop || 0);
+            }
+            else {
+                setViewportHeight(null);
+                setViewportTop(0);
+            }
         };
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
+        updateViewport();
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener("resize", updateViewport);
+            window.visualViewport.addEventListener("scroll", updateViewport);
+        }
+        window.addEventListener("resize", updateViewport);
+        return () => {
+            if (window.visualViewport) {
+                window.visualViewport.removeEventListener("resize", updateViewport);
+                window.visualViewport.removeEventListener("scroll", updateViewport);
+            }
+            window.removeEventListener("resize", updateViewport);
+        };
+    }, [isOpen]);
+    // Lock background body scroll on mobile when widget is open
+    (0, hooks_1.useEffect)(() => {
+        if (typeof document === "undefined")
+            return;
+        if (isOpen && isMobile) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = "hidden";
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen, isMobile]);
     const handleOpen = () => {
         try {
             sessionStorage.setItem("labto_widget_open", "true");
@@ -690,15 +726,27 @@ function ChatWidget({ api }) {
                         : "mbot-window-enter"
                     : "", style: {
                     position: isMobile ? "fixed" : "absolute",
-                    top: isMobile ? "0" : "auto",
+                    top: isMobile
+                        ? viewportTop > 0
+                            ? `${viewportTop}px`
+                            : "0px"
+                        : "auto",
                     left: isMobile ? "0" : isLeft ? "0" : "auto",
                     right: isMobile ? "0" : isLeft ? "auto" : "0",
-                    bottom: isMobile ? "0" : "72px",
+                    bottom: isMobile ? "auto" : "72px",
                     zIndex: 999999,
                     width: isMobile ? "100vw" : "390px",
                     maxWidth: isMobile ? "100vw" : "calc(100vw - 32px)",
-                    height: isMobile ? "100dvh" : "580px",
-                    maxHeight: isMobile ? "100dvh" : "calc(100vh - 120px)",
+                    height: isMobile
+                        ? viewportHeight
+                            ? `${viewportHeight}px`
+                            : "100dvh"
+                        : "580px",
+                    maxHeight: isMobile
+                        ? viewportHeight
+                            ? `${viewportHeight}px`
+                            : "100dvh"
+                        : "calc(100vh - 120px)",
                     backgroundColor: "#ffffff",
                     borderRadius: isMobile ? "0px" : "8px",
                     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
@@ -1021,7 +1069,11 @@ function ChatWidget({ api }) {
                                     borderRadius: "8px",
                                     padding: "4px 6px 4px 14px",
                                     boxShadow: "none",
-                                }, children: [(0, jsx_runtime_1.jsx)("input", { type: "text", placeholder: "Ask about projects, services, or anything...", value: inputValue, maxLength: 250, onInput: (e) => setInputValue((e.target.value || "").slice(0, 250)), style: {
+                                }, children: [(0, jsx_runtime_1.jsx)("input", { type: "text", placeholder: "Ask about projects, services, or anything...", value: inputValue, maxLength: 250, onFocus: () => {
+                                            if (isMobile) {
+                                                setTimeout(() => scrollToBottom(false), 220);
+                                            }
+                                        }, onInput: (e) => setInputValue((e.target.value || "").slice(0, 250)), style: {
                                             flex: 1,
                                             padding: "9px 0",
                                             border: "none",
