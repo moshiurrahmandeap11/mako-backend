@@ -193,7 +193,7 @@ export async function smartExtractCartAction(
 ): Promise<{ cartAction: any | null; product?: any }> {
   try {
     const combinedText = `${userMessage} ${finalReply}`;
-    
+
     // Check for any purchase, add to cart, or option selection intent
     const hasCartIntent =
       /\b(add\s*to\s*cart|add|buy|purchase|order|nite\s*chai|cart\s*e|kore\s*dao|kore\s*den|kore\s*dibo|kore\s*fellam|kora\s*hoyeche|added\s*to\s*cart|select\s*korte\s*hobe|select\s*koren|select\s*korle)\b/i.test(
@@ -286,7 +286,10 @@ export async function smartExtractCartAction(
         for (const opt of matchedProd.options as any[]) {
           const optName = opt.name;
           for (const val of opt.values || []) {
-            const reg = new RegExp(`\\b${val.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
+            const reg = new RegExp(
+              `\\b${val.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`,
+              "i",
+            );
             if (reg.test(userMessage) || reg.test(finalReply)) {
               targetOptions = { ...(targetOptions || {}), [optName]: val };
             }
