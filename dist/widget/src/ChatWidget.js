@@ -1182,7 +1182,8 @@ function ChatWidget({ api }) {
                                         setTimeout(() => scrollToBottom(true), 50);
                                         (0, cartBridge_1.requestAddToCart)(modalProduct.externalId || modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState, modalProduct.productUrl).then((res) => {
                                             if (res.platform !== "dom_simulation") {
-                                                showToast(res.message || `Added '${modalProduct.title}' to cart!`);
+                                                showToast(res.message ||
+                                                    `Added '${modalProduct.title}' to cart!`);
                                             }
                                         });
                                         setModalProduct(null);

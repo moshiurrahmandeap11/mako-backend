@@ -432,11 +432,176 @@ async function requestAddToCart(productId, quantity = 1, variantId, selectedOpti
             message: "Item added to cart!",
         };
     }
-    // 4. Background Custom / Headless / React Store Event & LocalStorage Addition (No Page Redirection)
+    // 4. Background Invisible Worker Simulation (For Headless / Next.js stores when user is on Homepage/Collection)
+    if (productUrl && productUrl !== "#" && typeof window !== "undefined") {
+        const iframeSuccess = await executeBackgroundIframeAddToCart(productUrl, selectedOptions, quantity);
+        if (iframeSuccess) {
+            executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
+            return {
+                success: true,
+                platform: "dom_simulation",
+                message: "Item added to cart!",
+            };
+        }
+    }
+    // 5. Background Custom / Headless / React Store Event & LocalStorage Addition
     executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
     return {
         success: true,
         platform: "custom_event",
         message: "Item added to cart!",
     };
+}
+/**
+ * Tier 3.5: Background Invisible Worker Simulation (For Headless/Next.js/Custom Stores when on Homepage/Collection)
+ */
+async function executeBackgroundIframeAddToCart(productUrl, selectedOptions, quantity = 1) {
+    if (typeof window === "undefined" || typeof document === "undefined")
+        return false;
+    return new Promise((resolve) => {
+        try {
+            const targetUrl = new URL(productUrl, window.location.origin);
+            if (targetUrl.origin !== window.location.origin) {
+                resolve(false);
+                return;
+            }
+            const iframe = document.createElement("iframe");
+            iframe.style.position = "fixed";
+            iframe.style.top = "-9999px";
+            iframe.style.left = "-9999px";
+            iframe.style.width = "10px";
+            iframe.style.height = "10px";
+            iframe.style.opacity = "0";
+            iframe.style.pointerEvents = "none";
+            iframe.style.border = "none";
+            iframe.setAttribute("tabindex", "-1");
+            iframe.setAttribute("aria-hidden", "true");
+            iframe.src = targetUrl.href;
+            let cleanedUp = false;
+            const cleanup = () => {
+                if (cleanedUp)
+                    return;
+                cleanedUp = true;
+                try {
+                    if (iframe.parentNode) {
+                        iframe.parentNode.removeChild(iframe);
+                    }
+                }
+                catch { }
+            };
+            const timeoutId = setTimeout(() => {
+                cleanup();
+                resolve(false);
+            }, 7000);
+            iframe.onload = async () => {
+                try {
+                    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+                    if (!doc) {
+                        clearTimeout(timeoutId);
+                        cleanup();
+                        resolve(false);
+                        return;
+                    }
+                    // Wait 350ms for React / Next.js hydration in the hidden frame
+                    await new Promise((r) => setTimeout(r, 400));
+                    // 1. Select options inside iframe
+                    if (selectedOptions && Object.keys(selectedOptions).length > 0) {
+                        Object.entries(selectedOptions).forEach(([optName, optVal]) => {
+                            const lowerVal = String(optVal).toLowerCase().trim();
+                            // Select dropdowns
+                            const selects = Array.from(doc.querySelectorAll("select"));
+                            for (const sel of selects) {
+                                for (let i = 0; i < sel.options.length; i++) {
+                                    if (sel.options[i].text.toLowerCase().trim() === lowerVal ||
+                                        sel.options[i].value.toLowerCase().trim() === lowerVal) {
+                                        sel.selectedIndex = i;
+                                        sel.dispatchEvent(new Event("change", { bubbles: true }));
+                                        sel.dispatchEvent(new Event("input", { bubbles: true }));
+                                    }
+                                }
+                            }
+                            // Buttons, swatches, pills
+                            const clickable = Array.from(doc.querySelectorAll('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, [data-size], [data-value], [data-color]'));
+                            for (const el of clickable) {
+                                const text = (el.textContent ||
+                                    el.value ||
+                                    el.getAttribute("data-value") ||
+                                    el.getAttribute("data-size") ||
+                                    el.getAttribute("data-color") ||
+                                    "")
+                                    .trim()
+                                    .toLowerCase();
+                                if (text === lowerVal) {
+                                    el.focus();
+                                    el.click();
+                                }
+                            }
+                        });
+                        await new Promise((r) => setTimeout(r, 200));
+                    }
+                    // 2. Click Add to Cart inside iframe
+                    const buttonSelectors = [
+                        'form[action*="cart"] button[type="submit"]',
+                        'button[name="add"]',
+                        'button[id*="add-to-cart" i]',
+                        'button[class*="add-to-cart" i]',
+                        'button[class*="single_add_to_cart" i]',
+                        '[data-action="add-to-cart" i]',
+                        '[data-testid*="add-to-cart" i]',
+                        ".add-to-cart-btn",
+                        ".single_add_to_cart_button",
+                        ".product-form__submit",
+                        "#AddToCart",
+                    ];
+                    let clicked = false;
+                    for (const sel of buttonSelectors) {
+                        const btn = doc.querySelector(sel);
+                        if (btn && typeof btn.click === "function") {
+                            btn.focus();
+                            btn.click();
+                            clicked = true;
+                            break;
+                        }
+                    }
+                    if (!clicked) {
+                        const allBtns = Array.from(doc.querySelectorAll('button, input[type="submit"], a[role="button"]'));
+                        for (const b of allBtns) {
+                            const txt = (b.textContent || "").trim().toLowerCase();
+                            if (/add\s*to\s*cart|add\s*to\s*bag|buy\s*now/i.test(txt)) {
+                                b.focus();
+                                b.click();
+                                clicked = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (clicked) {
+                        await new Promise((r) => setTimeout(r, 600));
+                        // Sync storage and events on parent window
+                        window.dispatchEvent(new Event("storage"));
+                        window.dispatchEvent(new CustomEvent("cart:updated", { bubbles: true }));
+                        document.dispatchEvent(new CustomEvent("cart:updated", { bubbles: true }));
+                        clearTimeout(timeoutId);
+                        cleanup();
+                        resolve(true);
+                        return;
+                    }
+                    clearTimeout(timeoutId);
+                    cleanup();
+                    resolve(false);
+                }
+                catch (err) {
+                    console.warn("[Labto AI Cart] Background iframe execution error:", err);
+                    clearTimeout(timeoutId);
+                    cleanup();
+                    resolve(false);
+                }
+            };
+            document.body.appendChild(iframe);
+        }
+        catch (err) {
+            console.warn("[Labto AI Cart] Background iframe setup error:", err);
+            resolve(false);
+        }
+    });
 }
