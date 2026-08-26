@@ -12,13 +12,16 @@ import { auth } from "./config/auth";
 
 import { initCronJobs } from "./jobs/cron";
 import { adminRouter } from "./modules/admin/admin.routes";
+import { getPublicPlatformSettings } from "./modules/admin/adminSettings.controller";
 import analyticsRoutes from "./modules/analytics/analytics.routes";
 import apiKeyRoutes from "./modules/apiKey/apiKey.routes";
 import billingRoutes from "./modules/billing/billing.routes";
 import widgetChatRoutes from "./modules/chat/chat.routes";
+import { contactRouter } from "./modules/contact/contact.routes";
 import knowledgeRoutes from "./modules/knowledge/knowledge.routes";
 import merchantRoutes from "./modules/merchant/merchant.routes";
 import productRoutes from "./modules/product/product.routes";
+import { reportsRouter } from "./modules/reports/reports.routes";
 import widgetConfigRoutes from "./modules/widgetConfig/widgetConfig.routes";
 
 const app = express();
@@ -97,7 +100,10 @@ app.use("/api/widget-config", widgetConfigRoutes);
 app.use("/api/widget", widgetChatRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
+app.use("/api/contact", contactRouter);
+app.use("/api/reports", reportsRouter);
 app.use("/api/admin", adminRouter);
+app.get("/api/settings/public", getPublicPlatformSettings);
 
 // Global Error Handler
 app.use(

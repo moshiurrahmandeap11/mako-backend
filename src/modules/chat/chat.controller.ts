@@ -105,12 +105,9 @@ export async function chat(
 
     const rawMessage = (message || "").trim();
     if (rawMessage.length > 250) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Prompt length exceeds maximum allowed limit of 250 characters.",
-        });
+      res.status(400).json({
+        error: "Prompt length exceeds maximum allowed limit of 250 characters.",
+      });
       return;
     }
 
@@ -131,6 +128,33 @@ export async function chat(
       const sendEvent = (type: string, data: any) => {
         res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
       };
+
+      // 0. Maintenance Mode Check
+      try {
+        const maintSetting = await (prisma as any).platformSetting.findUnique({
+          where: { key: "maintenanceMode" },
+        });
+        if (maintSetting && Boolean(maintSetting.value) === true) {
+          const msgSetting = await (prisma as any).platformSetting.findUnique({
+            where: { key: "maintenanceMessage" },
+          });
+          const customMessage =
+            msgSetting?.value ||
+            "Labto AI is currently undergoing scheduled platform maintenance. AI chat responses are temporarily paused. Please check back shortly.";
+
+          sendEvent("token", { token: `⚠️ ${customMessage}` });
+          sendEvent("done", {
+            text: `⚠️ ${customMessage}`,
+            suggestedQuestions: [],
+            products: [],
+            cartAction: null,
+          });
+          res.end();
+          return;
+        }
+      } catch (maintCheckErr) {
+        // Fallback
+      }
 
       try {
         const response = await processChatMessageStream(
@@ -156,6 +180,31 @@ export async function chat(
         res.end();
       }
       return;
+    }
+
+    // 0. Maintenance Mode Check for Non-Stream
+    try {
+      const maintSetting = await (prisma as any).platformSetting.findUnique({
+        where: { key: "maintenanceMode" },
+      });
+      if (maintSetting && Boolean(maintSetting.value) === true) {
+        const msgSetting = await (prisma as any).platformSetting.findUnique({
+          where: { key: "maintenanceMessage" },
+        });
+        const customMessage =
+          msgSetting?.value ||
+          "Labto AI is currently undergoing scheduled platform maintenance. AI chat responses are temporarily paused. Please check back shortly.";
+
+        res.json({
+          text: `⚠️ ${customMessage}`,
+          suggestedQuestions: [],
+          products: [],
+          cartAction: null,
+        });
+        return;
+      }
+    } catch (maintCheckErr) {
+      // Fallback
     }
 
     const response = await processChatMessage(

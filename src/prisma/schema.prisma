@@ -210,3 +210,31 @@ model KnowledgeChunk {
 
   @@index([merchantId])
 }
+
+model ContactInquiry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  status    String   @default("NEW") // NEW, IN_PROGRESS, RESOLVED, SPAM
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BugReport {
+  id          String   @id @default(cuid())
+  title       String?
+  description String
+  imageUrl    String?
+  userEmail   String?
+  status      String   @default("OPEN") // OPEN, UNDER_REVIEW, FIXED, DISMISSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
