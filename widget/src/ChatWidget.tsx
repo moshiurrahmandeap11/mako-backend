@@ -205,6 +205,20 @@ function renderMarkdownText(text: string) {
   let clean = text
     .replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, "")
     .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, "")
+    .replace(/```[a-zA-Z0-9_-]*\n?([\s\S]*?)```/g, "$1")
+    .replace(
+      /\*\*\[([^\]]+)\]\s*\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)\*\*/g,
+      "[$1]($2)",
+    )
+    .replace(
+      /\[\*\*([^*]+)\*\*\]\s*\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
+      "[$1]($2)",
+    )
+    .replace(
+      /\[([^\]]+)\]\s*\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
+      "[$1]($2)",
+    )
+    .replace(/^#+\s*/gm, "")
     .replace(/#+\s*/g, "")
     .replace(/^[\t ]*\*[\t ]+/gm, "• ")
     .replace(/\n[\t ]*\*[\t ]+/g, "\n• ")
@@ -216,7 +230,7 @@ function renderMarkdownText(text: string) {
 
   const parts = [];
   const regex =
-    /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)|\*\*([^*]+)\*\*|((?:https?:\/\/|mailto:)[^\s<>)"]+)/g;
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)|\*\*([^*]+)\*\*|(https?:\/\/[^\s<>)"]+)/g;
   let lastIndex = 0;
   let match;
 
