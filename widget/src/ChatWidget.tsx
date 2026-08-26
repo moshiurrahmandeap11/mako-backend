@@ -85,8 +85,8 @@ const CloseSvg = () => (
 
 const RefreshSvg = () => (
   <svg
-    width="18"
-    height="18"
+    width="20"
+    height="20"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -1661,7 +1661,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     : "#cbd5e1",
                   color: "#ffffff",
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   width: "34px",
                   height: "34px",
                   display: "flex",
