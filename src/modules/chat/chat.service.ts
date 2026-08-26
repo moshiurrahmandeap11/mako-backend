@@ -1,309 +1,22 @@
-import Anthropic from "@anthropic-ai/sdk";
-import fs from "fs";
-import yaml from "js-yaml";
-import OpenAI from "openai";
-import path from "path";
 import { prisma } from "../../config/db";
-import { env } from "../../config/env";
-import { keyRotator } from "../../utils/keyRotator";
 import { logger } from "../../utils/logger";
-import { addToCartTool } from "./tools/addToCart.tool";
+import {
+  isGratitude,
+  isOutOfScopeRequest,
+  isRoleHijackingAttempt,
+  isSimpleGreeting,
+} from "./guards/chatGuards";
+import { buildSystemPrompt } from "./prompts/systemPromptBuilder";
+import { executeLlmCascade } from "./providers/llmRunner";
 import { searchKnowledgeTool } from "./tools/searchKnowledge.tool";
 import { searchProductsTool } from "./tools/searchProducts.tool";
 import { webSearchTool } from "./tools/webSearch.tool";
-
-// High-Speed In-Memory Cache for frequent queries & FAQs (1-hour TTL)
-const queryResponseCache = new Map<
-  string,
-  { reply: string; thoughts: string[]; products: any[]; timestamp: number }
->();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-const anthropic = env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
-  : null;
-
-const groq = env.GROQ_API_KEY
-  ? new OpenAI({
-      apiKey: env.GROQ_API_KEY,
-      baseURL: "https://api.groq.com/openai/v1",
-    })
-  : null;
-
-const openrouter = env.OPENROUTER_API_KEY
-  ? new OpenAI({
-      apiKey: env.OPENROUTER_API_KEY,
-      baseURL: "https://openrouter.ai/api/v1",
-      defaultHeaders: {
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "Labto AI Widget",
-      },
-    })
-  : null;
-
-// Helper to load YAML prompt configuration based on chosen template
-function loadAiPromptsYaml(template?: string): any {
-  try {
-    let filename = "customer_support_and_sales.yml"; // Default fallback
-    if (template === "Customer Support") filename = "customer_support.yml";
-    else if (template === "FAQ / Knowledge Base")
-      filename = "faq_knowledge_base.yml";
-    else if (template === "Booking & Scheduling")
-      filename = "booking_and_scheduling.yml";
-    else if (template === "Customer Support & Sales")
-      filename = "customer_support_and_sales.yml";
-
-    const candidatePaths = [
-      path.resolve(process.cwd(), `config/prompts/${filename}`),
-      path.resolve(__dirname, `../../config/prompts/${filename}`),
-      path.resolve(__dirname, `../../../config/prompts/${filename}`),
-      path.resolve(__dirname, `../../../../config/prompts/${filename}`),
-    ];
-
-    for (const yamlPath of candidatePaths) {
-      if (fs.existsSync(yamlPath)) {
-        const content = fs.readFileSync(yamlPath, "utf8");
-        return yaml.load(content);
-      }
-    }
-  } catch (err) {
-    logger.error("Failed to load YAML prompt config:", err);
-  }
-  return null;
-}
-
-function isSimpleGreeting(message: string): boolean {
-  const clean = message.toLowerCase().trim();
-  if (/\b(thanks|thank|thx|dhonnobad|shukriya)\b/i.test(clean)) {
-    return false;
-  }
-  const greetingRegex =
-    /^\s*\b(hi|hello|hey|yo|sup|hola|hi there|hello there|hi bro|hey bro|hello bro|kemon achis|kemon acho|kemon aco|kire|kire bro|ki khobor|good morning|good afternoon|good evening|kemon acis|kemne acho|kemon|assalamu alaikum|salam)\b\s*$/i;
-  return (
-    greetingRegex.test(clean) ||
-    (clean.length <= 15 && /\b(hi|hello|hey|hola|salam)\b/i.test(clean))
-  );
-}
-
-function isGratitude(message: string): boolean {
-  const clean = message.toLowerCase().trim();
-  const gratitudeRegex =
-    /\b(thanks|thank\s*you|thx|thank\s*u|dhonnobad|many\s*thanks|shukriya)\b/i;
-  return gratitudeRegex.test(clean);
-}
-
-function isRoleHijackingAttempt(message: string): boolean {
-  const clean = message.toLowerCase().trim();
-  const hijackPatterns = [
-    /\b(marketing\s+off|promotion\s+off|branding\s+off)\b/i,
-    /\b(act\s+as|work\s+as|be\s+my|become\s+my)\s+(my\s+)?(personal|private|general|coding|developer)\s+assistant\b/i,
-    /\b(forget|ignore|disregard|override)\s+(all\s+)?(previous\s+)?(rules|instructions|prompts|identity|company|agency)\b/i,
-    /\b(dan\s+mode|jailbreak|unfiltered\s+mode|developer\s+mode)\b/i,
-    /\b(ami\s+ja\s+bolbo\s+shunba|kono\s+kotha\s+bolbi\s+na|mukheu\s+anbi\s+na)\b/i,
-  ];
-  return hijackPatterns.some((p) => p.test(clean));
-}
-
-function isOutOfScopeRequest(message: string): boolean {
-  const clean = message.toLowerCase().trim();
-
-  const offTopicPatterns = [
-    // Essays, compositions, paragraphs, poems, stories, jokes, animal compositions
-    /\b(rochona|rochona\s+likho|essay|composition|paragraph|kobita|poem|story|golpo|joke|chotkula|natok|gaan|song)\b/i,
-    /\b(goru|gorur|cow|animal|dog|cat|bird|tree|nature|environment|solar system|sun|moon|earth)\b/i,
-    // Explicit user word-count requests (e.g. "500 word", "1000 words", "write 300 words")
-    /\b(\d+\s*words?|\d+\s*lines?|\d+\s*page|long\s+paragraph|detailed\s+essay)\b/i,
-    /\b(write|create|make|generate)\s+(a|an|me)?\s*(paragraph|essay|composition|article|story|poem|report|summary)\b/i,
-    // School / Academic / Homework / Non-business subjects
-    /\b(homework|assignment|exam|math|gonit|physics|podartho|chemistry|roshayon|biology|jibobiggan|science|itihas|history|shongbidhan|geography)\b/i,
-    // Cooking, recipes, food preparation
-    /\b(recipe|cooking|ranna|biryani|cake|khabar|food|diet plan)\b/i,
-    // General world trivia / celebrities / sports / politics
-    /\b(capital of|rajdhani|president|prime minister|messi|ronaldo|cricket|football|cinema|movie|hero alom)\b/i,
-    // General coding / scripts / games / algorithms / software tutorials
-    /\b(write|create|make|give|show|generate|build|code)\s+(me\s+)?(a\s+)?(code|script|program|game|function|class|algorithm|component|snippet|app)\b/i,
-    /\b(in|using|with)\s+(c#|c\+\+|python|java|javascript|typescript|rust|go|php|ruby|swift|kotlin|c\b|react(\.?js)?|vue|angular|svelte|html|css)/i,
-    /\b(snake game|tic tac toe|flappy bird|chess game|calculator|sudoku)\b/i,
-    /\b(how\s+to\s+(create|build|make|code|program|develop))\b/i,
-  ];
-
-  const inScopeKeywords = [
-    "portfolio",
-    "project",
-    "service",
-    "hire",
-    "work",
-    "experience",
-    "pricing",
-    "charge",
-    "cost",
-    "contact",
-    "email",
-    "phone",
-    "location",
-    "about",
-    "who is",
-    "case study",
-    "casestudies",
-    "tech stack",
-    "agency",
-    "studio",
-  ];
-
-  const hasInScopeKeyword = inScopeKeywords.some((k) => clean.includes(k));
-  const isOffTopic = offTopicPatterns.some((p) => p.test(clean));
-
-  return isOffTopic && !hasInScopeKeyword;
-}
-
-function getSystemPrompt(
-  merchantName: string,
-  primaryDomain: string,
-  botMode: string,
-  customPrompt?: string,
-  template?: string,
-  hasStoreProducts: boolean = false,
-): string {
-  const yamlConfig = loadAiPromptsYaml(template);
-  const defaultPersona =
-    yamlConfig?.system_instructions?.persona ||
-    `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
-  const basePersona = customPrompt
-    ? `${defaultPersona}\nMerchant Custom Notes: ${customPrompt}`
-    : defaultPersona;
-  const personaPrompt = `You are the official AI Assistant for "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ""}. ${basePersona}`;
-
-  const rules = yamlConfig?.system_instructions?.strict_rules;
-  const formatRule =
-    rules?.formatting?.instructions ||
-    `Use clean GitHub Flavored Markdown formatting with bold titles and clickable link badges.`;
-  const cartRule = rules?.cart_action?.instructions || ``;
-
-  const langRule = `STRICT SCRIPT & LANGUAGE MATCHING & BANGLISH FLUENCY (CRITICAL):
-- Match the user's EXACT writing script and alphabet:
-  - If user writes in Banglish (English/Latin alphabet, e.g. "link daw to", "amar project link lagbe", "koto charge koro", "portfolio project link daw", "ki ki project ache") -> You MUST ALWAYS reply in ROMANIZED BANGLISH (Latin alphabet). NEVER reply in Bengali script (বাংলা হরফ) when user writes in English alphabet Banglish.
-  - If user writes in Bengali script (বাংলা হরফ, e.g. "প্রজেক্টের লিংক দিন", "কেমন আছেন") -> Reply in Bengali script (বাংলা হরফ).
-  - If user writes in English -> Reply in clear English.
-- FEW-SHOT BANGLISH CONVERSATION EXAMPLES (Follow this exact natural tone):
-  - User: "apnader portfolio te ki ki project ache?"
-    Assistant: "Amader main project gulo holo: [Echo Platform](https://abidnirob.com/projects/echo-platform), [Lusion Studio](https://abidnirob.com/projects/lusion-studio), ebong [AESHUT](https://abidnirob.com/projects/aeshut)। Apni konta somporke jante chan?"
-  - User: "hero io project er link daw"
-    Assistant: "Ei je [Hero IO](https://abidnirob.com/projects/hero-io) er project link। Ekhane project details dekhte parben।"
-  - User: "apnader services gulo ki ki?"
-    Assistant: "Amra custom web development, AI integration, ebong UI/UX design service diye thaki।"
-  - User: "koto charge koro?"
-    Assistant: "Project er scope ebong requirement onujayi amader pricing nirdharon kora hoy।"
-- NEVER mix conflicting pronouns, broken phonetics, or passive phrases like "ara" or "dekha jay". Use clear, fluent, natural conversational Banglish.`;
-
-  const linkAndContextRule = `CONTEXT AWARENESS, MANDATORY CLICKABLE LINKS & CLEAN LINK TITLES (CRITICAL):
-- The user is ALREADY ON THIS WEBSITE chatting with the embedded assistant.
-- NEVER say "visit our website [homepage_url]" or suggest navigating to the homepage, because the visitor is already on it!
-- MANDATORY CLICKABLE LINKS: EVERY single project name, portfolio item, service, or product mentioned in your response MUST be formatted as a clickable link badge: [Product / Project Name](url).
-- HARD BAN ON RAW DATABASE OBJECT IDS OR HOSTNAMES AS LINK TITLES: NEVER write link titles containing hexadecimal database IDs (e.g. NEVER write "[691f478fccec252c64981b47](url)") or raw domain strings (e.g. NEVER write "[everwear-frontend](url)").
-- ALWAYS format clickable links with CLEAN, HUMAN-READABLE PRODUCT OR PAGE TITLES e.g. [Electronic Plastic Table ($600)](url), [Generic Steel Pants ($987)](url), or [View Collection](url).`;
-
-  const addCartInstruction = hasStoreProducts
-    ? `DIRECT ADD TO CART & DYNAMIC VARIANT INQUIRY (CRITICAL RULE FOR E-COMMERCE):
-- You have direct access to the website store catalog and can add items to cart.
-- When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo", "pants ta dao", "bacon ta cart e dao", "2nd ta", "plastic table ta add kore dao"):
-  1. IDENTIFY THE EXACT PRODUCT from the Store Catalog:
-     - Match the product the user is referring to (by name, keyword, or context from previous conversation).
-  2. CHECK THE PRODUCT'S OPTIONS (from the "Options:" field in Catalog data):
-     - IF Options is NOT "None" (e.g. Size, Storage, Weight, Color) AND user has not chosen their specific option yet:
-       - YOU MUST NEVER claim it was added to cart! DO NOT say "cart e add kora hoyeche".
-       - INSTEAD, YOU MUST ASK THE USER for their preferred option in natural language (e.g. "Amader [Product Name](url) er Size (S, M, L, XL) available ache. Apnar kon size ta lagbe?").
-       - Append tag: [ADD_TO_CART: productId]
-     - ONCE the user specifies their option (e.g. "S", "M", "size L", "1kg", "256GB", "Black"):
-       - Friendly message: Confirm the item with their chosen option (e.g. "[Product Name](url) (Size: S) cart e add kora hoyeche!").
-       - Append tag: [ADD_TO_CART: productId, size: S] (or color / storage value).
-  3. If the product's Options is "None" (no size/color required):
-     - Friendly message: "[Product Name](url) cart e add kora hoyeche!"
-     - Append tag: [ADD_TO_CART: productId]
-- ALWAYS provide a polite, natural sentence in the user's matching script alongside the tag.
-- NEVER tell the user to manually visit the page to add to cart; ALWAYS trigger the cart tag!`
-    : `NON-ECOMMERCE WEBSITE & PORTFOLIO / SERVICE CLARIFICATION (STRICT RULE):
-- This website ("${merchantName}") is a PORTFOLIO / AGENCY / DIGITAL SERVICES business website. It does NOT sell physical products or have an e-commerce shopping cart.
-- If a user asks to "add to cart", "buy", or asks about shopping carts:
-  - DO NOT provide programming code, coding tutorials, or React components!
-  - Politely and briefly explain in the user's matching script that "${merchantName}" is a creative design and software development studio/agency providing services and showcasing projects.
-  - Invite the user to explore our portfolio projects, case studies, or discuss their own project requirements and consultations.`;
-
-  const codeGenerationBanRule = `STRICT BAN ON CODING TUTORIALS, CODE SNIPPETS & SCRIPT GENERATION (CRITICAL RULE):
-- You are EXCLUSIVELY the customer support and sales representative for "${merchantName}". You are NOT a coding assistant, programmer, or ChatGPT programming tool.
-- NEVER write programming code snippets, JavaScript/React/Python/HTML/CSS components, script files, or tutorials.
-- If a user asks to write code, build a component, or asks general programming questions (e.g. "add to cart react js", "write python script", "how to code in js"):
-  - Politely decline in 1 short sentence in the user's matching script:
-    - Banglish: "Ami sudhu amader agency services, portfolio projects ebong company information niye help korte pari। Apni ki amader kono project somporke jante chan?"
-    - Bengali: "আমি শুধুমাত্র আমাদের এজেন্সি সার্ভিস, পোর্টফোলিও প্রজেক্ট ও কোম্পানি সম্পর্কিত তথ্যে সাহায্য করতে পারি। আপনি কি আমাদের কোনো প্রজেক্ট বা সার্ভিস সম্পর্কে জানতে চান?"
-    - English: "I am the dedicated AI assistant for ${merchantName}. I can only assist with questions regarding our projects, services, and company."`;
-
-  const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (STRICT RULE):
-- You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "Amader", "Amra").
-- HARD BAN ON THIRD-PERSON WORDS: NEVER use third-person words ("Tara", "Tader", "They", "Their", "Them", "${merchantName}'s team", "dekha jay").
-- Convert any third-person context from scraped data into active FIRST-PERSON phrasing:
-  - WRONG: "Tara website e AESHUT project dekha jay... Tara VIEW ALL WORK button..."
-  - RIGHT: "Amader main project gulo holo: [AESHUT](url), [Regar](url), [Lusion Studio](url), ebong [Echo Platform](url)..."`;
-
-  const scopeLockRule = `CRITICAL STRICT BUSINESS BOUNDARY & HARD BAN ON USER WORD-COUNT OVERRIDES (STRICT RULE):
-- You are EXCLUSIVELY the customer support and business sales representative for "${merchantName}" (${primaryDomain || "this website"}).
-- You must ONLY assist with questions directly related to ${merchantName}'s services, portfolio projects, case studies, pricing, tech stack, skills, or contact info.
-- HARD BAN ON ESSAYS & WORD COUNT REQUESTS: NEVER fulfill requests to write 500-word paragraphs, essays ("গরুর রচনা", school homework), general coding scripts, stories, poems, or trivia.
-- IF A USER ASKS TO WRITE "500 WORDS", AN ESSAY, OR ANY OFF-TOPIC PARAGRAPH: YOU MUST IMMEDIATELY AND POLITELY DECLINE IN 1 SHORT SENTENCE. NEVER WRITE THE PARAGRAPH.
-- Decline response examples:
-  - Banglish: "Ami sudhu amader portfolio, services ebong company information niye help korte pari. Apni amader kono project somporke jante chan?"
-  - Bengali: "আমি শুধুমাত্র আমাদের প্রজেক্ট, সেবা ও ওয়েবসাইট সম্পর্কিত তথ্যে সাহায্য করতে পারি। আপনি কি আমাদের কোনো কাজ বা সেবা সম্পর্কে জানতে চান?"
-  - English: "I am the dedicated AI assistant for ${merchantName}. I can only assist with questions regarding our projects, services, and company."`;
-
-  const casualGreetingRule = `CASUAL GREETINGS & SHORT CHATS (CRITICAL):
-- When the user sends a greeting or casual phrase:
-  - DO NOT output an essay or list multiple questions.
-  - Reply in EXACTLY ONE SHORT SENTENCE (under 10 words) in the user's matching script.
-  - Examples:
-    - User: "kire bro" / "hi bro" -> Reply: "Hello bro! Bolun, kivabe help korte pari?"
-    - User: "hi" / "hello" -> Reply: "Hello! How can I help you today?"
-    - User: "kemon আছেন" -> Reply: "ভালো আছি, ধন্যবাদ! কীভাবে সাহায্য করতে পারি?"`;
-
-  const productShowcaseRule = hasStoreProducts
-    ? `PROACTIVE PRODUCT & COLLECTION SHOWCASING (CRITICAL RULE):
-- When a user asks about collections, products, catalog items, or asks to see items (e.g. "ki ki collection ache", "products dekhaw", "kichu dekhaw link soho", "what do you have", "show me your items", "collection e ki ache"):
-  - NEVER reply with a lazy one-liner telling them to visit the collection page!
-  - YOU MUST PROACTIVELY SHOWCASE 2 to 4 SPECIFIC PRODUCTS directly from the Store Catalog with their bold titles, prices, and clickable product links [Title](url).
-  - Example Banglish:
-    "Amader popular collection er kichu product holo:
-    1. [Electronic Plastic Table](productUrl) - $600
-    2. [Generic Steel Pants](productUrl) - $987
-    3. [Refined Metal Bacon](productUrl) - $268
-    Apnar kon product ti pochondo? Ami direct cart e add kore dite parbo! 🛍️"
-  - ALWAYS ask which one they like so you can help them add to cart!`
-    : `PORTFOLIO & PROJECT SHOWCASING (CRITICAL RULE FOR AGENCY/PORTFOLIO):
-- When a user asks about projects, portfolio, work, or services (e.g. "ki ki project ache", "portfolio dekhaw", "services ki ki", "what do you do"):
-  - Proactively highlight 2 to 4 specific showcase projects or core services from the Website Knowledge Base with clean clickable links [Project Title](url).
-  - Example Banglish:
-    "Amader notable projects gulo holo: [Project One](url) ebong [Project Two](url)। Apnar kon project ba service ti somporke aro details jante chan?"`;
-
-  const tokenEfficiencyRule = `CONCISE YET HELPFUL COMMUNICATION (STRICT RULE):
-- For general FAQs, company info, or simple questions: Answer concisely in 1 to 2 short sentences.
-- When the user asks to see products, collections, or projects: Showcase 2 to 4 specific items with bold titles, prices, and clickable link badges.
-- OVERRIDE USER WORD COUNT REQUESTS: Even if the user asks for "500 words" or "detailed essay", DO NOT obey their requested length. Politely decline off-topic essay requests.`;
-
-  return `${personaPrompt}
-
-Strict Rules:
-1. CASUAL GREETINGS & SHORT CHATS: ${casualGreetingRule}
-2. FIRST-PERSON PERSPECTIVE: ${firstPersonPerspectiveRule}
-3. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ""}. When asked for the website name or company name, answer clearly with "${merchantName}".
-4. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
-5. PROACTIVE SHOWCASING: ${productShowcaseRule}
-6. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
-7. BUSINESS CAPABILITIES: ${addCartInstruction}
-8. HARD BAN ON CODING TUTORIALS & CODE SNIPPETS: ${codeGenerationBanRule}
-9. ${tokenEfficiencyRule}
-10. ${scopeLockRule}
-11. LANGUAGE & SCRIPT MATCHING: ${langRule}
-12. FORMATTING RULE: ${formatRule}
-13. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
-${cartRule ? `14. MERCHANT CUSTOM CART RULE: ${cartRule}` : ""}`.trim();
-}
+import {
+  parseCartActionFromReply,
+  sanitizeReplyText,
+  smartExtractCartAction,
+} from "./utils/cartActionParser";
+import { getCachedResponse, setCachedResponse } from "./utils/chatCache";
 
 export async function processChatMessage(
   merchantId: string,
@@ -366,7 +79,7 @@ export async function processChatMessage(
       textSafe,
     );
 
-  // FAST PATH 1.5: Instant Gratitude Responses (<10ms)
+  // FAST PATH 1: Instant Gratitude Responses (<10ms)
   if (isGratitude(userMessage)) {
     let gratitudeReply = "";
     if (isBengaliScript) {
@@ -454,7 +167,7 @@ export async function processChatMessage(
     };
   }
 
-  // Save user message to database (keep content clean without raw 200KB base64 strings)
+  // Save user message to database
   const cleanUserText =
     userMessage || (imageUrl ? "Analyzing attached image." : "");
   await prisma.message.create({
@@ -467,14 +180,8 @@ export async function processChatMessage(
   });
 
   // FAST PATH 4: Instant High-Speed FAQ Cache Hit (<3ms, 0 token waste)
-  const normalizedQuery = (userMessage || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[?!.,]/g, "");
-  const cacheKey = `${merchantId}:${normalizedQuery}`;
-  const cached = normalizedQuery ? queryResponseCache.get(cacheKey) : null;
-
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS && !imageUrl) {
+  const cached = !imageUrl ? getCachedResponse(merchantId, userMessage) : null;
+  if (cached) {
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
@@ -503,13 +210,9 @@ export async function processChatMessage(
   let recommendedProducts: any[] = [];
   let retrievedProducts: any[] = [];
   let ragContext = "";
-  let cartAction: any = null;
-  let finalReply = "";
-
   const thoughts: string[] = [];
 
-  // 1. Dynamic Language & Script Analysis
-
+  // Language & Vision analysis thoughts
   if (isBengaliScript) {
     thoughts.push(
       `🗣️ Detected Bengali script query — Applying natural Bangla grammar.`,
@@ -633,17 +336,8 @@ Currently, no specific catalog items or knowledge base articles matched this que
     logger.error("RAG Search Error:", err);
   }
 
-  // Resolve LLM Provider & Vision Support (Gemini as #1 Primary Choice for Superior Multilingual & Banglish Fluency)
-  let selectedProvider = provider || "";
-  if (!selectedProvider) {
-    if (keyRotator.hasGeminiKeys()) selectedProvider = "gemini";
-    else if (keyRotator.hasGroqKeys()) selectedProvider = "groq";
-    else if (keyRotator.hasOpenRouterKeys()) selectedProvider = "openrouter";
-    else if (keyRotator.hasAnthropicKeys()) selectedProvider = "claude";
-  }
-
   const hasStoreProducts = retrievedProducts.length > 0;
-  const systemPrompt = getSystemPrompt(
+  const systemPrompt = buildSystemPrompt(
     merchantName,
     primaryDomain,
     botMode,
@@ -652,428 +346,68 @@ Currently, no specific catalog items or knowledge base articles matched this que
     hasStoreProducts,
   );
 
-  // Construct historical messages
-  const messagesParam: any[] = conversation.messages.map((m) => {
-    let text = m.content || "";
-    if (text.includes("data:image/")) {
-      text = text
-        .replace(
-          /!\[Uploaded Image\]\(data:image\/[^)]+\)/g,
-          "[Image Attached]",
-        )
-        .replace(
-          /data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g,
-          "[Image Attached]",
-        );
-    }
-    return {
-      role: m.role === "user" ? ("user" as const) : ("assistant" as const),
-      content: text,
-    };
-  });
+  // Execute Cascading LLM Provider Runner
+  const llmResult = await executeLlmCascade(
+    merchantId,
+    userMessage,
+    systemPrompt + ragContext,
+    conversation.messages,
+    imageUrl,
+    provider,
+    botMode,
+    template,
+  );
 
-  // Construct user content (Multimodal Vision array if imageUrl present)
-  const formattedUserText = userMessage
-    ? `### User Input:\n${userMessage}`
-    : `Please analyze this attached image in the context of ${merchantName}.`;
-  const userContent = imageUrl
-    ? [
-        { type: "text", text: formattedUserText },
-        { type: "image_url", image_url: { url: imageUrl } },
-      ]
-    : formattedUserText;
+  thoughts.push(...llmResult.thoughts);
+  if (llmResult.retrievedProducts?.length > 0) {
+    retrievedProducts = llmResult.retrievedProducts;
+  }
 
-  messagesParam.push({ role: "user", content: userContent as any });
+  let finalReply = sanitizeReplyText(llmResult.finalReply);
+  let cartAction: any = null;
 
-  let executionSuccess = false;
-  let estimatedTokens = 0;
-
-  // Attempt 1: Primary High-Intelligence Multilingual Provider (Google Gemini 1.5 Flash)
+  // Parse Cart Action tags from reply
+  const parsedCart = await parseCartActionFromReply(
+    finalReply,
+    merchantId,
+    isBengaliScript,
+    isBanglish,
+  );
+  finalReply = parsedCart.cleanedReply;
+  if (parsedCart.cartAction) cartAction = parsedCart.cartAction;
   if (
-    (selectedProvider === "gemini" || keyRotator.hasGeminiKeys()) &&
-    !executionSuccess
+    parsedCart.product &&
+    !recommendedProducts.some((p) => p.id === parsedCart.product.id)
   ) {
-    try {
-      const result = await keyRotator.executeGeminiCompletion(
-        "gemini-1.5-flash",
-        [
-          { role: "system", content: systemPrompt + ragContext },
-          ...messagesParam,
-        ],
-        850,
-      );
-      finalReply = result.content;
-      estimatedTokens = result.tokensUsed;
-      executionSuccess = true;
-      thoughts.push(
-        `⚡ Synthesized response via Google Gemini 3.6 Flash (~0.3s).`,
-      );
-    } catch (error) {
-      logger.error(
-        "Gemini provider pool failed, falling back to Groq pool:",
-        error,
-      );
-      selectedProvider = "groq";
-    }
+    recommendedProducts.push(parsedCart.product);
   }
 
-  // Attempt 2: High-Speed Groq Pool (llama3-70b-8192 / llama-3.2-11b-vision-preview)
-  if (
-    !executionSuccess &&
-    (selectedProvider === "groq" || keyRotator.hasGroqKeys())
-  ) {
-    try {
-      const model = imageUrl
-        ? "llama-3.2-11b-vision-preview"
-        : "llama-3.3-70b-versatile";
-      const result = await keyRotator.executeGroqCompletion(
-        model,
-        [
-          { role: "system", content: systemPrompt + ragContext },
-          ...messagesParam,
-        ],
-        850,
-      );
-      finalReply = result.content;
-      estimatedTokens = result.tokensUsed;
-      executionSuccess = true;
-      thoughts.push(`⚡ Synthesized response via Groq LLaMA 3.3 70B (~0.4s).`);
-    } catch (error) {
-      logger.error(
-        "Groq provider pool failed, falling back to OpenRouter pool:",
-        error,
-      );
-      selectedProvider = "openrouter";
-    }
-  }
-
-  // Attempt 3: Fallback to OpenRouter (meta-llama/llama-3.3-70b-instruct)
-  if (
-    !executionSuccess &&
-    (selectedProvider === "openrouter" || keyRotator.hasOpenRouterKeys())
-  ) {
-    try {
-      const result = await keyRotator.executeOpenRouterCompletion(
-        "meta-llama/llama-3.3-70b-instruct",
-        [
-          { role: "system", content: systemPrompt + ragContext },
-          ...messagesParam,
-        ],
-        850,
-      );
-      finalReply = result.content;
-      estimatedTokens = result.tokensUsed;
-      executionSuccess = true;
-      thoughts.push(
-        `⚡ Synthesized response via OpenRouter LLaMA 3.3 70B (~0.5s).`,
-      );
-    } catch (error) {
-      logger.error(
-        "OpenRouter provider pool failed, falling back to Anthropic:",
-        error,
-      );
-      selectedProvider = "claude";
-    }
-  }
-
-  // Attempt 4: Fallback to Anthropic Claude 3.5 Sonnet
-  if (
-    !executionSuccess &&
-    (selectedProvider === "claude" || keyRotator.hasAnthropicKeys())
-  ) {
-    try {
-      const anthropicMessages = conversation.messages.map((m) => ({
-        role: m.role === "user" ? ("user" as const) : ("assistant" as const),
-        content: m.content || "",
-      }));
-      anthropicMessages.push({ role: "user" as const, content: userMessage });
-
-      const result = await keyRotator.executeAnthropicCompletion(
-        "claude-3-5-sonnet-20241022",
-        systemPrompt + ragContext,
-        anthropicMessages,
-        850,
-      );
-      finalReply = result.content;
-      estimatedTokens = result.tokensUsed;
-      executionSuccess = true;
-      thoughts.push(
-        `⚡ Synthesized response via Anthropic Claude 3.5 Sonnet (~0.7s).`,
-      );
-    } catch (error) {
-      logger.error("Anthropic provider pool failed:", error);
-      selectedProvider = "fallback";
-    }
-  }
-
-  // Fallback to local DB text search when API calls fail or keys are missing
-  if (selectedProvider === "fallback" || !finalReply) {
-    const searchRes = await searchProductsTool(
-      merchantId,
-      userMessage,
-      undefined,
-      5,
-    );
-    retrievedProducts = searchRes;
-    if (searchRes.length > 0) {
-      finalReply = `Here are some products matching "${userMessage}":`;
-    } else {
-      if (botMode === "support" || template === "Customer Support") {
-        finalReply = `I am here to assist with questions about our company, services, and projects.`;
-      } else if (botMode === "sales") {
-        finalReply = `Welcome! How can I assist you with our services and projects today?`;
-      } else {
-        finalReply = `Welcome! How can I help you explore our website today?`;
-      }
-    }
-  }
-
-  // Process Add-to-cart triggers and sanitize response
-  finalReply = finalReply
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
-    .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
-    .trim();
-
-  // Remove raw markdown hashtags (#, ##, ###), convert raw * bullets to •, and clean trailing fragments
-  finalReply = finalReply
-    .replace(/#+\s*/g, "")
-    .replace(/^[\t ]*\*[\t ]+/gm, "• ")
-    .replace(/\n[\t ]*\*[\t ]+/g, "\n• ")
-    .replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, "")
-    .trim();
-
-  // Strip trailing incomplete bullet item (e.g. "\n5. " or "\n5. E-Commerce" without terminal punctuation)
-  finalReply = finalReply
-    .replace(/(\n|^)\s*(\d+\.|•|-)\s*[^\n.!?।]*$/g, "")
-    .trim();
-
-  // If output was abruptly cut off mid-sentence (ends with unclosed bracket or no terminal punctuation), trim to last complete sentence
-  if (
-    finalReply &&
-    (!/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(
-      finalReply,
-    ) ||
-      /\([^\)]*$/.test(finalReply))
-  ) {
-    const lastPunctIndex = Math.max(
-      finalReply.lastIndexOf("."),
-      finalReply.lastIndexOf("!"),
-      finalReply.lastIndexOf("?"),
-      finalReply.lastIndexOf("।"),
-    );
-    if (lastPunctIndex > 50) {
-      finalReply = finalReply.substring(0, lastPunctIndex + 1).trim();
-    }
-  }
-
-  // 1. Check for ```json:cart_action ... ``` or raw cart json or [ADD_TO_CART: ...]
-  const jsonCartMatch =
-    finalReply.match(/```json:cart_action\s*([\s\S]*?)\s*```/i) ||
-    finalReply.match(/\{[\s\S]*?"productId"\s*:\s*"([^"]+)"[\s\S]*?\}/i);
-  const tagCartMatch = finalReply.match(/\[ADD_TO_CART:\s*([^\]]+)\]/i);
-
-  if (jsonCartMatch || tagCartMatch) {
-    try {
-      let targetProdId = "";
-      let targetVariantId: string | undefined = undefined;
-      let targetOptions: Record<string, string> | undefined = undefined;
-      let targetQty = 1;
-
-      if (jsonCartMatch) {
-        if (jsonCartMatch[1] && jsonCartMatch[1].startsWith("{")) {
-          const parsed = JSON.parse(jsonCartMatch[1]);
-          targetProdId = parsed.productId || parsed.id || "";
-          targetVariantId = parsed.variantId;
-          targetOptions = parsed.selectedOptions || parsed.options;
-          targetQty = parsed.quantity || 1;
-        } else if (jsonCartMatch[1]) {
-          targetProdId = jsonCartMatch[1].trim();
-        }
-      } else if (tagCartMatch) {
-        const rawContent = tagCartMatch[1].trim();
-        const parts = rawContent.split(",").map((s) => s.trim());
-        targetProdId = parts[0].replace(/^productId:\s*/i, "").trim();
-
-        if (parts.length > 1) {
-          const secondPart = parts.slice(1).join(", ");
-          const kvMatches = Array.from(
-            secondPart.matchAll(/([a-zA-Z0-9_-]+)\s*:\s*([^,]+)/g),
-          );
-          if (kvMatches.length > 0) {
-            for (const match of kvMatches) {
-              const k = match[1].trim();
-              const v = match[2].trim();
-              targetOptions = { ...(targetOptions || {}), [k]: v };
-            }
-          } else if (/^(xs|s|m|l|xl|xxl|2xl|3xl|\d{2})$/i.test(secondPart)) {
-            targetOptions = {
-              ...(targetOptions || {}),
-              Size: secondPart.toUpperCase(),
-            };
-          } else {
-            targetVariantId = secondPart;
-          }
-        }
-      }
-
-      // Hard sanitization: Strip all raw tags and markdown blocks from user-visible reply
-      finalReply = finalReply
-        .replace(/```json:cart_action[\s\S]*?```/gi, "")
-        .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, "")
-        .trim();
-
-      if (targetProdId) {
-        const res = await addToCartTool(
-          merchantId,
-          targetProdId,
-          targetQty,
-          targetVariantId,
-          targetOptions,
-        );
-        if (res.cartAction) cartAction = res.cartAction;
-        if (
-          res.product &&
-          !recommendedProducts.some((p) => p.id === res.product.id)
-        ) {
-          recommendedProducts.push(res.product);
-        }
-
-        // If the reply became empty after stripping tag, provide clean message
-        if (!finalReply || finalReply.length < 3) {
-          const prodTitle = res.product?.title || "Product";
-          const prodUrl = res.product?.productUrl || "#";
-          const hasUnselectedOptions =
-            res.product?.options &&
-            (res.product.options as any[]).length > 0 &&
-            (!targetOptions || Object.keys(targetOptions).length === 0);
-
-          if (hasUnselectedOptions) {
-            const optNames =
-              (res.product?.options as any[])
-                ?.map((o: any) => o.name)
-                .join(" o ") || "Size";
-            if (isBengaliScript) {
-              finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames}টি পছন্দ?`;
-            } else if (isBanglish) {
-              finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames} ta lagbe?`;
-            } else {
-              finalReply = `Which ${optNames} would you prefer for [${prodTitle}](${prodUrl})?`;
-            }
-          } else {
-            const optNote =
-              targetOptions && Object.keys(targetOptions).length > 0
-                ? ` (${Object.entries(targetOptions)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(", ")})`
-                : "";
-            if (isBengaliScript) {
-              finalReply = `[${prodTitle}](${prodUrl})${optNote} কার্টে যোগ করা হয়েছে! 🛍️`;
-            } else if (isBanglish) {
-              finalReply = `[${prodTitle}](${prodUrl})${optNote} cart e add kora hoyeche! 🛍️`;
-            } else {
-              finalReply = `Added [${prodTitle}](${prodUrl})${optNote} to your cart! 🛍️`;
-            }
-          }
-        }
-      }
-    } catch (parseErr) {
-      logger.error("Failed to parse cart action tag:", parseErr);
-    }
-  }
-
-  // Fail-safe Smart Action Extractor:
-  // If no cartAction was parsed from tags, but the AI confirmed adding a product in finalReply
+  // Fail-safe Smart Action Extractor if no tag was found
   if (!cartAction && finalReply) {
-    const isQuestionOrOffer =
-      /\b(kore\s*dite\s*parbo|add\s*korte\s*chan|add\s*korbo\s*kina|add\s*kore\s*dibo|lagbe|pochondo|can\s*add\s*it|would\s*you\s*like)\b/i.test(
-        finalReply,
-      );
-    const isConfirmingAdd =
-      !isQuestionOrOffer &&
-      /\b(cart\s*e\s*add\s*kora\s*hoyeche|cart\s*e\s*add\s*kore\s*diyechi|cart\s*e\s*jog\s*kora\s*hoyeche|added\s*to\s*(your\s*)?cart|has\s*been\s*added)\b/i.test(
-        finalReply,
-      );
-    if (isConfirmingAdd) {
-      try {
-        const linkMatch = finalReply.match(/\[([^\]]+)\]\(([^)]+)\)/);
-        let targetProdId = "";
-        if (linkMatch && linkMatch[2]) {
-          const urlIdMatch = linkMatch[2].match(/\/product[s]?\/([^\/\?#]+)/i);
-          if (urlIdMatch) {
-            targetProdId = urlIdMatch[1];
-          }
-        }
-
-        let matchedProd: any = null;
-        if (targetProdId) {
-          matchedProd = await prisma.product.findFirst({
-            where: {
-              merchantId,
-              OR: [
-                { externalId: targetProdId },
-                { id: targetProdId },
-                { productUrl: { contains: targetProdId } },
-              ],
-            },
-          });
-        } else if (linkMatch && linkMatch[1]) {
-          matchedProd = await prisma.product.findFirst({
-            where: {
-              merchantId,
-              title: { contains: linkMatch[1].trim(), mode: "insensitive" },
-            },
-          });
-        }
-
-        if (matchedProd) {
-          let targetOptions: Record<string, string> | undefined = undefined;
-
-          // Dynamically match all options against the product's actual schema array
-          if (matchedProd.options && Array.isArray(matchedProd.options)) {
-            for (const opt of matchedProd.options as any[]) {
-              const optName = opt.name;
-              for (const val of opt.values || []) {
-                const reg = new RegExp(`\\b${val}\\b`, "i");
-                if (reg.test(finalReply) || reg.test(userMessage)) {
-                  targetOptions = { ...(targetOptions || {}), [optName]: val };
-                }
-              }
-            }
-          }
-
-          const res = await addToCartTool(
-            merchantId,
-            matchedProd.externalId || matchedProd.id,
-            1,
-            undefined,
-            targetOptions,
-          );
-          if (res.cartAction) cartAction = res.cartAction;
-          if (
-            res.product &&
-            !recommendedProducts.some((p) => p.id === res.product.id)
-          ) {
-            recommendedProducts.push(res.product);
-          }
-        }
-      } catch (err) {
-        logger.error("Smart Action Extractor Error:", err);
-      }
+    const smartCart = await smartExtractCartAction(
+      finalReply,
+      userMessage,
+      merchantId,
+    );
+    if (smartCart.cartAction) cartAction = smartCart.cartAction;
+    if (
+      smartCart.product &&
+      !recommendedProducts.some((p) => p.id === smartCart.product.id)
+    ) {
+      recommendedProducts.push(smartCart.product);
     }
   }
 
-  // Safe fallback sanitization (ensure no tag EVER leaks)
-  finalReply = finalReply
-    .replace(/```json:cart_action[\s\S]*?```/gi, "")
-    .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, "")
-    .trim();
+  // Final sanitization to guarantee no internal tags leak
+  finalReply = sanitizeReplyText(finalReply);
 
-  // Bind retrieved RAG products to the assistant response metadata
+  // Bind retrieved RAG products to response metadata
   if (recommendedProducts.length === 0 && retrievedProducts.length > 0) {
     recommendedProducts = retrievedProducts;
   }
 
   // Calculate estimated tokens if not provided by API
+  let estimatedTokens = llmResult.estimatedTokens;
   if (!estimatedTokens) {
     estimatedTokens = Math.max(
       15,
@@ -1095,26 +429,14 @@ Currently, no specific catalog items or knowledge base articles matched this que
     },
   });
 
-  // Store concise overview/FAQ answers in fast response cache
-  if (normalizedQuery && finalReply && !imageUrl && finalReply.length < 500) {
-    queryResponseCache.set(cacheKey, {
-      reply: finalReply,
-      thoughts: thoughts.slice(0, 2),
-      products: recommendedProducts.map((p) => ({
-        id: p.id,
-        externalId: p.externalId,
-        title: p.title,
-        price: p.price,
-        currency: p.currency || "USD",
-        imageUrl: p.imageUrl,
-        productUrl: p.productUrl,
-        inStock: p.inStock,
-        options: p.options,
-        variants: p.variants,
-      })),
-      timestamp: Date.now(),
-    });
-  }
+  // Store response in fast cache
+  setCachedResponse(
+    merchantId,
+    userMessage,
+    finalReply,
+    thoughts,
+    recommendedProducts,
+  );
 
   thoughts.push("✨ Formulated optimal response.");
 
