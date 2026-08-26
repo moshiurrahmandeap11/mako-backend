@@ -47,19 +47,23 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = require("../../config/db");
 const env_1 = require("../../config/env");
-const logger_1 = require("../../utils/logger");
-const domain_1 = require("../../utils/domain");
 const pricing_1 = require("../../config/pricing");
+const domain_1 = require("../../utils/domain");
+const logger_1 = require("../../utils/logger");
 async function register(req, res) {
     try {
         const { name, email, password } = req.body;
         if (!name || !email || !password) {
-            res.status(400).json({ error: 'Name, email, and password are required.' });
+            res
+                .status(400)
+                .json({ error: "Name, email, and password are required." });
             return;
         }
         const existingMerchant = await db_1.prisma.user.findUnique({ where: { email } });
         if (existingMerchant) {
-            res.status(409).json({ error: 'A merchant account with this email already exists.' });
+            res
+                .status(409)
+                .json({ error: "A merchant account with this email already exists." });
             return;
         }
         const passwordHash = await bcrypt_1.default.hash(password, 10);
@@ -71,10 +75,10 @@ async function register(req, res) {
                 allowedDomains: [],
                 widgetConfig: {
                     create: {
-                        primaryColor: '#111111',
-                        greetingMessage: 'Hi! How can I help you shop today?',
-                        botName: 'AI Assistant',
-                        position: 'bottom-right',
+                        primaryColor: "#111111",
+                        greetingMessage: "Hi! How can I help you shop today?",
+                        botName: "AI Assistant",
+                        position: "bottom-right",
                         addToCartEnabled: true,
                     },
                 },
@@ -83,15 +87,15 @@ async function register(req, res) {
                 widgetConfig: true,
             },
         });
-        const token = jsonwebtoken_1.default.sign({ merchantId: merchant.id, email: merchant.email }, env_1.env.JWT_SECRET, { expiresIn: '7d' });
-        res.cookie('token', token, {
+        const token = jsonwebtoken_1.default.sign({ merchantId: merchant.id, email: merchant.email }, env_1.env.JWT_SECRET, { expiresIn: "7d" });
+        res.cookie("token", token, {
             httpOnly: true,
-            secure: env_1.env.NODE_ENV === 'production',
-            sameSite: env_1.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            secure: env_1.env.NODE_ENV === "production",
+            sameSite: env_1.env.NODE_ENV === "production" ? "none" : "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
         res.status(201).json({
-            message: 'Registration successful',
+            message: "Registration successful",
             token,
             merchant: {
                 id: merchant.id,
@@ -104,15 +108,15 @@ async function register(req, res) {
         });
     }
     catch (error) {
-        logger_1.logger.error('Merchant Registration Error:', error);
-        res.status(500).json({ error: 'Failed to register merchant account.' });
+        logger_1.logger.error("Merchant Registration Error:", error);
+        res.status(500).json({ error: "Failed to register merchant account." });
     }
 }
 async function login(req, res) {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
-            res.status(400).json({ error: 'Email and password are required.' });
+            res.status(400).json({ error: "Email and password are required." });
             return;
         }
         const merchant = await db_1.prisma.user.findUnique({
@@ -120,27 +124,31 @@ async function login(req, res) {
             include: { widgetConfig: true },
         });
         if (!merchant) {
-            res.status(401).json({ error: 'Invalid email or password.' });
+            res.status(401).json({ error: "Invalid email or password." });
             return;
         }
         if (!merchant.passwordHash) {
-            res.status(401).json({ error: 'This account is set up with social authentication. Please log in with Google or GitHub.' });
+            res
+                .status(401)
+                .json({
+                error: "This account is set up with social authentication. Please log in with Google or GitHub.",
+            });
             return;
         }
         const isMatch = await bcrypt_1.default.compare(password, merchant.passwordHash);
         if (!isMatch) {
-            res.status(401).json({ error: 'Invalid email or password.' });
+            res.status(401).json({ error: "Invalid email or password." });
             return;
         }
-        const token = jsonwebtoken_1.default.sign({ merchantId: merchant.id, email: merchant.email }, env_1.env.JWT_SECRET, { expiresIn: '7d' });
-        res.cookie('token', token, {
+        const token = jsonwebtoken_1.default.sign({ merchantId: merchant.id, email: merchant.email }, env_1.env.JWT_SECRET, { expiresIn: "7d" });
+        res.cookie("token", token, {
             httpOnly: true,
-            secure: env_1.env.NODE_ENV === 'production',
-            sameSite: env_1.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            secure: env_1.env.NODE_ENV === "production",
+            sameSite: env_1.env.NODE_ENV === "production" ? "none" : "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
         res.json({
-            message: 'Login successful',
+            message: "Login successful",
             token,
             merchant: {
                 id: merchant.id,
@@ -153,8 +161,8 @@ async function login(req, res) {
         });
     }
     catch (error) {
-        logger_1.logger.error('Merchant Login Error:', error);
-        res.status(500).json({ error: 'Failed to authenticate merchant.' });
+        logger_1.logger.error("Merchant Login Error:", error);
+        res.status(500).json({ error: "Failed to authenticate merchant." });
     }
 }
 async function me(req, res) {
@@ -174,11 +182,14 @@ async function me(req, res) {
             },
         });
         if (!merchant) {
-            res.status(404).json({ error: 'Merchant not found.' });
+            res.status(404).json({ error: "Merchant not found." });
             return;
         }
-        const adminEmail = (env_1.env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
-        const isAdmin = merchant.role === 'ADMIN' || merchant.email.trim().toLowerCase() === adminEmail;
+        const adminEmail = (env_1.env.ADMIN_EMAIL || "admin@ahsanul.dev")
+            .trim()
+            .toLowerCase();
+        const isAdmin = merchant.role === "ADMIN" ||
+            merchant.email.trim().toLowerCase() === adminEmail;
         const domainStatuses = await Promise.all((merchant.allowedDomains || []).map(async (domain) => {
             const chunkCount = await db_1.prisma.knowledgeChunk.count({
                 where: {
@@ -188,7 +199,7 @@ async function me(req, res) {
             });
             return {
                 domain,
-                status: chunkCount > 0 ? 'scraped' : 'pending',
+                status: chunkCount > 0 ? "scraped" : "pending",
                 chunkCount,
             };
         }));
@@ -201,8 +212,8 @@ async function me(req, res) {
         });
     }
     catch (error) {
-        logger_1.logger.error('Get Merchant Profile Error:', error);
-        res.status(500).json({ error: 'Failed to fetch merchant profile.' });
+        logger_1.logger.error("Get Merchant Profile Error:", error);
+        res.status(500).json({ error: "Failed to fetch merchant profile." });
     }
 }
 async function updateDomains(req, res) {
@@ -213,19 +224,23 @@ async function updateDomains(req, res) {
             where: { id: merchantId },
             select: { planTier: true },
         });
-        const planTier = dbMerchant?.planTier || req.merchant?.planTier || 'FREE';
+        const planTier = dbMerchant?.planTier || req.merchant?.planTier || "FREE";
         const { allowedDomains } = req.body;
         if (!Array.isArray(allowedDomains)) {
-            res.status(400).json({ error: 'allowedDomains must be an array of domain strings.' });
+            res
+                .status(400)
+                .json({ error: "allowedDomains must be an array of domain strings." });
             return;
         }
-        const rawSanitized = allowedDomains.map((d) => (0, domain_1.normalizeDomain)(d)).filter(Boolean);
+        const rawSanitized = allowedDomains
+            .map((d) => (0, domain_1.normalizeDomain)(d))
+            .filter(Boolean);
         const sanitizedDomains = [...new Set(rawSanitized)];
         const plan = (0, pricing_1.getPlanConfig)(planTier);
         const limit = plan.maxDomains;
         if (sanitizedDomains.length > limit) {
             res.status(400).json({
-                error: `Your ${planTier} plan allows whitelisting up to ${limit} domains. Please upgrade to add more domains.`
+                error: `Your ${planTier} plan allows whitelisting up to ${limit} domains. Please upgrade to add more domains.`,
             });
             return;
         }
@@ -235,45 +250,47 @@ async function updateDomains(req, res) {
             select: { id: true, allowedDomains: true },
         });
         // Automatically trigger persistent detailed background crawl for updated domains
-        const { triggerBackgroundCrawl } = await Promise.resolve().then(() => __importStar(require('../../services/scraper.service')));
+        const { triggerBackgroundCrawl } = await Promise.resolve().then(() => __importStar(require("../../services/scraper.service")));
         if (merchantId) {
             for (const domain of sanitizedDomains) {
                 triggerBackgroundCrawl(domain, merchantId);
             }
         }
         res.json({
-            message: 'Allowed domains updated successfully and background scraping initiated',
+            message: "Allowed domains updated successfully and background scraping initiated",
             allowedDomains: updatedMerchant.allowedDomains,
         });
     }
     catch (error) {
-        logger_1.logger.error('Update Domains Error:', error);
-        res.status(500).json({ error: 'Failed to update allowed domains.' });
+        logger_1.logger.error("Update Domains Error:", error);
+        res.status(500).json({ error: "Failed to update allowed domains." });
     }
 }
 async function logout(req, res) {
-    res.clearCookie('token');
-    res.json({ message: 'Logged out successfully' });
+    res.clearCookie("token");
+    res.json({ message: "Logged out successfully" });
 }
 async function scrapeUrl(req, res) {
     try {
         const merchantId = req.merchant?.id;
         const { url } = req.body;
         if (!url) {
-            res.status(400).json({ error: 'Target URL is required.' });
+            res.status(400).json({ error: "Target URL is required." });
             return;
         }
-        const { triggerBackgroundCrawl } = await Promise.resolve().then(() => __importStar(require('../../services/scraper.service')));
+        const { triggerBackgroundCrawl } = await Promise.resolve().then(() => __importStar(require("../../services/scraper.service")));
         const result = triggerBackgroundCrawl(url, merchantId);
         res.status(202).json({
-            message: result.message || 'Background scrape initiated successfully!',
+            message: result.message || "Background scrape initiated successfully!",
             url,
-            status: 'in_progress',
+            status: "in_progress",
         });
     }
     catch (error) {
-        logger_1.logger.error('Scrape URL Error:', error);
-        res.status(500).json({ error: error.message || 'Failed to initiate website scrape.' });
+        logger_1.logger.error("Scrape URL Error:", error);
+        res
+            .status(500)
+            .json({ error: error.message || "Failed to initiate website scrape." });
     }
 }
 async function rescrapeDomain(req, res) {
@@ -281,10 +298,10 @@ async function rescrapeDomain(req, res) {
         const merchantId = req.merchant?.id;
         const { domain } = req.body;
         if (!domain) {
-            res.status(400).json({ error: 'Domain name is required.' });
+            res.status(400).json({ error: "Domain name is required." });
             return;
         }
-        const { triggerBackgroundCrawl } = await Promise.resolve().then(() => __importStar(require('../../services/scraper.service')));
+        const { triggerBackgroundCrawl } = await Promise.resolve().then(() => __importStar(require("../../services/scraper.service")));
         triggerBackgroundCrawl(domain, merchantId);
         res.json({
             message: `Background re-scrape initiated for ${domain}`,
@@ -292,7 +309,9 @@ async function rescrapeDomain(req, res) {
         });
     }
     catch (error) {
-        logger_1.logger.error('Rescrape Domain Error:', error);
-        res.status(500).json({ error: error.message || 'Failed to initiate re-scrape.' });
+        logger_1.logger.error("Rescrape Domain Error:", error);
+        res
+            .status(500)
+            .json({ error: error.message || "Failed to initiate re-scrape." });
     }
 }

@@ -618,7 +618,116 @@ async function indexPageContent(
 
       const extractedOptions: Array<{ name: string; values: string[] }> = [];
 
-      // 1. Generic <select> option extraction (Dropdowns: Storage, Weight, Flavor, Material, Color, Size, etc.)
+      // Helper to add unique option names and values cleanly
+      const addExtractedOption = (name: string, values: string[]) => {
+        if (!name || !values || values.length === 0) return;
+        const cleanName =
+          name.trim().charAt(0).toUpperCase() + name.trim().slice(1);
+        const uniqueVals = Array.from(
+          new Set(
+            values
+              .map((v) => v.trim())
+              .filter(
+                (v) =>
+                  v.length > 0 &&
+                  v.length < 50 &&
+                  !/^(add\s*to\s*cart|buy\s*now|checkout|login|signup)$/i.test(
+                    v,
+                  ),
+              ),
+          ),
+        );
+        if (uniqueVals.length === 0) return;
+
+        const existing = extractedOptions.find(
+          (o) => o.name.toLowerCase() === cleanName.toLowerCase(),
+        );
+        if (existing) {
+          existing.values = Array.from(
+            new Set([...existing.values, ...uniqueVals]),
+          );
+        } else {
+          extractedOptions.push({ name: cleanName, values: uniqueVals });
+        }
+      };
+
+      // 1. Universal Semantic Heading & Sibling Container Traversal
+      // Matches headings like "Select Size", "Select Color", "Select Storage", "Choose Flavor", "Material:", etc.
+      $(
+        'p, label, h2, h3, h4, h5, h6, legend, [class*="label" i], [class*="heading" i], [class*="title" i]',
+      ).each((_, headingEl) => {
+        if (
+          $(headingEl).find('button, input[type="radio"], [role="radio"]')
+            .length > 0
+        )
+          return;
+
+        const text = $(headingEl).text().trim().replace(/\s+/g, " ");
+        if (!text || text.length > 35) return;
+
+        const match = text.match(
+          /^(?:Select|Choose|Pick|Available)?\s*([A-Za-z0-9\s_-]+?)(?:\s*:|\s*Options)?$/i,
+        );
+        if (match && match[1]) {
+          let candidateName = match[1].trim();
+          if (!candidateName || candidateName.split(/\s+/).length > 3) return;
+          if (
+            /^(product|item|quantity|qty|cart|checkout|price|shipping|review|rating|delivery|details?|description|login|order|related|recommended|category)$/i.test(
+              candidateName,
+            )
+          ) {
+            return;
+          }
+
+          const nextEl = $(headingEl).next();
+          let buttonsInContainer = nextEl
+            .find(
+              'button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, li',
+            )
+            .filter((_, b) => {
+              const bText = $(b).text().trim();
+              return (
+                bText.length > 0 &&
+                !/add\s*to\s*cart|buy\s*now|checkout|login|signup/i.test(bText)
+              );
+            });
+
+          if (
+            buttonsInContainer.length === 0 &&
+            nextEl.is(
+              'button, input[type="radio"], [role="radio"], [role="button"]',
+            )
+          ) {
+            buttonsInContainer = nextEl;
+          }
+
+          if (buttonsInContainer.length === 0) {
+            const parentContainer = $(headingEl).parent();
+            buttonsInContainer = parentContainer
+              .find(
+                'button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, li',
+              )
+              .filter((_, b) => {
+                const bText = $(b).text().trim();
+                return (
+                  bText.length > 0 &&
+                  !/add\s*to\s*cart|buy\s*now|checkout|login|signup/i.test(
+                    bText,
+                  )
+                );
+              });
+          }
+
+          if (buttonsInContainer.length > 0) {
+            const vals = buttonsInContainer
+              .map((_, b) => $(b).text().trim())
+              .get();
+            addExtractedOption(candidateName, vals);
+          }
+        }
+      });
+
+      // 2. Generic <select> option extraction (Dropdowns: Storage, Weight, Flavor, Material, Color, Size, etc.)
       $("select").each((_, sel) => {
         const selectEl = $(sel);
         let optName =
@@ -626,13 +735,14 @@ async function indexPageContent(
           selectEl.attr("id") ||
           selectEl.prev("label").text().trim() ||
           selectEl.parent().find("label").text().trim() ||
+          selectEl.parent().find("p, span, h4, h5").first().text().trim() ||
           "Option";
         optName = optName
           .replace(/[-_]/g, " ")
           .replace(/attribute/i, "")
           .replace(/select/i, "")
+          .replace(/choose/i, "")
           .trim();
-        optName = optName.charAt(0).toUpperCase() + optName.slice(1);
 
         const vals: string[] = [];
         selectEl.find("option").each((_, opt) => {
@@ -647,84 +757,65 @@ async function indexPageContent(
           }
         });
 
-        if (
-          vals.length > 0 &&
-          !extractedOptions.some(
-            (o) => o.name.toLowerCase() === optName.toLowerCase(),
-          )
-        ) {
-          extractedOptions.push({ name: optName, values: vals });
+        if (vals.length > 0) {
+          addExtractedOption(optName, vals);
         }
       });
 
-      // 2. Generic Button Groups, Pills, & Swatches (Sizes, Storage, Weights, Colors)
+      // 3. Fallback Pattern Matchers (Sizes, Storage, Weights, Colors)
       const sizeButtons = $("button, .size-btn, [data-size]").filter((_, el) =>
-        /^(xs|s|m|l|xl|xxl|\d{2})$/i.test($(el).text().trim()),
+        /^(xs|s|m|l|xl|xxl|2xl|3xl|\d{2})$/i.test($(el).text().trim()),
       );
-      if (
-        sizeButtons.length > 0 &&
-        !extractedOptions.some((o) => o.name.toLowerCase() === "size")
-      ) {
-        extractedOptions.push({
-          name: "Size",
-          values: Array.from(
-            new Set(sizeButtons.map((_, el) => $(el).text().trim()).get()),
-          ),
-        });
+      if (sizeButtons.length > 0) {
+        addExtractedOption(
+          "Size",
+          sizeButtons.map((_, el) => $(el).text().trim()).get(),
+        );
       }
 
       const storageButtons = $("button, .option-btn, [data-storage]").filter(
         (_, el) => /^\d+\s*(gb|tb|mb)$/i.test($(el).text().trim()),
       );
-      if (
-        storageButtons.length > 0 &&
-        !extractedOptions.some((o) => o.name.toLowerCase() === "storage")
-      ) {
-        extractedOptions.push({
-          name: "Storage",
-          values: Array.from(
-            new Set(storageButtons.map((_, el) => $(el).text().trim()).get()),
-          ),
-        });
+      if (storageButtons.length > 0) {
+        addExtractedOption(
+          "Storage",
+          storageButtons.map((_, el) => $(el).text().trim()).get(),
+        );
       }
 
       const weightButtons = $("button, .option-btn, [data-weight]").filter(
         (_, el) => /^\d+\s*(g|kg|lb|oz|ml|l)$/i.test($(el).text().trim()),
       );
-      if (
-        weightButtons.length > 0 &&
-        !extractedOptions.some((o) => o.name.toLowerCase() === "weight")
-      ) {
-        extractedOptions.push({
-          name: "Weight",
-          values: Array.from(
-            new Set(weightButtons.map((_, el) => $(el).text().trim()).get()),
-          ),
-        });
+      if (weightButtons.length > 0) {
+        addExtractedOption(
+          "Weight",
+          weightButtons.map((_, el) => $(el).text().trim()).get(),
+        );
       }
 
       const colorButtons = $(
-        "[data-color], .color-swatch, .swatch[data-value]",
+        "[data-color], .color-swatch, .swatch[data-value], button [style*='background-color'], button [style*='background:']",
       );
-      if (
-        colorButtons.length > 0 &&
-        !extractedOptions.some((o) => o.name.toLowerCase() === "color")
-      ) {
+      if (colorButtons.length > 0) {
         const colorVals = colorButtons
-          .map(
-            (_, el) =>
+          .map((_, el) => {
+            const btnParent = $(el).is("button")
+              ? $(el)
+              : $(el).closest("button");
+            return (
               $(el).attr("data-color") ||
               $(el).attr("data-value") ||
               $(el).attr("title") ||
-              $(el).text().trim(),
-          )
+              btnParent.text().trim() ||
+              $(el).text().trim()
+            );
+          })
           .get()
-          .filter(Boolean);
+          .filter(
+            (v) => Boolean(v) && v.length < 30 && !/add\s*to\s*cart/i.test(v),
+          );
         if (colorVals.length > 0) {
-          extractedOptions.push({
-            name: "Color",
-            values: Array.from(new Set(colorVals)),
-          });
+          addExtractedOption("Color", colorVals);
         }
       }
 
@@ -808,7 +899,7 @@ async function indexPageContent(
 
   // Deep Semantic Container Traversal across modern SPAs & static sites
   $(
-    'p, li, blockquote, [data-description], dd, dt, table tr, td, th, div[class*="desc" i], div[class*="detail" i], div[class*="spec" i], div[class*="feature" i], div[class*="content" i], div[class*="faq" i], div[class*="policy" i], section p, article p'
+    'p, li, blockquote, [data-description], dd, dt, table tr, td, th, div[class*="desc" i], div[class*="detail" i], div[class*="spec" i], div[class*="feature" i], div[class*="content" i], div[class*="faq" i], div[class*="policy" i], section p, article p',
   ).each((_, el) => {
     const text = $(el).text().trim().replace(/\s+/g, " ");
     if (text && text.length > 12 && !seenBlockTexts.has(text.toLowerCase())) {
@@ -855,11 +946,7 @@ async function indexPageContent(
   // 4. Save Granular Structured Chunks (~380-450 chars) to KnowledgeChunk with vector embeddings
   let chunksCreated = 0;
   let currentChunk = `${headerPrefix}\n\n`;
-  const elementsToChunk = [
-    ...headings,
-    ...contentBlocks,
-    ...pageLinks,
-  ];
+  const elementsToChunk = [...headings, ...contentBlocks, ...pageLinks];
 
   for (const el of elementsToChunk) {
     currentChunk += el + "\n\n";
@@ -1171,13 +1258,27 @@ export async function scrapeWebsite(
 
       // Discover internal links from current page
       const $ = cheerio.load(html);
-      $('a[href]').each((_, el) => {
-        const href = $(el).attr('href');
-        if (href && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('javascript:')) {
+      $("a[href]").each((_, el) => {
+        const href = $(el).attr("href");
+        if (
+          href &&
+          !href.startsWith("#") &&
+          !href.startsWith("mailto:") &&
+          !href.startsWith("tel:") &&
+          !href.startsWith("javascript:")
+        ) {
           try {
             const nextUrl = new URL(href, parsedUrl.origin);
-            if (nextUrl.hostname === parsedUrl.hostname && !visitedUrls.has(nextUrl.href) && !queue.includes(nextUrl.href)) {
-              if (!nextUrl.pathname.match(/\.(png|jpg|jpeg|gif|svg|pdf|zip|css|js|woff|woff2)$/i)) {
+            if (
+              nextUrl.hostname === parsedUrl.hostname &&
+              !visitedUrls.has(nextUrl.href) &&
+              !queue.includes(nextUrl.href)
+            ) {
+              if (
+                !nextUrl.pathname.match(
+                  /\.(png|jpg|jpeg|gif|svg|pdf|zip|css|js|woff|woff2)$/i,
+                )
+              ) {
                 queue.push(nextUrl.href);
               }
             }
@@ -1363,11 +1464,17 @@ export function triggerBackgroundCrawl(
   const domainList = Array.isArray(domains) ? domains : [domains];
   const existingJob = activeScrapeJobs.get(merchantId);
   if (existingJob && existingJob.isScraping) {
-    logger.info(`[BackgroundScraper] Scrape already in progress for merchant ${merchantId}`);
-    return { success: true, message: 'Crawl already in progress in background', isAlreadyRunning: true };
+    logger.info(
+      `[BackgroundScraper] Scrape already in progress for merchant ${merchantId}`,
+    );
+    return {
+      success: true,
+      message: "Crawl already in progress in background",
+      isAlreadyRunning: true,
+    };
   }
 
-  const primaryDomain = domainList[0] || 'all';
+  const primaryDomain = domainList[0] || "all";
   const jobStatus: ScrapeJobStatus = {
     isScraping: true,
     domain: primaryDomain,
@@ -1380,7 +1487,7 @@ export function triggerBackgroundCrawl(
   activeScrapeJobs.set(merchantId, jobStatus);
 
   logger.info(
-    `[BackgroundScraper] Launching persistent background crawl for merchant ${merchantId} on domains: ${domainList.join(', ')}`,
+    `[BackgroundScraper] Launching persistent background crawl for merchant ${merchantId} on domains: ${domainList.join(", ")}`,
   );
 
   (async () => {
@@ -1393,7 +1500,10 @@ export function triggerBackgroundCrawl(
         jobStatus.pagesCrawled = totalPages;
         jobStatus.lastUpdated = Date.now();
       } catch (err) {
-        logger.error(`[BackgroundScraper] Persistent background crawl failed for ${dom}:`, err);
+        logger.error(
+          `[BackgroundScraper] Persistent background crawl failed for ${dom}:`,
+          err,
+        );
       }
     }
     activeScrapeJobs.set(merchantId, {
@@ -1421,5 +1531,5 @@ export function triggerBackgroundCrawl(
     logger.error(`[BackgroundScraper] Crawl job failed:`, err);
   });
 
-  return { success: true, message: 'Background crawl initiated successfully' };
+  return { success: true, message: "Background crawl initiated successfully" };
 }

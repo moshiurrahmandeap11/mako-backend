@@ -1,25 +1,29 @@
-import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { prisma } from '../../config/db';
-import { env } from '../../config/env';
-import { logger } from '../../utils/logger';
-import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
-import { normalizeDomain } from '../../utils/domain';
-import { getPlanConfig } from '../../config/pricing';
+import bcrypt from "bcrypt";
+import { Request, Response } from "express";
+import jwt from "jsonwebtoken";
+import { prisma } from "../../config/db";
+import { env } from "../../config/env";
+import { getPlanConfig } from "../../config/pricing";
+import { DashboardAuthRequest } from "../../middleware/authenticateDashboard";
+import { normalizeDomain } from "../../utils/domain";
+import { logger } from "../../utils/logger";
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      res.status(400).json({ error: 'Name, email, and password are required.' });
+      res
+        .status(400)
+        .json({ error: "Name, email, and password are required." });
       return;
     }
 
     const existingMerchant = await prisma.user.findUnique({ where: { email } });
     if (existingMerchant) {
-      res.status(409).json({ error: 'A merchant account with this email already exists.' });
+      res
+        .status(409)
+        .json({ error: "A merchant account with this email already exists." });
       return;
     }
 
@@ -33,10 +37,10 @@ export async function register(req: Request, res: Response): Promise<void> {
         allowedDomains: [],
         widgetConfig: {
           create: {
-            primaryColor: '#111111',
-            greetingMessage: 'Hi! How can I help you shop today?',
-            botName: 'AI Assistant',
-            position: 'bottom-right',
+            primaryColor: "#111111",
+            greetingMessage: "Hi! How can I help you shop today?",
+            botName: "AI Assistant",
+            position: "bottom-right",
             addToCartEnabled: true,
           },
         },
@@ -49,18 +53,18 @@ export async function register(req: Request, res: Response): Promise<void> {
     const token = jwt.sign(
       { merchantId: merchant.id, email: merchant.email },
       env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" },
     );
 
-    res.cookie('token', token, {
+    res.cookie("token", token, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: env.NODE_ENV === "production",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.status(201).json({
-      message: 'Registration successful',
+      message: "Registration successful",
       token,
       merchant: {
         id: merchant.id,
@@ -72,8 +76,8 @@ export async function register(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    logger.error('Merchant Registration Error:', error);
-    res.status(500).json({ error: 'Failed to register merchant account.' });
+    logger.error("Merchant Registration Error:", error);
+    res.status(500).json({ error: "Failed to register merchant account." });
   }
 }
 
@@ -82,7 +86,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      res.status(400).json({ error: 'Email and password are required.' });
+      res.status(400).json({ error: "Email and password are required." });
       return;
     }
 
@@ -92,36 +96,41 @@ export async function login(req: Request, res: Response): Promise<void> {
     });
 
     if (!merchant) {
-      res.status(401).json({ error: 'Invalid email or password.' });
+      res.status(401).json({ error: "Invalid email or password." });
       return;
     }
 
     if (!merchant.passwordHash) {
-      res.status(401).json({ error: 'This account is set up with social authentication. Please log in with Google or GitHub.' });
+      res
+        .status(401)
+        .json({
+          error:
+            "This account is set up with social authentication. Please log in with Google or GitHub.",
+        });
       return;
     }
 
     const isMatch = await bcrypt.compare(password, merchant.passwordHash);
     if (!isMatch) {
-      res.status(401).json({ error: 'Invalid email or password.' });
+      res.status(401).json({ error: "Invalid email or password." });
       return;
     }
 
     const token = jwt.sign(
       { merchantId: merchant.id, email: merchant.email },
       env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" },
     );
 
-    res.cookie('token', token, {
+    res.cookie("token", token, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: env.NODE_ENV === "production",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.json({
-      message: 'Login successful',
+      message: "Login successful",
       token,
       merchant: {
         id: merchant.id,
@@ -133,12 +142,15 @@ export async function login(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    logger.error('Merchant Login Error:', error);
-    res.status(500).json({ error: 'Failed to authenticate merchant.' });
+    logger.error("Merchant Login Error:", error);
+    res.status(500).json({ error: "Failed to authenticate merchant." });
   }
 }
 
-export async function me(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function me(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id;
 
@@ -157,12 +169,16 @@ export async function me(req: DashboardAuthRequest, res: Response): Promise<void
     });
 
     if (!merchant) {
-      res.status(404).json({ error: 'Merchant not found.' });
+      res.status(404).json({ error: "Merchant not found." });
       return;
     }
 
-    const adminEmail = (env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
-    const isAdmin = merchant.role === 'ADMIN' || merchant.email.trim().toLowerCase() === adminEmail;
+    const adminEmail = (env.ADMIN_EMAIL || "admin@ahsanul.dev")
+      .trim()
+      .toLowerCase();
+    const isAdmin =
+      merchant.role === "ADMIN" ||
+      merchant.email.trim().toLowerCase() === adminEmail;
 
     const domainStatuses = await Promise.all(
       (merchant.allowedDomains || []).map(async (domain) => {
@@ -174,10 +190,10 @@ export async function me(req: DashboardAuthRequest, res: Response): Promise<void
         });
         return {
           domain,
-          status: chunkCount > 0 ? 'scraped' : 'pending',
+          status: chunkCount > 0 ? "scraped" : "pending",
           chunkCount,
         };
-      })
+      }),
     );
 
     res.json({
@@ -188,12 +204,15 @@ export async function me(req: DashboardAuthRequest, res: Response): Promise<void
       },
     });
   } catch (error) {
-    logger.error('Get Merchant Profile Error:', error);
-    res.status(500).json({ error: 'Failed to fetch merchant profile.' });
+    logger.error("Get Merchant Profile Error:", error);
+    res.status(500).json({ error: "Failed to fetch merchant profile." });
   }
 }
 
-export async function updateDomains(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function updateDomains(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id;
 
@@ -202,22 +221,26 @@ export async function updateDomains(req: DashboardAuthRequest, res: Response): P
       where: { id: merchantId },
       select: { planTier: true },
     });
-    const planTier = dbMerchant?.planTier || req.merchant?.planTier || 'FREE';
+    const planTier = dbMerchant?.planTier || req.merchant?.planTier || "FREE";
     const { allowedDomains } = req.body;
 
     if (!Array.isArray(allowedDomains)) {
-      res.status(400).json({ error: 'allowedDomains must be an array of domain strings.' });
+      res
+        .status(400)
+        .json({ error: "allowedDomains must be an array of domain strings." });
       return;
     }
 
-    const rawSanitized = allowedDomains.map((d) => normalizeDomain(d)).filter(Boolean);
+    const rawSanitized = allowedDomains
+      .map((d) => normalizeDomain(d))
+      .filter(Boolean);
     const sanitizedDomains = [...new Set(rawSanitized)];
     const plan = getPlanConfig(planTier);
     const limit = plan.maxDomains;
 
     if (sanitizedDomains.length > limit) {
       res.status(400).json({
-        error: `Your ${planTier} plan allows whitelisting up to ${limit} domains. Please upgrade to add more domains.`
+        error: `Your ${planTier} plan allows whitelisting up to ${limit} domains. Please upgrade to add more domains.`,
       });
       return;
     }
@@ -229,7 +252,8 @@ export async function updateDomains(req: DashboardAuthRequest, res: Response): P
     });
 
     // Automatically trigger persistent detailed background crawl for updated domains
-    const { triggerBackgroundCrawl } = await import('../../services/scraper.service');
+    const { triggerBackgroundCrawl } =
+      await import("../../services/scraper.service");
     if (merchantId) {
       for (const domain of sanitizedDomains) {
         triggerBackgroundCrawl(domain, merchantId);
@@ -237,55 +261,66 @@ export async function updateDomains(req: DashboardAuthRequest, res: Response): P
     }
 
     res.json({
-      message: 'Allowed domains updated successfully and background scraping initiated',
+      message:
+        "Allowed domains updated successfully and background scraping initiated",
       allowedDomains: updatedMerchant.allowedDomains,
     });
   } catch (error) {
-    logger.error('Update Domains Error:', error);
-    res.status(500).json({ error: 'Failed to update allowed domains.' });
+    logger.error("Update Domains Error:", error);
+    res.status(500).json({ error: "Failed to update allowed domains." });
   }
 }
 
 export async function logout(req: Request, res: Response): Promise<void> {
-  res.clearCookie('token');
-  res.json({ message: 'Logged out successfully' });
+  res.clearCookie("token");
+  res.json({ message: "Logged out successfully" });
 }
 
-export async function scrapeUrl(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function scrapeUrl(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
     const { url } = req.body;
 
     if (!url) {
-      res.status(400).json({ error: 'Target URL is required.' });
+      res.status(400).json({ error: "Target URL is required." });
       return;
     }
 
-    const { triggerBackgroundCrawl } = await import('../../services/scraper.service');
+    const { triggerBackgroundCrawl } =
+      await import("../../services/scraper.service");
     const result = triggerBackgroundCrawl(url, merchantId);
 
     res.status(202).json({
-      message: result.message || 'Background scrape initiated successfully!',
+      message: result.message || "Background scrape initiated successfully!",
       url,
-      status: 'in_progress',
+      status: "in_progress",
     });
   } catch (error: any) {
-    logger.error('Scrape URL Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to initiate website scrape.' });
+    logger.error("Scrape URL Error:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Failed to initiate website scrape." });
   }
 }
 
-export async function rescrapeDomain(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function rescrapeDomain(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
     const { domain } = req.body;
 
     if (!domain) {
-      res.status(400).json({ error: 'Domain name is required.' });
+      res.status(400).json({ error: "Domain name is required." });
       return;
     }
 
-    const { triggerBackgroundCrawl } = await import('../../services/scraper.service');
+    const { triggerBackgroundCrawl } =
+      await import("../../services/scraper.service");
     triggerBackgroundCrawl(domain, merchantId);
 
     res.json({
@@ -293,7 +328,9 @@ export async function rescrapeDomain(req: DashboardAuthRequest, res: Response): 
       domain,
     });
   } catch (error: any) {
-    logger.error('Rescrape Domain Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to initiate re-scrape.' });
+    logger.error("Rescrape Domain Error:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Failed to initiate re-scrape." });
   }
 }

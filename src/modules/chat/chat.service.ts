@@ -876,17 +876,16 @@ Currently, no specific catalog items or knowledge base articles matched this que
 
         if (parts.length > 1) {
           const secondPart = parts.slice(1).join(", ");
-          if (/size:\s*([a-zA-Z0-9]+)/i.test(secondPart)) {
-            const m = secondPart.match(/size:\s*([a-zA-Z0-9]+)/i);
-            if (m)
-              targetOptions = {
-                ...(targetOptions || {}),
-                Size: m[1].toUpperCase(),
-              };
-          } else if (/color:\s*([a-zA-Z0-9]+)/i.test(secondPart)) {
-            const m = secondPart.match(/color:\s*([a-zA-Z0-9]+)/i);
-            if (m) targetOptions = { ...(targetOptions || {}), Color: m[1] };
-          } else if (/^(xs|s|m|l|xl|xxl|\d{2})$/i.test(secondPart)) {
+          const kvMatches = Array.from(
+            secondPart.matchAll(/([a-zA-Z0-9_-]+)\s*:\s*([^,]+)/g),
+          );
+          if (kvMatches.length > 0) {
+            for (const match of kvMatches) {
+              const k = match[1].trim();
+              const v = match[2].trim();
+              targetOptions = { ...(targetOptions || {}), [k]: v };
+            }
+          } else if (/^(xs|s|m|l|xl|xxl|2xl|3xl|\d{2})$/i.test(secondPart)) {
             targetOptions = {
               ...(targetOptions || {}),
               Size: secondPart.toUpperCase(),
@@ -932,30 +931,33 @@ Currently, no specific catalog items or knowledge base articles matched this que
             const optNames =
               (res.product?.options as any[])
                 ?.map((o: any) => o.name)
-                .join(", ") || "Size";
+                .join(" o ") || "Size";
             if (isBengaliScript) {
-              finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames || "সাইজ"}টি পছন্দ?`;
+              finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames}টি পছন্দ?`;
             } else if (isBanglish) {
-              finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames || "size"} ta lagbe?`;
+              finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames} ta lagbe?`;
             } else {
-              finalReply = `Which ${optNames || "size"} would you prefer for [${prodTitle}](${prodUrl})?`;
+              finalReply = `Which ${optNames} would you prefer for [${prodTitle}](${prodUrl})?`;
             }
           } else {
-            const sizeNote = targetOptions?.Size
-              ? ` (Size: ${targetOptions.Size})`
-              : "";
+            const optNote =
+              targetOptions && Object.keys(targetOptions).length > 0
+                ? ` (${Object.entries(targetOptions)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(", ")})`
+                : "";
             if (isBengaliScript) {
-              finalReply = `[${prodTitle}](${prodUrl})${sizeNote} কার্টে যোগ করা হয়েছে! 🛍️`;
+              finalReply = `[${prodTitle}](${prodUrl})${optNote} কার্টে যোগ করা হয়েছে! 🛍️`;
             } else if (isBanglish) {
-              finalReply = `[${prodTitle}](${prodUrl})${sizeNote} cart e add kora hoyeche! 🛍️`;
+              finalReply = `[${prodTitle}](${prodUrl})${optNote} cart e add kora hoyeche! 🛍️`;
             } else {
-              finalReply = `[${prodTitle}](${prodUrl})${sizeNote} has been added to your cart! 🛍️`;
+              finalReply = `Added [${prodTitle}](${prodUrl})${optNote} to your cart! 🛍️`;
             }
           }
         }
       }
-    } catch (err) {
-      logger.error("Parsing Add to Cart Tag Error:", err);
+    } catch (parseErr) {
+      logger.error("Failed to parse cart action tag:", parseErr);
     }
   }
 
@@ -1005,13 +1007,18 @@ Currently, no specific catalog items or knowledge base articles matched this que
 
         if (matchedProd) {
           let targetOptions: Record<string, string> | undefined = undefined;
-          const sizeMatch =
-            finalReply.match(/Size:\s*([a-zA-Z0-9]+)/i) ||
-            userMessage.match(/^(xs|s|m|l|xl|xxl|\d{2})$/i);
-          if (sizeMatch) {
-            targetOptions = {
-              Size: (sizeMatch[1] || sizeMatch[0]).toUpperCase(),
-            };
+
+          // Dynamically match all options against the product's actual schema array
+          if (matchedProd.options && Array.isArray(matchedProd.options)) {
+            for (const opt of matchedProd.options as any[]) {
+              const optName = opt.name;
+              for (const val of opt.values || []) {
+                const reg = new RegExp(`\\b${val}\\b`, "i");
+                if (reg.test(finalReply) || reg.test(userMessage)) {
+                  targetOptions = { ...(targetOptions || {}), [optName]: val };
+                }
+              }
+            }
           }
 
           const res = await addToCartTool(

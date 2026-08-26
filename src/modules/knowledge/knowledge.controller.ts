@@ -1,14 +1,12 @@
-import { Response } from 'express';
-import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
-import { prisma } from '../../config/db';
+import { Response } from "express";
+import { prisma } from "../../config/db";
+import { DashboardAuthRequest } from "../../middleware/authenticateDashboard";
 import {
-  scrapeWebsite,
-  scrapeSingleUrl,
   addManualKnowledgeChunk,
+  scrapeSingleUrl,
   triggerBackgroundCrawl,
-  getScrapeStatus,
-} from '../../services/scraper.service';
-import { logger } from '../../utils/logger';
+} from "../../services/scraper.service";
+import { logger } from "../../utils/logger";
 
 /**
  * List all knowledge chunks and indexed sources for merchant
@@ -17,12 +15,12 @@ export async function listKnowledge(req: DashboardAuthRequest, res: Response) {
   try {
     const merchantId = req.merchant?.id;
     if (!merchantId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const chunks = await prisma.knowledgeChunk.findMany({
       where: { merchantId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 150,
       select: {
         id: true,
@@ -51,8 +49,8 @@ export async function listKnowledge(req: DashboardAuthRequest, res: Response) {
       chunks,
     });
   } catch (error: any) {
-    logger.error('Error listing knowledge chunks:', error);
-    return res.status(500).json({ error: 'Failed to fetch knowledge base' });
+    logger.error("Error listing knowledge chunks:", error);
+    return res.status(500).json({ error: "Failed to fetch knowledge base" });
   }
 }
 
@@ -63,48 +61,60 @@ export async function scrapeUrl(req: DashboardAuthRequest, res: Response) {
   try {
     const merchantId = req.merchant?.id;
     if (!merchantId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const { url } = req.body;
-    if (!url || typeof url !== 'string') {
-      return res.status(400).json({ error: 'A valid URL is required' });
+    if (!url || typeof url !== "string") {
+      return res.status(400).json({ error: "A valid URL is required" });
     }
 
-    logger.info(`Merchant ${merchantId} requested manual scrape of URL: ${url}`);
+    logger.info(
+      `Merchant ${merchantId} requested manual scrape of URL: ${url}`,
+    );
     const result = await scrapeSingleUrl(url, merchantId);
 
     return res.json({
-      message: 'Successfully scraped and indexed URL',
+      message: "Successfully scraped and indexed URL",
       pageTitle: result.pageTitle,
       chunksCreated: result.chunksCount,
       productsIndexed: result.products.length,
     });
   } catch (error: any) {
-    logger.error('Error scraping custom URL:', error);
-    return res.status(500).json({ error: error.message || 'Failed to scrape URL' });
+    logger.error("Error scraping custom URL:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to scrape URL" });
   }
 }
 
 /**
  * Add a manual custom text / FAQ note to knowledge base
  */
-export async function addCustomKnowledge(req: DashboardAuthRequest, res: Response) {
+export async function addCustomKnowledge(
+  req: DashboardAuthRequest,
+  res: Response,
+) {
   try {
     const merchantId = req.merchant?.id;
     if (!merchantId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const { title, content, sourceUrl } = req.body;
     if (!title || !content) {
-      return res.status(400).json({ error: 'Title and content are required' });
+      return res.status(400).json({ error: "Title and content are required" });
     }
 
-    const chunk = await addManualKnowledgeChunk(merchantId, title, content, sourceUrl);
+    const chunk = await addManualKnowledgeChunk(
+      merchantId,
+      title,
+      content,
+      sourceUrl,
+    );
 
     return res.json({
-      message: 'Knowledge chunk added successfully',
+      message: "Knowledge chunk added successfully",
       chunk: {
         id: chunk.id,
         url: chunk.url,
@@ -112,24 +122,27 @@ export async function addCustomKnowledge(req: DashboardAuthRequest, res: Respons
       },
     });
   } catch (error: any) {
-    logger.error('Error adding custom knowledge:', error);
-    return res.status(500).json({ error: 'Failed to add custom knowledge' });
+    logger.error("Error adding custom knowledge:", error);
+    return res.status(500).json({ error: "Failed to add custom knowledge" });
   }
 }
 
 /**
  * Delete a specific knowledge chunk
  */
-export async function deleteKnowledge(req: DashboardAuthRequest, res: Response) {
+export async function deleteKnowledge(
+  req: DashboardAuthRequest,
+  res: Response,
+) {
   try {
     const merchantId = req.merchant?.id;
     if (!merchantId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const { id } = req.params;
     if (!id) {
-      return res.status(400).json({ error: 'Chunk ID is required' });
+      return res.status(400).json({ error: "Chunk ID is required" });
     }
 
     await prisma.knowledgeChunk.deleteMany({
@@ -139,31 +152,34 @@ export async function deleteKnowledge(req: DashboardAuthRequest, res: Response) 
       },
     });
 
-    return res.json({ message: 'Knowledge chunk deleted successfully' });
+    return res.json({ message: "Knowledge chunk deleted successfully" });
   } catch (error: any) {
-    logger.error('Error deleting knowledge chunk:', error);
-    return res.status(500).json({ error: 'Failed to delete knowledge chunk' });
+    logger.error("Error deleting knowledge chunk:", error);
+    return res.status(500).json({ error: "Failed to delete knowledge chunk" });
   }
 }
 
 /**
  * Delete ALL knowledge chunks for merchant
  */
-export async function deleteAllKnowledge(req: DashboardAuthRequest, res: Response) {
+export async function deleteAllKnowledge(
+  req: DashboardAuthRequest,
+  res: Response,
+) {
   try {
     const merchantId = req.merchant?.id;
     if (!merchantId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     await prisma.knowledgeChunk.deleteMany({
       where: { merchantId },
     });
 
-    return res.json({ message: 'All knowledge chunks deleted successfully' });
+    return res.json({ message: "All knowledge chunks deleted successfully" });
   } catch (error: any) {
-    logger.error('Error clearing all knowledge chunks:', error);
-    return res.status(500).json({ error: 'Failed to clear knowledge base' });
+    logger.error("Error clearing all knowledge chunks:", error);
+    return res.status(500).json({ error: "Failed to clear knowledge base" });
   }
 }
 
@@ -174,7 +190,7 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
   try {
     const merchantId = req.merchant?.id;
     if (!merchantId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const user = await prisma.user.findUnique({
@@ -183,17 +199,33 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
     });
 
     const publicDomains = (user?.allowedDomains || []).filter((d: string) => {
-      const clean = d.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
-      return clean && clean !== 'localhost' && clean !== '127.0.0.1' && clean !== '0.0.0.0';
+      const clean = d
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, "")
+        .split("/")[0]
+        .split(":")[0];
+      return (
+        clean &&
+        clean !== "localhost" &&
+        clean !== "127.0.0.1" &&
+        clean !== "0.0.0.0"
+      );
     });
 
     const domainsToCrawl = req.body.domain ? [req.body.domain] : publicDomains;
 
     if (domainsToCrawl.length === 0) {
-      return res.status(400).json({ error: 'No valid public domains configured for this merchant' });
+      return res
+        .status(400)
+        .json({
+          error: "No valid public domains configured for this merchant",
+        });
     }
 
-    logger.info(`Merchant ${merchantId} triggered rescrape for domains: ${domainsToCrawl.join(', ')}`);
+    logger.info(
+      `Merchant ${merchantId} triggered rescrape for domains: ${domainsToCrawl.join(", ")}`,
+    );
 
     // Launch non-blocking background crawler with mutex lock
     const crawlResult = triggerBackgroundCrawl(domainsToCrawl, merchantId);
@@ -202,30 +234,37 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
       success: true,
       message: crawlResult.message,
       domains: domainsToCrawl,
-      status: 'in_progress',
+      status: "in_progress",
     });
   } catch (error: any) {
-    logger.error('Error initiating full rescrape:', error);
-    return res.status(500).json({ error: error.message || 'Failed to initiate full rescrape' });
+    logger.error("Error initiating full rescrape:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to initiate full rescrape" });
   }
 }
 
 /**
  * Get real-time background scrape status for merchant
  */
-export async function getScrapeStatusHandler(req: DashboardAuthRequest, res: Response) {
+export async function getScrapeStatusHandler(
+  req: DashboardAuthRequest,
+  res: Response,
+) {
   try {
     const merchantId = req.merchant?.id;
     if (!merchantId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { getScrapeStatus } = await import('../../services/scraper.service');
+    const { getScrapeStatus } = await import("../../services/scraper.service");
     const status = getScrapeStatus(merchantId);
     return res.json({ status });
   } catch (error: any) {
-    logger.error('Error fetching scrape status:', error);
-    return res.status(500).json({ error: 'Failed to fetch background scrape status' });
+    logger.error("Error fetching scrape status:", error);
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch background scrape status" });
   }
 }
 
@@ -236,61 +275,67 @@ export async function uploadDoc(req: DashboardAuthRequest, res: Response) {
   try {
     const merchantId = req.merchant?.id;
     if (!merchantId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const { filename, fileData, fileType, textContent } = req.body;
     if (!filename) {
-      return res.status(400).json({ error: 'Filename is required' });
+      return res.status(400).json({ error: "Filename is required" });
     }
 
-    let extractedText = textContent || '';
+    let extractedText = textContent || "";
 
     // If PDF base64 provided, parse with pdf-parse
-    if (fileData && (fileType === 'pdf' || filename.endsWith('.pdf'))) {
+    if (fileData && (fileType === "pdf" || filename.endsWith(".pdf"))) {
       try {
-        const pdfParse = require('pdf-parse');
-        const base64Clean = fileData.replace(/^data:application\/pdf;base64,/, '').trim();
-        const buffer = Buffer.from(base64Clean, 'base64');
+        const pdfParse = require("pdf-parse");
+        const base64Clean = fileData
+          .replace(/^data:application\/pdf;base64,/, "")
+          .trim();
+        const buffer = Buffer.from(base64Clean, "base64");
         const parsed = await pdfParse(buffer);
-        extractedText = parsed.text || '';
+        extractedText = parsed.text || "";
       } catch (err: any) {
-        logger.error('PDF parsing error:', err);
-        return res.status(400).json({ error: `Failed to parse PDF document: ${err.message}` });
+        logger.error("PDF parsing error:", err);
+        return res
+          .status(400)
+          .json({ error: `Failed to parse PDF document: ${err.message}` });
       }
     } else if (fileData && !extractedText) {
       // Plain text or base64 text fallback
-      const base64Clean = fileData.replace(/^data:[^;]+;base64,/, '').trim();
-      extractedText = Buffer.from(base64Clean, 'base64').toString('utf-8');
+      const base64Clean = fileData.replace(/^data:[^;]+;base64,/, "").trim();
+      extractedText = Buffer.from(base64Clean, "base64").toString("utf-8");
     }
 
-    extractedText = (extractedText || '').trim();
+    extractedText = (extractedText || "").trim();
     if (!extractedText || extractedText.length < 10) {
-      return res.status(400).json({ error: 'Could not extract meaningful text from document.' });
+      return res
+        .status(400)
+        .json({ error: "Could not extract meaningful text from document." });
     }
 
     // Split extracted text into semantic chunks (~500 chars)
     const rawParagraphs = extractedText.split(/\n\s*\n/);
     const chunks: string[] = [];
-    let currentChunk = '';
+    let currentChunk = "";
 
     for (const para of rawParagraphs) {
-      const cleanPara = para.replace(/\s+/g, ' ').trim();
+      const cleanPara = para.replace(/\s+/g, " ").trim();
       if (!cleanPara) continue;
 
-      if ((currentChunk + ' ' + cleanPara).length > 600) {
+      if ((currentChunk + " " + cleanPara).length > 600) {
         if (currentChunk) chunks.push(currentChunk.trim());
         currentChunk = cleanPara;
       } else {
-        currentChunk += (currentChunk ? '\n\n' : '') + cleanPara;
+        currentChunk += (currentChunk ? "\n\n" : "") + cleanPara;
       }
     }
     if (currentChunk.trim()) {
       chunks.push(currentChunk.trim());
     }
 
-    const sourceUrl = `doc:${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const { generateEmbedding } = await import('../../utils/embeddings');
+    const sourceUrl = `doc:${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const { generateEmbedding } = await import("../../utils/embeddings");
 
     let createdCount = 0;
     for (const chunkText of chunks.slice(0, 100)) {
@@ -308,25 +353,27 @@ export async function uploadDoc(req: DashboardAuthRequest, res: Response) {
         if (emb && emb.some((v) => v !== 0)) {
           await prisma.$executeRawUnsafe(
             `UPDATE "KnowledgeChunk" SET embedding = $1::vector WHERE id = $2`,
-            `[${emb.join(',')}]`,
-            chunkRecord.id
+            `[${emb.join(",")}]`,
+            chunkRecord.id,
           );
         }
       } catch (embErr) {
-        logger.warn('Failed to embed chunk for document:', embErr);
+        logger.warn("Failed to embed chunk for document:", embErr);
       }
 
       createdCount++;
     }
 
     return res.json({
-      message: 'Document uploaded and indexed successfully',
+      message: "Document uploaded and indexed successfully",
       filename,
       chunksCreated: createdCount,
       sourceUrl,
     });
   } catch (error: any) {
-    logger.error('Error uploading document:', error);
-    return res.status(500).json({ error: error.message || 'Failed to process document' });
+    logger.error("Error uploading document:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to process document" });
   }
 }
