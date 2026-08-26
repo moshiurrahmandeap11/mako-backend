@@ -5,6 +5,8 @@ import {
   scrapeWebsite,
   scrapeSingleUrl,
   addManualKnowledgeChunk,
+  triggerBackgroundCrawl,
+  getScrapeStatus,
 } from '../../services/scraper.service';
 import { logger } from '../../utils/logger';
 
@@ -166,7 +168,7 @@ export async function deleteAllKnowledge(req: DashboardAuthRequest, res: Respons
 }
 
 /**
- * Trigger full re-crawl for merchant's primary domain
+ * Trigger full rescrape of all merchant domains (Async Non-Blocking)
  */
 export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
   try {
@@ -180,7 +182,6 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
       select: { allowedDomains: true },
     });
 
-    // Filter out localhost and 127.0.0.1 from allowedDomains to find public domains
     const publicDomains = (user?.allowedDomains || []).filter((d: string) => {
       const clean = d.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
       return clean && clean !== 'localhost' && clean !== '127.0.0.1' && clean !== '0.0.0.0';
@@ -194,31 +195,18 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
 
     logger.info(`Merchant ${merchantId} triggered rescrape for domains: ${domainsToCrawl.join(', ')}`);
 
-    let totalPagesCrawled = 0;
-    let totalChunksCreated = 0;
-    let totalProductsIndexed = 0;
+    // Launch non-blocking background crawler with mutex lock
+    const crawlResult = triggerBackgroundCrawl(domainsToCrawl, merchantId);
 
-    for (const domain of domainsToCrawl) {
-      try {
-        const result = await scrapeWebsite(domain, merchantId);
-        totalPagesCrawled += result.pagesCrawledCount || 0;
-        totalChunksCreated += result.knowledgeChunksCount || 0;
-        totalProductsIndexed += result.indexedCount || 0;
-      } catch (err) {
-        logger.error(`Error crawling domain ${domain}:`, err);
-      }
-    }
-
-    return res.json({
-      message: 'Domain crawl completed successfully',
-      domainsCrawled: domainsToCrawl.length,
-      pagesCrawled: totalPagesCrawled,
-      chunksCreated: totalChunksCreated,
-      productsIndexed: totalProductsIndexed,
+    return res.status(202).json({
+      success: true,
+      message: crawlResult.message,
+      domains: domainsToCrawl,
+      status: 'in_progress',
     });
   } catch (error: any) {
-    logger.error('Error in full rescrape:', error);
-    return res.status(500).json({ error: error.message || 'Failed to perform full rescrape' });
+    logger.error('Error initiating full rescrape:', error);
+    return res.status(500).json({ error: error.message || 'Failed to initiate full rescrape' });
   }
 }
 

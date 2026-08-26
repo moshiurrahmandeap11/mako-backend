@@ -796,17 +796,25 @@ async function indexPageContent(
     });
   }
 
-  // 3. Extract Knowledge Headings, Paragraphs, and Clickable Links
+  // 3. Extract Knowledge Headings, Semantic Containers, Paragraphs, and Clickable Links
   const headings: string[] = [];
-  $("h1, h2, h3, h4").each((_, el) => {
+  $("h1, h2, h3, h4, h5, h6").each((_, el) => {
     const text = $(el).text().trim().replace(/\s+/g, " ");
     if (text && text.length > 2) headings.push(`### ${text}`);
   });
 
-  const paragraphs: string[] = [];
-  $("p, li, blockquote, [data-description]").each((_, el) => {
+  const contentBlocks: string[] = [];
+  const seenBlockTexts = new Set<string>();
+
+  // Deep Semantic Container Traversal across modern SPAs & static sites
+  $(
+    'p, li, blockquote, [data-description], dd, dt, table tr, td, th, div[class*="desc" i], div[class*="detail" i], div[class*="spec" i], div[class*="feature" i], div[class*="content" i], div[class*="faq" i], div[class*="policy" i], section p, article p'
+  ).each((_, el) => {
     const text = $(el).text().trim().replace(/\s+/g, " ");
-    if (text && text.length > 15) paragraphs.push(text);
+    if (text && text.length > 12 && !seenBlockTexts.has(text.toLowerCase())) {
+      seenBlockTexts.add(text.toLowerCase());
+      contentBlocks.push(text);
+    }
   });
 
   const pageLinksSet = new Set<string>();
@@ -826,27 +834,36 @@ async function indexPageContent(
       } catch {}
     }
   });
-  const pageLinks = Array.from(pageLinksSet).slice(0, 35);
+  const pageLinks = Array.from(pageLinksSet).slice(0, 40);
 
   const headerPrefix = `# Page Title: ${pageTitle}\nPage URL: ${currentUrlStr}\n${metaDescription ? `Description: ${metaDescription}\n` : ""}`;
   const linksSection =
     pageLinks.length > 0
       ? `\n\n### Page Links & Navigation:\n${pageLinks.join("\n")}`
       : "";
-  const pageMarkdown = `${headerPrefix}\n\n${headings.join("\n")}\n\n${paragraphs.slice(0, 20).join("\n\n")}${linksSection}`;
+  const pageMarkdown = `${headerPrefix}\n\n${headings.join("\n")}\n\n${contentBlocks.slice(0, 30).join("\n\n")}${linksSection}`;
 
-  // 4. Save structured chunks to KnowledgeChunk with vector embeddings
+  // Clean previous chunks for this specific page atomically before inserting new ones
+  await prisma
+    .$executeRawUnsafe(
+      `DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1 AND "url" = $2`,
+      merchantId,
+      currentUrlStr,
+    )
+    .catch(() => {});
+
+  // 4. Save Granular Structured Chunks (~380-450 chars) to KnowledgeChunk with vector embeddings
   let chunksCreated = 0;
   let currentChunk = `${headerPrefix}\n\n`;
   const elementsToChunk = [
     ...headings,
-    ...paragraphs.slice(0, 25),
+    ...contentBlocks,
     ...pageLinks,
   ];
 
   for (const el of elementsToChunk) {
     currentChunk += el + "\n\n";
-    if (currentChunk.length >= 650) {
+    if (currentChunk.length >= 380) {
       try {
         const kChunk = await (prisma as any).knowledgeChunk.create({
           data: {
@@ -874,7 +891,7 @@ async function indexPageContent(
     }
   }
 
-  if (currentChunk.trim().length > headerPrefix.length + 15) {
+  if (currentChunk.trim().length > headerPrefix.length + 10) {
     try {
       const kChunk = await (prisma as any).knowledgeChunk.create({
         data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
@@ -1054,21 +1071,9 @@ export async function scrapeWebsite(
     );
   }
 
-  // Clear old knowledge chunks ONLY for this specific website domain to maintain clean domain isolation
-  try {
-    const domainFilter = `%${parsedUrl.hostname}%`;
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1 AND "url" ILIKE $2`,
-      merchantId,
-      domainFilter,
-    );
-  } catch (err) {
-    logger.error("Failed to clear old knowledge chunks for domain:", err);
-  }
-
   const visitedUrls = new Set<string>();
   const queue: string[] = [parsedUrl.href];
-  const maxPages = 40;
+  const maxPages = 100;
 
   // ── Tier 1 & Tier 2: Opportunistic Sitemaps & robots.txt Discovery ──
   try {
@@ -1159,20 +1164,28 @@ export async function scrapeWebsite(
       totalKnowledgeChunks += chunksCount;
 
       const currentJob = activeScrapeJobs.get(merchantId);
-      if (currentJob) {
+      if (currentJob && currentJob.isScraping) {
         currentJob.pagesCrawled = visitedUrls.size;
         currentJob.lastUpdated = Date.now();
       }
 
-      // Extract new internal routes & links dynamically
-      const newRoutes = extractSpaRoutes(html, parsedUrl);
-      for (const r of newRoutes) {
-        if (!visitedUrls.has(r) && !queue.includes(r) && queue.length < 100) {
-          queue.push(r);
+      // Discover internal links from current page
+      const $ = cheerio.load(html);
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('javascript:')) {
+          try {
+            const nextUrl = new URL(href, parsedUrl.origin);
+            if (nextUrl.hostname === parsedUrl.hostname && !visitedUrls.has(nextUrl.href) && !queue.includes(nextUrl.href)) {
+              if (!nextUrl.pathname.match(/\.(png|jpg|jpeg|gif|svg|pdf|zip|css|js|woff|woff2)$/i)) {
+                queue.push(nextUrl.href);
+              }
+            }
+          } catch {}
         }
-      }
+      });
     } catch (err) {
-      logger.error(`Failed to process ${currentUrlStr}:`, err);
+      logger.error(`Error scraping page ${currentUrlStr}:`, err);
     }
   }
 
@@ -1246,15 +1259,6 @@ export async function scrapeSingleUrl(targetUrl: string, merchantId: string) {
     throw new Error("Target URL resolves to a restricted/private address.");
   }
 
-  // Delete previous chunks from this specific URL
-  await prisma
-    .$executeRawUnsafe(
-      `DELETE FROM "KnowledgeChunk" WHERE "merchantId" = $1 AND "url" = $2`,
-      merchantId,
-      parsedUrl.href,
-    )
-    .catch(() => {});
-
   const response = await fetch(parsedUrl.href, {
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LabtoBot/2.0",
@@ -1278,9 +1282,6 @@ export async function scrapeSingleUrl(targetUrl: string, merchantId: string) {
     (html.includes('id="root"') && html.length < 1500);
 
   if (isSpaBailout) {
-    logger.info(
-      `[Scraper] Single URL SPA detected on ${parsedUrl.href}. Hydrating via Puppeteer...`,
-    );
     const hydratedHtml = await fetchRenderedHtmlWithPuppeteer(parsedUrl.href);
     if (hydratedHtml && hydratedHtml.length > html.length) {
       html = hydratedHtml;
@@ -1292,6 +1293,7 @@ export async function scrapeSingleUrl(targetUrl: string, merchantId: string) {
     html,
     merchantId,
     parsedUrl.origin,
+    false,
   );
 }
 
@@ -1346,7 +1348,7 @@ export function getScrapeStatus(merchantId: string): ScrapeJobStatus {
       isScraping: false,
       domain: "",
       pagesCrawled: 0,
-      maxPages: 40,
+      maxPages: 100,
       status: "completed",
       startTime: 0,
       lastUpdated: Date.now(),
@@ -1355,14 +1357,22 @@ export function getScrapeStatus(merchantId: string): ScrapeJobStatus {
 }
 
 export function triggerBackgroundCrawl(
-  domain: string,
+  domains: string | string[],
   merchantId: string,
-): void {
+): { success: boolean; message: string; isAlreadyRunning?: boolean } {
+  const domainList = Array.isArray(domains) ? domains : [domains];
+  const existingJob = activeScrapeJobs.get(merchantId);
+  if (existingJob && existingJob.isScraping) {
+    logger.info(`[BackgroundScraper] Scrape already in progress for merchant ${merchantId}`);
+    return { success: true, message: 'Crawl already in progress in background', isAlreadyRunning: true };
+  }
+
+  const primaryDomain = domainList[0] || 'all';
   const jobStatus: ScrapeJobStatus = {
     isScraping: true,
-    domain,
+    domain: primaryDomain,
     pagesCrawled: 0,
-    maxPages: 40,
+    maxPages: 100 * domainList.length,
     status: "in_progress",
     startTime: Date.now(),
     lastUpdated: Date.now(),
@@ -1370,37 +1380,46 @@ export function triggerBackgroundCrawl(
   activeScrapeJobs.set(merchantId, jobStatus);
 
   logger.info(
-    `[BackgroundScraper] Launching persistent background crawl for merchant ${merchantId} on domain ${domain}`,
+    `[BackgroundScraper] Launching persistent background crawl for merchant ${merchantId} on domains: ${domainList.join(', ')}`,
   );
 
-  scrapeWebsite(domain, merchantId)
-    .then((result) => {
-      activeScrapeJobs.set(merchantId, {
-        isScraping: false,
-        domain,
-        pagesCrawled: result.pagesCrawledCount || 40,
-        maxPages: 40,
-        status: "completed",
-        startTime: jobStatus.startTime,
-        lastUpdated: Date.now(),
-      });
-      logger.info(
-        `[BackgroundScraper] Persistent background crawl completed for merchant ${merchantId} on ${domain}`,
-      );
-    })
-    .catch((err) => {
-      activeScrapeJobs.set(merchantId, {
-        isScraping: false,
-        domain,
-        pagesCrawled: 0,
-        maxPages: 40,
-        status: "failed",
-        startTime: jobStatus.startTime,
-        lastUpdated: Date.now(),
-      });
-      logger.error(
-        `[BackgroundScraper] Persistent background crawl failed for ${domain}:`,
-        err,
-      );
+  (async () => {
+    let totalPages = 0;
+    for (const dom of domainList) {
+      try {
+        jobStatus.domain = dom;
+        const result = await scrapeWebsite(dom, merchantId);
+        totalPages += result.pagesCrawledCount || 0;
+        jobStatus.pagesCrawled = totalPages;
+        jobStatus.lastUpdated = Date.now();
+      } catch (err) {
+        logger.error(`[BackgroundScraper] Persistent background crawl failed for ${dom}:`, err);
+      }
+    }
+    activeScrapeJobs.set(merchantId, {
+      isScraping: false,
+      domain: primaryDomain,
+      pagesCrawled: totalPages,
+      maxPages: jobStatus.maxPages,
+      status: "completed",
+      startTime: jobStatus.startTime,
+      lastUpdated: Date.now(),
     });
+    logger.info(
+      `[BackgroundScraper] Persistent background crawl completed for merchant ${merchantId}`,
+    );
+  })().catch((err) => {
+    activeScrapeJobs.set(merchantId, {
+      isScraping: false,
+      domain: primaryDomain,
+      pagesCrawled: 0,
+      maxPages: jobStatus.maxPages,
+      status: "failed",
+      startTime: jobStatus.startTime,
+      lastUpdated: Date.now(),
+    });
+    logger.error(`[BackgroundScraper] Crawl job failed:`, err);
+  });
+
+  return { success: true, message: 'Background crawl initiated successfully' };
 }

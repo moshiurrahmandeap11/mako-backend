@@ -263,16 +263,17 @@ async function scrapeUrl(req, res) {
             res.status(400).json({ error: 'Target URL is required.' });
             return;
         }
-        const { scrapeWebsite } = await Promise.resolve().then(() => __importStar(require('../../services/scraper.service')));
-        const result = await scrapeWebsite(url, merchantId);
-        res.json({
-            message: 'Website scraped and catalog indexed successfully!',
-            result,
+        const { triggerBackgroundCrawl } = await Promise.resolve().then(() => __importStar(require('../../services/scraper.service')));
+        const result = triggerBackgroundCrawl(url, merchantId);
+        res.status(202).json({
+            message: result.message || 'Background scrape initiated successfully!',
+            url,
+            status: 'in_progress',
         });
     }
     catch (error) {
         logger_1.logger.error('Scrape URL Error:', error);
-        res.status(500).json({ error: error.message || 'Failed to scrape website.' });
+        res.status(500).json({ error: error.message || 'Failed to initiate website scrape.' });
     }
 }
 async function rescrapeDomain(req, res) {

@@ -261,16 +261,17 @@ export async function scrapeUrl(req: DashboardAuthRequest, res: Response): Promi
       return;
     }
 
-    const { scrapeWebsite } = await import('../../services/scraper.service');
-    const result = await scrapeWebsite(url, merchantId);
+    const { triggerBackgroundCrawl } = await import('../../services/scraper.service');
+    const result = triggerBackgroundCrawl(url, merchantId);
 
-    res.json({
-      message: 'Website scraped and catalog indexed successfully!',
-      result,
+    res.status(202).json({
+      message: result.message || 'Background scrape initiated successfully!',
+      url,
+      status: 'in_progress',
     });
   } catch (error: any) {
     logger.error('Scrape URL Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to scrape website.' });
+    res.status(500).json({ error: error.message || 'Failed to initiate website scrape.' });
   }
 }
 
