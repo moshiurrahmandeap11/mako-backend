@@ -52,9 +52,10 @@ export function generateDeterministicExternalId(
     return urlMatch[1].trim();
   }
   const cleanUrl = productUrl.split("?")[0].split("#")[0].toLowerCase().trim();
+  const cleanTitle = (title || "").toLowerCase().trim();
   const hash = crypto
     .createHash("md5")
-    .update(cleanUrl || title.toLowerCase())
+    .update(`${cleanUrl}#${cleanTitle}`)
     .digest("hex")
     .slice(0, 12);
   return `PROD-${hash}`;
