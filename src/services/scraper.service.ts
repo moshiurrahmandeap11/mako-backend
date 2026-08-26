@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import crypto from "crypto";
 import puppeteer from "puppeteer";
 import { prisma } from "../config/db";
 import { generateEmbedding } from "../utils/embeddings";
@@ -33,6 +34,30 @@ export interface ScrapeResult {
   indexedCount: number;
   pagesCrawledCount: number;
   knowledgeChunksCount: number;
+}
+
+export function generateDeterministicExternalId(
+  productUrl: string,
+  title: string,
+  sku?: string,
+): string {
+  if (sku && String(sku).trim().length > 0 && !/^scrape-/i.test(String(sku))) {
+    return String(sku).trim();
+  }
+  const urlMatch =
+    productUrl.match(/\/product[s]?\/([^\/\?#]+)/i) ||
+    productUrl.match(/\/item\/([^\/\?#]+)/i) ||
+    productUrl.match(/\/p\/([^\/\?#]+)/i);
+  if (urlMatch && urlMatch[1] && urlMatch[1].length > 1) {
+    return urlMatch[1].trim();
+  }
+  const cleanUrl = productUrl.split("?")[0].split("#")[0].toLowerCase().trim();
+  const hash = crypto
+    .createHash("md5")
+    .update(cleanUrl || title.toLowerCase())
+    .digest("hex")
+    .slice(0, 12);
+  return `PROD-${hash}`;
 }
 
 export function isSafeUrl(url: URL): boolean {
@@ -492,13 +517,25 @@ async function indexPageContent(
           ) {
             const title = item.name || pageTitle;
             const description = item.description || metaDescription || title;
-            const offers = Array.isArray(item.offers)
-              ? item.offers
-              : [item.offers || {}];
+            const rawOffers = item.offers || {};
+            const offers = Array.isArray(rawOffers)
+              ? rawOffers
+              : Array.isArray(rawOffers.offers)
+                ? rawOffers.offers
+                : [rawOffers];
             const primaryOffer = offers[0] || {};
-            const price =
+            let price =
               parseFloat(primaryOffer.price || primaryOffer.lowPrice || "0") ||
               0;
+
+            // If price is 0 and there are multiple offers with paid options, pick first non-zero price
+            if (price === 0 && offers.length > 1) {
+              const paidOffer = offers.find(
+                (o: any) => parseFloat(o.price || "0") > 0,
+              );
+              if (paidOffer) price = parseFloat(paidOffer.price);
+            }
+
             const currency = primaryOffer.priceCurrency || "USD";
             const imageUrl = Array.isArray(item.image)
               ? item.image[0]
@@ -507,10 +544,11 @@ async function indexPageContent(
               ? new URL(item.url, origin).href
               : currentUrlStr;
             const category = item.category || "General";
-            const sku =
-              item.sku ||
-              item.mpn ||
-              `SCRAPE-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+            const sku = generateDeterministicExternalId(
+              productUrl,
+              title,
+              item.sku || item.mpn,
+            );
 
             let parsedVariants: any[] | undefined = undefined;
             if (offers.length > 1) {
@@ -568,9 +606,10 @@ async function indexPageContent(
       if (title && title.length > 2 && (link || img)) {
         const fullUrl = link ? new URL(link, origin).href : currentUrlStr;
         const fullImg = img ? new URL(img, origin).href : ogImage;
+        const extId = generateDeterministicExternalId(fullUrl, title);
 
         productsFound.push({
-          externalId: `DOM-${idx + 1}-${Buffer.from(title).toString("hex").slice(0, 10)}`,
+          externalId: extId,
           title,
           description: `${title} - Details available at ${fullUrl}`,
           price: numericPrice,
@@ -836,10 +875,10 @@ async function indexPageContent(
         }
       }
 
-      const urlMatch = currentUrlStr.match(/\/product[s]?\/([^\/\?#]+)/i);
-      const extractedId = urlMatch
-        ? urlMatch[1]
-        : `PROD-${Buffer.from(singleTitle).toString("hex").slice(0, 10)}`;
+      const extractedId = generateDeterministicExternalId(
+        currentUrlStr,
+        singleTitle,
+      );
 
       if (singleTitle && singleTitle.length > 2) {
         productsFound.push({
@@ -877,8 +916,7 @@ async function indexPageContent(
       const priceText = link.text().match(/\$\s*(\d+(?:\.\d{1,2})?)/);
       const price = priceText ? parseFloat(priceText[1]) : 0;
 
-      const urlMatch = href.match(/\/product[s]?\/([^\/\?#]+)/i);
-      const extId = urlMatch ? urlMatch[1] : `PROD-${idx + 1}`;
+      const extId = generateDeterministicExternalId(fullUrl, title);
 
       if (
         title &&
