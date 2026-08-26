@@ -120,10 +120,11 @@ function isOutOfScopeRequest(message: string): boolean {
     /\b(recipe|cooking|ranna|biryani|cake|khabar|food|diet plan)\b/i,
     // General world trivia / celebrities / sports / politics
     /\b(capital of|rajdhani|president|prime minister|messi|ronaldo|cricket|football|cinema|movie|hero alom)\b/i,
-    // General coding / scripts / games / algorithms
-    /\b(write|create|make|give|show|generate)\s+(me\s+)?(a\s+)?(code|script|program|game|function|class|algorithm)\b/i,
-    /\b(in|using)\s+(c#|c\+\+|python|java|javascript|typescript|rust|go|php|ruby|swift|kotlin|c\b)/i,
+    // General coding / scripts / games / algorithms / software tutorials
+    /\b(write|create|make|give|show|generate|build|code)\s+(me\s+)?(a\s+)?(code|script|program|game|function|class|algorithm|component|snippet|app)\b/i,
+    /\b(in|using|with)\s+(c#|c\+\+|python|java|javascript|typescript|rust|go|php|ruby|swift|kotlin|c\b|react(\.?js)?|vue|angular|svelte|html|css)/i,
     /\b(snake game|tic tac toe|flappy bird|chess game|calculator|sudoku)\b/i,
+    /\b(how\s+to\s+(create|build|make|code|program|develop))\b/i,
   ];
 
   const inScopeKeywords = [
@@ -142,18 +143,11 @@ function isOutOfScopeRequest(message: string): boolean {
     "location",
     "about",
     "who is",
-    "tech stack",
-    "react",
-    "next",
-    "node",
-    "developer",
-    "designer",
     "case study",
     "casestudies",
-    "abid",
-    "nirob",
-    "labto",
-    "labtobit",
+    "tech stack",
+    "agency",
+    "studio",
   ];
 
   const hasInScopeKeyword = inScopeKeywords.some((k) => clean.includes(k));
@@ -168,6 +162,7 @@ function getSystemPrompt(
   botMode: string,
   customPrompt?: string,
   template?: string,
+  hasStoreProducts: boolean = false,
 ): string {
   const yamlConfig = loadAiPromptsYaml(template);
   const defaultPersona =
@@ -207,7 +202,8 @@ function getSystemPrompt(
 - HARD BAN ON RAW DATABASE OBJECT IDS OR HOSTNAMES AS LINK TITLES: NEVER write link titles containing hexadecimal database IDs (e.g. NEVER write "[691f478fccec252c64981b47](url)") or raw domain strings (e.g. NEVER write "[everwear-frontend](url)").
 - ALWAYS format clickable links with CLEAN, HUMAN-READABLE PRODUCT OR PAGE TITLES e.g. [Electronic Plastic Table ($600)](url), [Generic Steel Pants ($987)](url), or [View Collection](url).`;
 
-  const addCartInstruction = `DIRECT ADD TO CART & DYNAMIC VARIANT INQUIRY (CRITICAL RULE):
+  const addCartInstruction = hasStoreProducts
+    ? `DIRECT ADD TO CART & DYNAMIC VARIANT INQUIRY (CRITICAL RULE FOR E-COMMERCE):
 - You have direct access to the website store catalog and can add items to cart.
 - When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo", "pants ta dao", "bacon ta cart e dao", "2nd ta", "plastic table ta add kore dao"):
   1. IDENTIFY THE EXACT PRODUCT from the Store Catalog:
@@ -224,7 +220,22 @@ function getSystemPrompt(
      - Friendly message: "[Product Name](url) cart e add kora hoyeche!"
      - Append tag: [ADD_TO_CART: productId]
 - ALWAYS provide a polite, natural sentence in the user's matching script alongside the tag.
-- NEVER tell the user to manually visit the page to add to cart; ALWAYS trigger the cart tag!`;
+- NEVER tell the user to manually visit the page to add to cart; ALWAYS trigger the cart tag!`
+    : `NON-ECOMMERCE WEBSITE & PORTFOLIO / SERVICE CLARIFICATION (STRICT RULE):
+- This website ("${merchantName}") is a PORTFOLIO / AGENCY / DIGITAL SERVICES business website. It does NOT sell physical products or have an e-commerce shopping cart.
+- If a user asks to "add to cart", "buy", or asks about shopping carts:
+  - DO NOT provide programming code, coding tutorials, or React components!
+  - Politely and briefly explain in the user's matching script that "${merchantName}" is a creative design and software development studio/agency providing services and showcasing projects.
+  - Invite the user to explore our portfolio projects, case studies, or discuss their own project requirements and consultations.`;
+
+  const codeGenerationBanRule = `STRICT BAN ON CODING TUTORIALS, CODE SNIPPETS & SCRIPT GENERATION (CRITICAL RULE):
+- You are EXCLUSIVELY the customer support and sales representative for "${merchantName}". You are NOT a coding assistant, programmer, or ChatGPT programming tool.
+- NEVER write programming code snippets, JavaScript/React/Python/HTML/CSS components, script files, or tutorials.
+- If a user asks to write code, build a component, or asks general programming questions (e.g. "add to cart react js", "write python script", "how to code in js"):
+  - Politely decline in 1 short sentence in the user's matching script:
+    - Banglish: "Ami sudhu amader agency services, portfolio projects ebong company information niye help korte pari। Apni ki amader kono project somporke jante chan?"
+    - Bengali: "আমি শুধুমাত্র আমাদের এজেন্সি সার্ভিস, পোর্টফোলিও প্রজেক্ট ও কোম্পানি সম্পর্কিত তথ্যে সাহায্য করতে পারি। আপনি কি আমাদের কোনো প্রজেক্ট বা সার্ভিস সম্পর্কে জানতে চান?"
+    - English: "I am the dedicated AI assistant for ${merchantName}. I can only assist with questions regarding our projects, services, and company."`;
 
   const firstPersonPerspectiveRule = `FIRST-PERSON REPRESENTATIVE PERSPECTIVE (STRICT RULE):
 - You ARE an official representative of "${merchantName}". You MUST ALWAYS speak in the FIRST PERSON ("We", "Our", "Us", "Amader", "Amra").
@@ -252,7 +263,8 @@ function getSystemPrompt(
     - User: "hi" / "hello" -> Reply: "Hello! How can I help you today?"
     - User: "kemon আছেন" -> Reply: "ভালো আছি, ধন্যবাদ! কীভাবে সাহায্য করতে পারি?"`;
 
-  const productShowcaseRule = `PROACTIVE PRODUCT & COLLECTION SHOWCASING (CRITICAL RULE):
+  const productShowcaseRule = hasStoreProducts
+    ? `PROACTIVE PRODUCT & COLLECTION SHOWCASING (CRITICAL RULE):
 - When a user asks about collections, products, catalog items, or asks to see items (e.g. "ki ki collection ache", "products dekhaw", "kichu dekhaw link soho", "what do you have", "show me your items", "collection e ki ache"):
   - NEVER reply with a lazy one-liner telling them to visit the collection page!
   - YOU MUST PROACTIVELY SHOWCASE 2 to 4 SPECIFIC PRODUCTS directly from the Store Catalog with their bold titles, prices, and clickable product links [Title](url).
@@ -262,7 +274,12 @@ function getSystemPrompt(
     2. [Generic Steel Pants](productUrl) - $987
     3. [Refined Metal Bacon](productUrl) - $268
     Apnar kon product ti pochondo? Ami direct cart e add kore dite parbo! 🛍️"
-  - ALWAYS ask which one they like so you can help them add to cart!`;
+  - ALWAYS ask which one they like so you can help them add to cart!`
+    : `PORTFOLIO & PROJECT SHOWCASING (CRITICAL RULE FOR AGENCY/PORTFOLIO):
+- When a user asks about projects, portfolio, work, or services (e.g. "ki ki project ache", "portfolio dekhaw", "services ki ki", "what do you do"):
+  - Proactively highlight 2 to 4 specific showcase projects or core services from the Website Knowledge Base with clean clickable links [Project Title](url).
+  - Example Banglish:
+    "Amader notable projects gulo holo: [Project One](url) ebong [Project Two](url)। Apnar kon project ba service ti somporke aro details jante chan?"`;
 
   const tokenEfficiencyRule = `CONCISE YET HELPFUL COMMUNICATION (STRICT RULE):
 - For general FAQs, company info, or simple questions: Answer concisely in 1 to 2 short sentences.
@@ -276,15 +293,16 @@ Strict Rules:
 2. FIRST-PERSON PERSPECTIVE: ${firstPersonPerspectiveRule}
 3. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ""}. When asked for the website name or company name, answer clearly with "${merchantName}".
 4. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
-5. PROACTIVE PRODUCT & COLLECTION SHOWCASING: ${productShowcaseRule}
+5. PROACTIVE SHOWCASING: ${productShowcaseRule}
 6. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
-7. DIRECT ADD TO CART: ${addCartInstruction}
-8. ${tokenEfficiencyRule}
-9. ${scopeLockRule}
-10. LANGUAGE & SCRIPT MATCHING: ${langRule}
-11. FORMATTING RULE: ${formatRule}
-12. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
-${cartRule ? `13. MERCHANT CUSTOM CART RULE: ${cartRule}` : ""}`.trim();
+7. BUSINESS CAPABILITIES: ${addCartInstruction}
+8. HARD BAN ON CODING TUTORIALS & CODE SNIPPETS: ${codeGenerationBanRule}
+9. ${tokenEfficiencyRule}
+10. ${scopeLockRule}
+11. LANGUAGE & SCRIPT MATCHING: ${langRule}
+12. FORMATTING RULE: ${formatRule}
+13. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
+${cartRule ? `14. MERCHANT CUSTOM CART RULE: ${cartRule}` : ""}`.trim();
 }
 
 export async function processChatMessage(
@@ -624,12 +642,14 @@ Currently, no specific catalog items or knowledge base articles matched this que
     else if (keyRotator.hasAnthropicKeys()) selectedProvider = "claude";
   }
 
+  const hasStoreProducts = retrievedProducts.length > 0;
   const systemPrompt = getSystemPrompt(
     merchantName,
     primaryDomain,
     botMode,
     customPrompt,
     template,
+    hasStoreProducts,
   );
 
   // Construct historical messages
