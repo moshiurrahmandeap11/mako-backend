@@ -423,7 +423,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [thinkingPhase, setThinkingPhase] = useState(0);
 
   // Variant Options Selection Modal state
   const [modalProduct, setModalProduct] = useState<ProductCard | null>(null);
@@ -496,20 +495,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       setIsClosing(false);
     }, 220);
   };
-
-  // Cycle thinking phases
-  useEffect(() => {
-    let interval: any;
-    if (isLoading) {
-      setThinkingPhase(0);
-      interval = setInterval(() => {
-        setThinkingPhase((prev) => (prev < 2 ? prev + 1 : 0));
-      }, 700);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isLoading]);
 
   // Dragging event listeners
   useEffect(() => {
@@ -985,6 +970,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
         }
+        @keyframes mbot-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
         .mbot-skeleton {
           background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
           background-size: 200% 100%;
@@ -1299,7 +1288,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                           borderRadius: "50%",
                           border: "2px solid #cbd5e1",
                           borderTopColor: primaryColor,
-                          animation: "spin 0.8s linear infinite",
+                          animation: "mbot-spin 0.75s linear infinite",
                         }}
                       />
                       <span>Thinking...</span>
@@ -1530,32 +1519,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Dynamic Real-time AI Thinking Stage Badge */}
-              {isLoading && (
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    fontSize: "12.5px",
-                    color: "#334155",
-                    backgroundColor: "#f8fafc",
-                    border: "1.5px solid #e2e8f0",
-                    padding: "8px 14px",
-                    borderRadius: "16px",
-                    maxWidth: "90%",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  }}
-                >
-                  <BrainSvg />
-                  <span style={{ fontWeight: "600", color: "#0f172a" }}>
-                    {thinkingPhase === 0 && "Analyzing intent & language..."}
-                    {thinkingPhase === 1 && "Querying knowledge base..."}
-                    {thinkingPhase === 2 && "Generating verified response..."}
-                  </span>
                 </div>
               )}
 
