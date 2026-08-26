@@ -404,6 +404,17 @@ export async function uploadDoc(req: DashboardAuthRequest, res: Response) {
       chunks.push(currentChunk.trim());
     }
 
+    let sourceUrl = `doc:${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    if (targetDomain && targetDomain !== "all" && targetDomain !== "global") {
+      const cleanDomain = targetDomain
+        .replace(/^https?:\/\//, "")
+        .split("/")[0]
+        .split(":")[0];
+      sourceUrl = `https://${cleanDomain}/doc/${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    } else {
+      sourceUrl = `global://doc/${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    }
+
     const { generateEmbedding } = await import("../../utils/embeddings");
 
     let createdCount = 0;
