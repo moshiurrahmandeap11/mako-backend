@@ -617,6 +617,49 @@ function ChatWidget({ api }) {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+        @keyframes mbot-user-send {
+          0% {
+            opacity: 0;
+            transform: scale(0.92) translateY(14px);
+          }
+          65% {
+            opacity: 0.95;
+            transform: scale(1.01) translateY(-2px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .mbot-msg-user {
+          animation: mbot-user-send 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transform-origin: bottom right;
+        }
+        @keyframes mbot-backdrop-enter {
+          0% {
+            opacity: 0;
+          }
+          100% {
+            opacity: 1;
+          }
+        }
+        @keyframes mbot-modal-enter {
+          0% {
+            opacity: 0;
+            transform: scale(0.86) translateY(24px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .mbot-backdrop-anim {
+          animation: mbot-backdrop-enter 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .mbot-modal-anim {
+          animation: mbot-modal-enter 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transform-origin: center bottom;
+        }
         .mbot-skeleton {
           background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
           background-size: 200% 100%;
@@ -846,7 +889,7 @@ function ChatWidget({ api }) {
                                                         display: "flex",
                                                         alignItems: "center",
                                                         gap: "5px",
-                                                    }, children: [(0, jsx_runtime_1.jsx)("span", { style: { color: "#94a3b8" }, children: "\u2022" }), (0, jsx_runtime_1.jsx)("span", { children: t })] }, idx))) })] })), Boolean(msg.text || msg.sender === "user") && ((0, jsx_runtime_1.jsx)("div", { style: {
+                                                    }, children: [(0, jsx_runtime_1.jsx)("span", { style: { color: "#94a3b8" }, children: "\u2022" }), (0, jsx_runtime_1.jsx)("span", { children: t })] }, idx))) })] })), Boolean(msg.text || msg.sender === "user") && ((0, jsx_runtime_1.jsx)("div", { className: msg.sender === "user" ? "mbot-msg-user" : "", style: {
                                             backgroundColor: msg.sender === "user" ? primaryColor : "#f1f5f9",
                                             color: msg.sender === "user" ? "#ffffff" : "#1e293b",
                                             padding: "13px 17px",
@@ -1008,7 +1051,7 @@ function ChatWidget({ api }) {
                             gap: "6px",
                             border: "1px solid rgba(255,255,255,0.1)",
                             animation: "fadeIn 0.2s ease",
-                        }, children: [(0, jsx_runtime_1.jsx)("span", { children: "\u2713" }), (0, jsx_runtime_1.jsx)("span", { children: toastMsg })] })), modalProduct && ((0, jsx_runtime_1.jsx)("div", { style: {
+                        }, children: [(0, jsx_runtime_1.jsx)("span", { children: "\u2713" }), (0, jsx_runtime_1.jsx)("span", { children: toastMsg })] })), modalProduct && ((0, jsx_runtime_1.jsx)("div", { className: "mbot-backdrop-anim", style: {
                             position: "absolute",
                             top: 0,
                             left: 0,
@@ -1021,7 +1064,7 @@ function ChatWidget({ api }) {
                             alignItems: "center",
                             justifyContent: "center",
                             padding: "16px",
-                        }, children: (0, jsx_runtime_1.jsxs)("div", { style: {
+                        }, children: (0, jsx_runtime_1.jsxs)("div", { className: "mbot-modal-anim", style: {
                                 backgroundColor: "#ffffff",
                                 borderRadius: "16px",
                                 padding: "20px",

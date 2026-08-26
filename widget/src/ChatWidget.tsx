@@ -974,6 +974,49 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+        @keyframes mbot-user-send {
+          0% {
+            opacity: 0;
+            transform: scale(0.92) translateY(14px);
+          }
+          65% {
+            opacity: 0.95;
+            transform: scale(1.01) translateY(-2px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .mbot-msg-user {
+          animation: mbot-user-send 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transform-origin: bottom right;
+        }
+        @keyframes mbot-backdrop-enter {
+          0% {
+            opacity: 0;
+          }
+          100% {
+            opacity: 1;
+          }
+        }
+        @keyframes mbot-modal-enter {
+          0% {
+            opacity: 0;
+            transform: scale(0.86) translateY(24px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .mbot-backdrop-anim {
+          animation: mbot-backdrop-enter 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .mbot-modal-anim {
+          animation: mbot-modal-enter 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transform-origin: center bottom;
+        }
         .mbot-skeleton {
           background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
           background-size: 200% 100%;
@@ -1358,6 +1401,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   {/* Text Bubble */}
                   {Boolean(msg.text || msg.sender === "user") && (
                     <div
+                      className={msg.sender === "user" ? "mbot-msg-user" : ""}
                       style={{
                         backgroundColor:
                           msg.sender === "user" ? primaryColor : "#f1f5f9",
@@ -1660,6 +1704,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           {/* Product Variant Options Selection Modal */}
           {modalProduct && (
             <div
+              className="mbot-backdrop-anim"
               style={{
                 position: "absolute",
                 top: 0,
@@ -1676,6 +1721,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               }}
             >
               <div
+                className="mbot-modal-anim"
                 style={{
                   backgroundColor: "#ffffff",
                   borderRadius: "16px",
