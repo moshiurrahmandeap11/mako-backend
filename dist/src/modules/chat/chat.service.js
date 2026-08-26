@@ -234,8 +234,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
                         .join("\n\n") +
                     `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
         }
-        if (retrievedProducts.length === 0 &&
-            retrievedKnowledgeRes.length === 0) {
+        if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
             ragContext = `\n\n### Website Context:
 Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ""}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
