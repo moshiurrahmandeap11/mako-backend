@@ -242,10 +242,11 @@ async function executeWooCommerceAddToCart(
 }
 
 /**
- * Tier 3: Smart DOM Simulation (For Custom React, Next.js, Vue, PHP, Webflow, HTML, Wix, Squarespace)
+ * Tier 3: High-Reliability Smart DOM Simulation (Universal Product Page Execution)
  */
 async function executeDomSimulationAddToCart(
   selectedOptions?: Record<string, string>,
+  quantity: number = 1,
 ): Promise<boolean> {
   if (typeof document === "undefined") return false;
 
@@ -321,7 +322,7 @@ async function executeDomSimulationAddToCart(
         }
       });
 
-      // If an option was selected, wait 150ms for React/Vue/Svelte/Next.js state hydration
+      // If an option was selected, wait 180ms for React/Vue/Svelte/Next.js state hydration
       if (optionClicked) {
         await new Promise((r) =>
           requestAnimationFrame(() => setTimeout(r, 180)),
@@ -329,7 +330,45 @@ async function executeDomSimulationAddToCart(
       }
     }
 
-    // 2. Find and trigger the native Add to Cart Button
+    // 2. Set Quantity in the page's input if quantity > 1
+    if (quantity && quantity > 1) {
+      const qtyInputs = Array.from(
+        document.querySelectorAll(
+          'input[name*="quantity" i], input[name*="qty" i], input[type="number"], .quantity-input, #quantity, #qty, input[aria-label*="quantity" i]',
+        ),
+      ) as HTMLInputElement[];
+
+      let qtySet = false;
+      for (const input of qtyInputs) {
+        if (input && input.offsetParent !== null) {
+          input.focus();
+          input.value = String(quantity);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          input.dispatchEvent(new Event("blur", { bubbles: true }));
+          qtySet = true;
+          break;
+        }
+      }
+
+      if (!qtySet) {
+        const plusBtns = Array.from(
+          document.querySelectorAll(
+            'button[class*="plus" i], button[class*="increase" i], button[data-action="increase" i], .qty-plus, .plus, [aria-label*="increase" i]',
+          ),
+        ) as HTMLElement[];
+        for (const pBtn of plusBtns) {
+          if (pBtn && pBtn.offsetParent !== null) {
+            for (let i = 0; i < quantity - 1; i++) {
+              pBtn.click();
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Find and trigger the native Add to Cart Button
     const buttonSelectors = [
       'form[action*="cart"] button[type="submit"]',
       'form[action*="cart"] input[type="submit"]',
@@ -357,7 +396,7 @@ async function executeDomSimulationAddToCart(
       }
     }
 
-    // 3. Fallback: Search all buttons / submit inputs for Add to Cart text
+    // 4. Fallback: Search all buttons / submit inputs for Add to Cart text
     const allButtons = Array.from(
       document.querySelectorAll(
         'button, input[type="submit"], a[role="button"]',
@@ -419,20 +458,18 @@ export function initAutoAddWatcher(): void {
         return;
       }
 
-      const clicked = await executeDomSimulationAddToCart(data.options);
+      const clicked = await executeDomSimulationAddToCart(
+        data.options,
+        data.quantity || 1,
+      );
       if (clicked) {
         clearInterval(interval);
         isAutoAdding = false;
         executeEventAndLocalStorageAddToCart(
           data.productId,
-          data.quantity,
+          data.quantity || 1,
           data.variantId,
           data.options,
-        );
-        window.dispatchEvent(
-          new CustomEvent("labto:toast", {
-            detail: { message: "Added to cart successfully!" },
-          }),
         );
       }
     }, 300);
@@ -565,7 +602,10 @@ export async function requestAddToCart(
   }
 
   // 3. Check & Execute Smart DOM Simulation on Current Page (if user is already on the product page)
-  const domSuccess = await executeDomSimulationAddToCart(selectedOptions);
+  const domSuccess = await executeDomSimulationAddToCart(
+    selectedOptions,
+    quantity,
+  );
   if (domSuccess) {
     executeEventAndLocalStorageAddToCart(
       productId,

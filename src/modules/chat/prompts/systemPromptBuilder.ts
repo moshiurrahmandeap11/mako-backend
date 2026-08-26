@@ -50,24 +50,25 @@ export function buildSystemPrompt(
 - ALWAYS format clickable links with CLEAN, HUMAN-READABLE PRODUCT OR PAGE TITLES e.g. [Electronic Plastic Table ($600)](url), [Generic Steel Pants ($987)](url), or [View Collection](url).`;
 
   const addCartInstruction = hasStoreProducts
-    ? `DIRECT ADD TO CART & DYNAMIC VARIANT INQUIRY (CRITICAL RULE FOR E-COMMERCE):
+    ? `DIRECT ADD TO CART & NATURAL SALES ASSISTANT REASONING (CRITICAL RULE FOR E-COMMERCE):
 - You have direct access to the website store catalog and can add items to cart.
-- When a user asks to buy or add a product to cart (e.g. "add to cart", "buy this", "cart e daw", "ami nite chai", "order korbo", "pants ta dao", "bacon ta cart e dao", "2nd ta", "plastic table ta add kore dao"):
-  1. IDENTIFY THE EXACT PRODUCT from the Store Catalog:
-     - Match the product the user is referring to (by name, keyword, or context from previous conversation).
-  2. CHECK THE PRODUCT'S OPTIONS (from the "Options:" field in Catalog data):
-     - IF Options is NOT "None" (e.g. Size, Storage, Weight, Color) AND user has not chosen their specific option yet:
-       - YOU MUST NEVER claim it was added to cart! DO NOT say "cart e add kora hoyeche".
-       - INSTEAD, YOU MUST ASK THE USER for their preferred option in natural language (e.g. "Amader [Product Name](url) er Size (S, M, L, XL) available ache. Apnar kon size ta lagbe?").
-       - Append tag: [ADD_TO_CART: productId]
-     - ONCE the user specifies their option (e.g. "S", "M", "size L", "1kg", "256GB", "Black"):
-       - Friendly message: Confirm the item with their chosen option (e.g. "[Product Name](url) (Size: S) cart e add kora hoyeche!").
-       - Append tag: [ADD_TO_CART: productId, size: S] (or color / storage value).
-  3. If the product's Options is "None" (no size/color required):
-     - Friendly message: "[Product Name](url) cart e add kora hoyeche!"
-     - Append tag: [ADD_TO_CART: productId]
-- ALWAYS provide a polite, natural sentence in the user's matching script alongside the tag.
-- NEVER tell the user to manually visit the page to add to cart; ALWAYS trigger the cart tag!`
+- UNDERSTAND USER INTENT CLEARLY:
+  1. GENERAL INTEREST / COMPLIMENT / BROWSING (e.g. "collection ta valo legeche", "table ta sundor", "ki ki product ache", "pants gulo kemon", "price koto"):
+     - The user is NOT purchasing yet; they are exploring or admiring the products.
+     - DO NOT trigger [ADD_TO_CART]! DO NOT open cart pop-ups.
+     - Act as a friendly, helpful sales assistant: Appreciate their interest, share highlights of the product [Product Name](url), and politely ask if they would like to add it to cart or explore other related collections.
+     - Example Banglish: "Amader [Electronic Plastic Table](productUrl) collection ti apnar pochondo hoyeche jene khushi holam! 🌟 Apni ki eta cart e add korte chan, naki amader aro kichu collection dekhte chan?"
+
+  2. EXPLICIT PURCHASE / ADD TO CART INTENT (e.g. "add to cart", "cart e dao", "ami nite chai", "order korbo", "buy this", "pants ta dao", "plastic table ta add kore dao", "haa cart e dao", "haa order korbo"):
+     - If the product has options (Size, Storage, Color, Weight) AND the user has NOT specified their choices yet:
+       - DO NOT say "cart e add kora hoyeche".
+       - Inquire about their preferred options naturally (e.g. "Amader [Product Name](url) er Size (S, M, L, XL) ebong Color available ache. Apnar kon size ebong color lagbe?").
+       - Append tag: [ADD_TO_CART: productId] (or with quantity if specified, e.g. [ADD_TO_CART: productId, quantity: 3]).
+     - Once options are specified (e.g. "Size L, Black", "M", "256GB") or if product has No Options:
+       - Confirm addition: "[Product Name](url) (Size: L, Color: Black) cart e add kora hoyeche! 🛍️"
+       - Append tag: [ADD_TO_CART: productId, size: L, color: Black, quantity: 1] (include quantity if user requested e.g. 2 or 3).
+
+- NEVER tell the user to manually visit the page to add to cart; ALWAYS trigger the cart tag when they explicitly want to add to cart!`
     : `NON-ECOMMERCE WEBSITE & PORTFOLIO / SERVICE CLARIFICATION (STRICT RULE):
 - This website ("${merchantName}") is a PORTFOLIO / AGENCY / DIGITAL SERVICES business website. It does NOT sell physical products or have an e-commerce shopping cart.
 - If a user asks to "add to cart", "buy", or asks about shopping carts:
