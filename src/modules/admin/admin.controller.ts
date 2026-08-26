@@ -1,9 +1,15 @@
-import { Response } from 'express';
-import { prisma } from '../../config/db';
-import { logger } from '../../utils/logger';
-import { DashboardAuthRequest, clearPlanTierCache } from '../../middleware/authenticateDashboard';
+import { Response } from "express";
+import { prisma } from "../../config/db";
+import {
+  DashboardAuthRequest,
+  clearPlanTierCache,
+} from "../../middleware/authenticateDashboard";
+import { logger } from "../../utils/logger";
 
-export async function getAdminOverview(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function getAdminOverview(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const [
       totalMerchants,
@@ -23,14 +29,20 @@ export async function getAdminOverview(req: DashboardAuthRequest, res: Response)
       prisma.conversation.count(),
       prisma.message.count(),
       prisma.knowledgeChunk.count(),
-      prisma.user.count({ where: { planTier: 'FREE' } }),
-      prisma.user.count({ where: { planTier: 'STARTER' } }),
-      prisma.user.count({ where: { planTier: 'PRO' } }),
-      prisma.user.count({ where: { planTier: 'ENTERPRISE' } }),
+      prisma.user.count({ where: { planTier: "FREE" } }),
+      prisma.user.count({ where: { planTier: "STARTER" } }),
+      prisma.user.count({ where: { planTier: "PRO" } }),
+      prisma.user.count({ where: { planTier: "ENTERPRISE" } }),
       prisma.user.findMany({
         take: 5,
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, name: true, email: true, planTier: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          planTier: true,
+          createdAt: true,
+        },
       }),
       prisma.message.aggregate({
         _sum: { tokensUsed: true },
@@ -43,33 +55,41 @@ export async function getAdminOverview(req: DashboardAuthRequest, res: Response)
       totalTokens = totalMessages * 180; // realistic average tokens per turn
     }
 
-    res.json({
-      metrics: {
-        totalMerchants,
-        totalApiKeys,
-        totalConversations,
-        totalMessages,
-        totalKnowledgeChunks,
-        totalTokensEstimated: totalTokens,
-        tierBreakdown: {
-          FREE: freeTiers,
-          STARTER: starterTiers,
-          PRO: proTiers,
-          ENTERPRISE: enterpriseTiers,
-        },
+    const metricsData = {
+      totalMerchants,
+      totalApiKeys,
+      totalConversations,
+      totalMessages,
+      totalKnowledgeChunks,
+      totalTokensEstimated: totalTokens,
+      tierBreakdown: {
+        FREE: freeTiers,
+        STARTER: starterTiers,
+        PRO: proTiers,
+        ENTERPRISE: enterpriseTiers,
       },
+    };
+
+    res.json({
+      metrics: metricsData,
+      overview: metricsData,
       recentMerchants,
     });
   } catch (error) {
-    logger.error('Admin Overview Error:', error);
-    res.status(500).json({ error: 'Failed to fetch admin overview statistics.' });
+    logger.error("Admin Overview Error:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch admin overview statistics." });
   }
 }
 
-export async function getAdminMerchants(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function getAdminMerchants(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchants = await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       select: {
         id: true,
         name: true,
@@ -130,23 +150,26 @@ export async function getAdminMerchants(req: DashboardAuthRequest, res: Response
           totalMessages: messagesCount,
           totalTokensUsed: tokens,
         };
-      })
+      }),
     );
 
     res.json({ merchants: merchantStats });
   } catch (error) {
-    logger.error('Admin Merchants Error:', error);
-    res.status(500).json({ error: 'Failed to fetch merchant client list.' });
+    logger.error("Admin Merchants Error:", error);
+    res.status(500).json({ error: "Failed to fetch merchant client list." });
   }
 }
 
-export async function updateMerchantPlan(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function updateMerchantPlan(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = String(req.params.merchantId);
     const { planTier, role } = req.body;
 
-    if (!merchantId || merchantId === 'undefined') {
-      res.status(400).json({ error: 'Merchant ID is required.' });
+    if (!merchantId || merchantId === "undefined") {
+      res.status(400).json({ error: "Merchant ID is required." });
       return;
     }
 
@@ -170,7 +193,7 @@ export async function updateMerchantPlan(req: DashboardAuthRequest, res: Respons
 
     res.json({ success: true, merchant: updated });
   } catch (error) {
-    logger.error('Update Merchant Plan Error:', error);
-    res.status(500).json({ error: 'Failed to update merchant plan.' });
+    logger.error("Update Merchant Plan Error:", error);
+    res.status(500).json({ error: "Failed to update merchant plan." });
   }
 }
