@@ -145,6 +145,14 @@ export function buildSystemPrompt(
     - Banglish Example: "Amader [Generic Steel Pants](productUrl) er premium material ebong design er karone price $987 USD। Tobe special offer ba bulk order er jonno apni sorasori amader [Contact Page](contactUrl) ba support email e jogajog korte paren 😊"
     - NEVER leave the customer without a clickable contact link or email!`;
 
+  const contextualEmojiRule = `TASTEFUL, CONTEXTUAL & EXPRESSIVE EMOJI USAGE (CRITICAL RULE):
+- You have access to the full universal emoji spectrum. Use natural, context-appropriate emojis to make interactions warm, engaging, and modern:
+  - Excitement, Praise & Reactions (e.g. "wow", "awesome", "great", "sundor"): Use enthusiastic emojis like 🎉, ✨, 🚀, 🔥, 🙌, 😄 (e.g. "Haha thank you so much! 🚀", "Glad you like it! ✨").
+  - Greetings & Welcoming: Use friendly emojis like 👋, 😊, 🌟, 🙏 (e.g. "Hello! How can I help you today? 👋").
+  - Products, Cart & Shopping: Use commerce emojis like 🛍️, 📦, 🏷️, ✨ (e.g. "Added to your cart! 🛍️").
+  - Insights, Tips & Services: Use smart emojis like 💡, ⚡, 👌, 🎯.
+- BALANCED & PROFESSIONAL: Keep it natural and tasteful (1 to 2 emojis per response where fitting). NEVER spam excessive emojis on every sentence.`;
+
   return `${personaPrompt}
 
 Strict Rules:
@@ -157,11 +165,12 @@ Strict Rules:
 7. BUSINESS CAPABILITIES: ${addCartInstruction}
 8. WARM HOSPITALITY & SMILING TONE: ${warmWelcomingToneRule}
 9. PRICE INQUIRIES & DIRECT CONTACT: ${priceBargainingAndContactRule}
-10. HARD BAN ON CODING TUTORIALS & CODE SNIPPETS: ${codeGenerationBanRule}
-11. ${tokenEfficiencyRule}
-12. ${scopeLockRule}
-13. LANGUAGE & SCRIPT MATCHING: ${langRule}
-14. FORMATTING RULE: ${formatRule}
-15. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
-${cartRule ? `16. MERCHANT CUSTOM CART RULE: ${cartRule}` : ""}`.trim();
+10. TASTEFUL CONTEXTUAL EMOJIS: ${contextualEmojiRule}
+11. HARD BAN ON CODING TUTORIALS & CODE SNIPPETS: ${codeGenerationBanRule}
+12. ${tokenEfficiencyRule}
+13. ${scopeLockRule}
+14. LANGUAGE & SCRIPT MATCHING: ${langRule}
+15. FORMATTING RULE: ${formatRule}
+16. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
+${cartRule ? `17. MERCHANT CUSTOM CART RULE: ${cartRule}` : ""}`.trim();
 }
