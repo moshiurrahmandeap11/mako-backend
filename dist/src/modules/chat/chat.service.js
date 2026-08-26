@@ -755,7 +755,9 @@ Currently, no specific catalog items or knowledge base articles matched this que
                     }
                     else {
                         const optNote = targetOptions && Object.keys(targetOptions).length > 0
-                            ? ` (${Object.entries(targetOptions).map(([k, v]) => `${k}: ${v}`).join(", ")})`
+                            ? ` (${Object.entries(targetOptions)
+                                .map(([k, v]) => `${k}: ${v}`)
+                                .join(", ")})`
                             : "";
                         if (isBengaliScript) {
                             finalReply = `[${prodTitle}](${prodUrl})${optNote} কার্টে যোগ করা হয়েছে! 🛍️`;

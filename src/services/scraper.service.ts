@@ -656,6 +656,11 @@ async function indexPageContent(
       $(
         'p, label, h2, h3, h4, h5, h6, legend, [class*="label" i], [class*="heading" i], [class*="title" i]',
       ).each((_, headingEl) => {
+        // Skip elements in footer, navigation, or header bars
+        if ($(headingEl).closest('footer, header, nav, [class*="footer" i], [class*="header" i], [class*="nav" i]').length > 0) {
+          return;
+        }
+
         if (
           $(headingEl).find('button, input[type="radio"], [role="radio"]')
             .length > 0
@@ -665,6 +670,10 @@ async function indexPageContent(
         const text = $(headingEl).text().trim().replace(/\s+/g, " ");
         if (!text || text.length > 35) return;
 
+        if (/^(company|get\s*in\s*touch|about\s*us|customer\s*service|subscribe|newsletter|follow\s*us|social|links|navigation|copyright)$/i.test(text)) {
+          return;
+        }
+
         const match = text.match(
           /^(?:Select|Choose|Pick|Available)?\s*([A-Za-z0-9\s_-]+?)(?:\s*:|\s*Options)?$/i,
         );
@@ -672,7 +681,7 @@ async function indexPageContent(
           let candidateName = match[1].trim();
           if (!candidateName || candidateName.split(/\s+/).length > 3) return;
           if (
-            /^(product|item|quantity|qty|cart|checkout|price|shipping|review|rating|delivery|details?|description|login|order|related|recommended|category)$/i.test(
+            /^(company|get\s*in\s*touch|product|item|quantity|qty|cart|checkout|price|shipping|review|rating|delivery|details?|description|login|order|related|recommended|category)$/i.test(
               candidateName,
             )
           ) {
@@ -1066,7 +1075,7 @@ async function indexPageContent(
  * Headless Browser SPA Hydration (Smart Puppeteer Scraper)
  * Used when a modern client-rendered SPA (Next.js, React, Vue) has missing or client-rendered DOM.
  */
-async function fetchRenderedHtmlWithPuppeteer(url: string): Promise<string> {
+export async function fetchRenderedHtmlWithPuppeteer(url: string): Promise<string> {
   let browser: any = null;
   try {
     logger.info(
@@ -1099,9 +1108,11 @@ async function fetchRenderedHtmlWithPuppeteer(url: string): Promise<string> {
       }
     });
 
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
-    // Brief sleep for React/Next.js hydration
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 }).catch(() => {
+      return page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+    });
+    // Sleep for React/Next.js client state hydration
+    await new Promise((resolve) => setTimeout(resolve, 2500));
 
     const content = await page.content();
     if (

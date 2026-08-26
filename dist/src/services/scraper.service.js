@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isSafeUrl = isSafeUrl;
 exports.decodeCloudflareEmail = decodeCloudflareEmail;
+exports.fetchRenderedHtmlWithPuppeteer = fetchRenderedHtmlWithPuppeteer;
 exports.scrapeWebsite = scrapeWebsite;
 exports.scrapeSingleUrl = scrapeSingleUrl;
 exports.addManualKnowledgeChunk = addManualKnowledgeChunk;
@@ -538,7 +539,9 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
                 const cleanName = name.trim().charAt(0).toUpperCase() + name.trim().slice(1);
                 const uniqueVals = Array.from(new Set(values
                     .map((v) => v.trim())
-                    .filter((v) => v.length > 0 && v.length < 50 && !/^(add\s*to\s*cart|buy\s*now|checkout|login|signup)$/i.test(v))));
+                    .filter((v) => v.length > 0 &&
+                    v.length < 50 &&
+                    !/^(add\s*to\s*cart|buy\s*now|checkout|login|signup)$/i.test(v))));
                 if (uniqueVals.length === 0)
                     return;
                 const existing = extractedOptions.find((o) => o.name.toLowerCase() === cleanName.toLowerCase());
@@ -552,36 +555,53 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
             // 1. Universal Semantic Heading & Sibling Container Traversal
             // Matches headings like "Select Size", "Select Color", "Select Storage", "Choose Flavor", "Material:", etc.
             $('p, label, h2, h3, h4, h5, h6, legend, [class*="label" i], [class*="heading" i], [class*="title" i]').each((_, headingEl) => {
-                if ($(headingEl).find('button, input[type="radio"], [role="radio"]').length > 0)
+                // Skip elements in footer, navigation, or header bars
+                if ($(headingEl).closest('footer, header, nav, [class*="footer" i], [class*="header" i], [class*="nav" i]').length > 0) {
+                    return;
+                }
+                if ($(headingEl).find('button, input[type="radio"], [role="radio"]')
+                    .length > 0)
                     return;
                 const text = $(headingEl).text().trim().replace(/\s+/g, " ");
                 if (!text || text.length > 35)
                     return;
+                if (/^(company|get\s*in\s*touch|about\s*us|customer\s*service|subscribe|newsletter|follow\s*us|social|links|navigation|copyright)$/i.test(text)) {
+                    return;
+                }
                 const match = text.match(/^(?:Select|Choose|Pick|Available)?\s*([A-Za-z0-9\s_-]+?)(?:\s*:|\s*Options)?$/i);
                 if (match && match[1]) {
                     let candidateName = match[1].trim();
                     if (!candidateName || candidateName.split(/\s+/).length > 3)
                         return;
-                    if (/^(product|item|quantity|qty|cart|checkout|price|shipping|review|rating|delivery|details?|description|login|order|related|recommended|category)$/i.test(candidateName)) {
+                    if (/^(company|get\s*in\s*touch|product|item|quantity|qty|cart|checkout|price|shipping|review|rating|delivery|details?|description|login|order|related|recommended|category)$/i.test(candidateName)) {
                         return;
                     }
                     const nextEl = $(headingEl).next();
-                    let buttonsInContainer = nextEl.find('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, li').filter((_, b) => {
+                    let buttonsInContainer = nextEl
+                        .find('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, li')
+                        .filter((_, b) => {
                         const bText = $(b).text().trim();
-                        return bText.length > 0 && !/add\s*to\s*cart|buy\s*now|checkout|login|signup/i.test(bText);
+                        return (bText.length > 0 &&
+                            !/add\s*to\s*cart|buy\s*now|checkout|login|signup/i.test(bText));
                     });
-                    if (buttonsInContainer.length === 0 && nextEl.is('button, input[type="radio"], [role="radio"], [role="button"]')) {
+                    if (buttonsInContainer.length === 0 &&
+                        nextEl.is('button, input[type="radio"], [role="radio"], [role="button"]')) {
                         buttonsInContainer = nextEl;
                     }
                     if (buttonsInContainer.length === 0) {
                         const parentContainer = $(headingEl).parent();
-                        buttonsInContainer = parentContainer.find('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, li').filter((_, b) => {
+                        buttonsInContainer = parentContainer
+                            .find('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, li')
+                            .filter((_, b) => {
                             const bText = $(b).text().trim();
-                            return bText.length > 0 && !/add\s*to\s*cart|buy\s*now|checkout|login|signup/i.test(bText);
+                            return (bText.length > 0 &&
+                                !/add\s*to\s*cart|buy\s*now|checkout|login|signup/i.test(bText));
                         });
                     }
                     if (buttonsInContainer.length > 0) {
-                        const vals = buttonsInContainer.map((_, b) => $(b).text().trim()).get();
+                        const vals = buttonsInContainer
+                            .map((_, b) => $(b).text().trim())
+                            .get();
                         addExtractedOption(candidateName, vals);
                     }
                 }
@@ -632,7 +652,9 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
             if (colorButtons.length > 0) {
                 const colorVals = colorButtons
                     .map((_, el) => {
-                    const btnParent = $(el).is("button") ? $(el) : $(el).closest("button");
+                    const btnParent = $(el).is("button")
+                        ? $(el)
+                        : $(el).closest("button");
                     return ($(el).attr("data-color") ||
                         $(el).attr("data-value") ||
                         $(el).attr("title") ||
@@ -877,9 +899,11 @@ async function fetchRenderedHtmlWithPuppeteer(url) {
                 req.continue();
             }
         });
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
-        // Brief sleep for React/Next.js hydration
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 }).catch(() => {
+            return page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+        });
+        // Sleep for React/Next.js client state hydration
+        await new Promise((resolve) => setTimeout(resolve, 2500));
         const content = await page.content();
         if (content.includes("This page couldn’t load") ||
             content.includes("This page couldn't load")) {
