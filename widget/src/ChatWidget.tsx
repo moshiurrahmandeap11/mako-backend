@@ -15,6 +15,7 @@ interface MessageItem {
   thoughts?: string[];
   time: string;
   shouldAnimate?: boolean;
+  isStreaming?: boolean;
 }
 
 // Crisp Vector SVGs (No Emojis)
@@ -711,17 +712,65 @@ export function ChatWidget({ api }: ChatWidgetProps) {
       time: "Just now",
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const botMsgId = `bot_${Date.now()}`;
+    const botMsg: MessageItem = {
+      id: botMsgId,
+      sender: "bot",
+      text: "",
+      thoughts: [],
+      time: "Just now",
+      isStreaming: true,
+    };
+
+    setMessages((prev) => [...prev, userMsg, botMsg]);
     setInputValue("");
     setIsLoading(true);
 
-    try {
-      const res = await api.sendMessage(sessionId, text);
+    const onThought = (thought: string) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === botMsgId
+            ? { ...m, thoughts: [...(m.thoughts || []), thought] }
+            : m,
+        ),
+      );
+      scrollToBottom(true);
+    };
 
+    const onToken = (token: string) => {
+      setIsLoading(false);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === botMsgId ? { ...m, text: (m.text || "") + token } : m,
+        ),
+      );
+      scrollToBottom(false);
+    };
+
+    const onDone = (res: any) => {
+      setIsLoading(false);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === botMsgId
+            ? {
+                ...m,
+                text: res.reply || m.text,
+                products: res.products,
+                thoughts:
+                  res.thoughts && res.thoughts.length > 0
+                    ? res.thoughts
+                    : m.thoughts,
+                isStreaming: false,
+              }
+            : m,
+        ),
+      );
+
+      // Handle Cart Action & Variant Modal
       if (res.cartAction) {
         const actionProdId = res.cartAction.productId;
         const targetProd = (res.products || []).find(
-          (p) =>
+          (p: any) =>
             p.id === actionProdId ||
             (p as any).externalId === actionProdId ||
             p.productUrl?.includes(actionProdId),
@@ -743,7 +792,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           typeof res.cartAction.selectedOptions === "object" &&
           Object.keys(res.cartAction.selectedOptions).length > 0;
 
-        // If the product has options BUT neither user nor AI has selected one yet -> Open Modal ONLY
         if (hasOptions && !hasSelectedOpts && !res.cartAction.variantId) {
           const defaultOpts: Record<string, string> = {};
           allOptions.forEach((opt: any) => {
@@ -755,7 +803,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           setModalQuantity(res.cartAction.quantity || 1);
           setModalProduct({ ...targetProd, options: allOptions });
         } else {
-          // Selected options are present (e.g. Size: S) or product has NO options -> Call Add to Cart!
           requestAddToCart(
             res.cartAction.productId,
             res.cartAction.quantity || 1,
@@ -769,19 +816,11 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           });
         }
       }
+      scrollToBottom(true);
+    };
 
-      const botMsg: MessageItem = {
-        id: `bot_${Date.now()}`,
-        sender: "bot",
-        text: res.reply,
-        products: res.products,
-        thoughts: res.thoughts,
-        time: "Just now",
-        shouldAnimate: true,
-      };
-
-      setMessages((prev) => [...prev, botMsg]);
-    } catch (err: any) {
+    const onError = (err: any) => {
+      setIsLoading(false);
       let errorMsg = "Sorry, I ran into an error. Please try again.";
       if (
         err?.message?.includes("revoked") ||
@@ -801,18 +840,28 @@ export function ChatWidget({ api }: ChatWidgetProps) {
         errorMsg = err.message;
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err_${Date.now()}`,
-          sender: "bot",
-          text: errorMsg,
-          time: "Just now",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === botMsgId
+            ? {
+                ...m,
+                text: errorMsg,
+                isStreaming: false,
+              }
+            : m,
+        ),
+      );
+      scrollToBottom(true);
+    };
+
+    await api.streamMessage(
+      sessionId,
+      text,
+      onThought,
+      onToken,
+      onDone,
+      onError,
+    );
   };
 
   const handleResetSession = () => {
@@ -1177,6 +1226,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     msg.thoughts &&
                     msg.thoughts.length > 0 && (
                       <details
+                        open={msg.isStreaming}
                         style={{
                           marginBottom: "8px",
                           fontSize: "11px",
@@ -1256,12 +1306,52 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         msg.sender === "user" ? "none" : "1px solid #e2e8f0",
                     }}
                   >
-                    <TypewriterMessageText
-                      text={msg.text}
-                      isBot={msg.sender === "bot"}
-                      shouldAnimate={Boolean(msg.shouldAnimate)}
-                      onType={() => scrollToBottom(false)}
-                    />
+                    {msg.isStreaming && !msg.text ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          color: "#64748b",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: "12px",
+                            height: "12px",
+                            borderRadius: "50%",
+                            border: "2px solid #cbd5e1",
+                            borderTopColor: primaryColor,
+                            animation: "spin 0.8s linear infinite",
+                          }}
+                        />
+                        <span>Thinking...</span>
+                      </div>
+                    ) : msg.isStreaming ? (
+                      <div>
+                        {renderMarkdownText(msg.text)}
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: "5px",
+                            height: "13px",
+                            backgroundColor: primaryColor,
+                            marginLeft: "4px",
+                            verticalAlign: "middle",
+                            borderRadius: "1px",
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <TypewriterMessageText
+                        text={msg.text}
+                        isBot={msg.sender === "bot"}
+                        shouldAnimate={Boolean(msg.shouldAnimate)}
+                        onType={() => scrollToBottom(false)}
+                      />
+                    )}
                   </div>
 
                   {/* Subtitle / Timestamp under Bot Bubble */}

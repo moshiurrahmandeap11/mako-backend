@@ -111,7 +111,7 @@ async function getWidgetConfigPublic(req, res) {
 async function chat(req, res) {
     try {
         const merchantId = req.merchant?.id;
-        const { sessionId, message, botMode, provider, imageUrl } = req.body;
+        const { sessionId, message, botMode, provider, imageUrl, stream } = req.body;
         if ((!message || typeof message !== 'string') && !imageUrl) {
             res.status(400).json({ error: 'Message or imageUrl field is required.' });
             return;
@@ -122,6 +122,30 @@ async function chat(req, res) {
             return;
         }
         const effectiveSessionId = sessionId || `sess_${crypto_1.default.randomBytes(16).toString('hex')}`;
+        const isStream = stream === true ||
+            req.query.stream === 'true' ||
+            req.headers.accept?.includes('text/event-stream');
+        if (isStream) {
+            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-transform');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('X-Accel-Buffering', 'no');
+            res.flushHeaders?.();
+            const sendEvent = (type, data) => {
+                res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+            };
+            try {
+                const response = await (0, chat_service_1.processChatMessageStream)(merchantId, effectiveSessionId, rawMessage.slice(0, 250), (thought) => sendEvent('thought', { thought }), (token) => sendEvent('token', { token }), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl);
+                sendEvent('done', response);
+                res.end();
+            }
+            catch (streamErr) {
+                logger_1.logger.error('Stream processing error:', streamErr);
+                sendEvent('error', { error: streamErr?.message || 'Stream processing failed' });
+                res.end();
+            }
+            return;
+        }
         const response = await (0, chat_service_1.processChatMessage)(merchantId, effectiveSessionId, rawMessage.slice(0, 250), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl);
         res.json(response);
     }

@@ -426,11 +426,43 @@ function ChatWidget({ api }) {
             text,
             time: "Just now",
         };
-        setMessages((prev) => [...prev, userMsg]);
+        const botMsgId = `bot_${Date.now()}`;
+        const botMsg = {
+            id: botMsgId,
+            sender: "bot",
+            text: "",
+            thoughts: [],
+            time: "Just now",
+            isStreaming: true,
+        };
+        setMessages((prev) => [...prev, userMsg, botMsg]);
         setInputValue("");
         setIsLoading(true);
-        try {
-            const res = await api.sendMessage(sessionId, text);
+        const onThought = (thought) => {
+            setMessages((prev) => prev.map((m) => m.id === botMsgId
+                ? { ...m, thoughts: [...(m.thoughts || []), thought] }
+                : m));
+            scrollToBottom(true);
+        };
+        const onToken = (token) => {
+            setIsLoading(false);
+            setMessages((prev) => prev.map((m) => m.id === botMsgId ? { ...m, text: (m.text || "") + token } : m));
+            scrollToBottom(false);
+        };
+        const onDone = (res) => {
+            setIsLoading(false);
+            setMessages((prev) => prev.map((m) => m.id === botMsgId
+                ? {
+                    ...m,
+                    text: res.reply || m.text,
+                    products: res.products,
+                    thoughts: res.thoughts && res.thoughts.length > 0
+                        ? res.thoughts
+                        : m.thoughts,
+                    isStreaming: false,
+                }
+                : m));
+            // Handle Cart Action & Variant Modal
             if (res.cartAction) {
                 const actionProdId = res.cartAction.productId;
                 const targetProd = (res.products || []).find((p) => p.id === actionProdId ||
@@ -450,7 +482,6 @@ function ChatWidget({ api }) {
                 const hasSelectedOpts = res.cartAction.selectedOptions &&
                     typeof res.cartAction.selectedOptions === "object" &&
                     Object.keys(res.cartAction.selectedOptions).length > 0;
-                // If the product has options BUT neither user nor AI has selected one yet -> Open Modal ONLY
                 if (hasOptions && !hasSelectedOpts && !res.cartAction.variantId) {
                     const defaultOpts = {};
                     allOptions.forEach((opt) => {
@@ -463,7 +494,6 @@ function ChatWidget({ api }) {
                     setModalProduct({ ...targetProd, options: allOptions });
                 }
                 else {
-                    // Selected options are present (e.g. Size: S) or product has NO options -> Call Add to Cart!
                     (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, targetProd.productUrl).then((result) => {
                         if (result.message && !result.platform?.includes("cross_page")) {
                             showToast(result.message);
@@ -471,18 +501,10 @@ function ChatWidget({ api }) {
                     });
                 }
             }
-            const botMsg = {
-                id: `bot_${Date.now()}`,
-                sender: "bot",
-                text: res.reply,
-                products: res.products,
-                thoughts: res.thoughts,
-                time: "Just now",
-                shouldAnimate: true,
-            };
-            setMessages((prev) => [...prev, botMsg]);
-        }
-        catch (err) {
+            scrollToBottom(true);
+        };
+        const onError = (err) => {
+            setIsLoading(false);
             let errorMsg = "Sorry, I ran into an error. Please try again.";
             if (err?.message?.includes("revoked") ||
                 err?.message?.includes("Invalid") ||
@@ -499,19 +521,16 @@ function ChatWidget({ api }) {
             else if (err?.message) {
                 errorMsg = err.message;
             }
-            setMessages((prev) => [
-                ...prev,
-                {
-                    id: `err_${Date.now()}`,
-                    sender: "bot",
+            setMessages((prev) => prev.map((m) => m.id === botMsgId
+                ? {
+                    ...m,
                     text: errorMsg,
-                    time: "Just now",
-                },
-            ]);
-        }
-        finally {
-            setIsLoading(false);
-        }
+                    isStreaming: false,
+                }
+                : m));
+            scrollToBottom(true);
+        };
+        await api.streamMessage(sessionId, text, onThought, onToken, onDone, onError);
     };
     const handleResetSession = () => {
         api
@@ -752,7 +771,7 @@ function ChatWidget({ api }) {
                                     alignItems: msg.sender === "user" ? "flex-end" : "flex-start",
                                 }, children: [msg.sender === "bot" &&
                                         msg.thoughts &&
-                                        msg.thoughts.length > 0 && ((0, jsx_runtime_1.jsxs)("details", { style: {
+                                        msg.thoughts.length > 0 && ((0, jsx_runtime_1.jsxs)("details", { open: msg.isStreaming, style: {
                                             marginBottom: "8px",
                                             fontSize: "11px",
                                             color: "#475569",
@@ -800,7 +819,29 @@ function ChatWidget({ api }) {
                                             lineHeight: "1.5",
                                             fontWeight: "450",
                                             border: msg.sender === "user" ? "none" : "1px solid #e2e8f0",
-                                        }, children: (0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === "bot", shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) }) }), msg.sender === "bot" && ((0, jsx_runtime_1.jsxs)("span", { style: {
+                                        }, children: msg.isStreaming && !msg.text ? ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "8px",
+                                                color: "#64748b",
+                                                fontSize: "13px",
+                                            }, children: [(0, jsx_runtime_1.jsx)("span", { style: {
+                                                        display: "inline-block",
+                                                        width: "12px",
+                                                        height: "12px",
+                                                        borderRadius: "50%",
+                                                        border: "2px solid #cbd5e1",
+                                                        borderTopColor: primaryColor,
+                                                        animation: "spin 0.8s linear infinite",
+                                                    } }), (0, jsx_runtime_1.jsx)("span", { children: "Thinking..." })] })) : msg.isStreaming ? ((0, jsx_runtime_1.jsxs)("div", { children: [renderMarkdownText(msg.text), (0, jsx_runtime_1.jsx)("span", { style: {
+                                                        display: "inline-block",
+                                                        width: "5px",
+                                                        height: "13px",
+                                                        backgroundColor: primaryColor,
+                                                        marginLeft: "4px",
+                                                        verticalAlign: "middle",
+                                                        borderRadius: "1px",
+                                                    } })] })) : ((0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === "bot", shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) })) }), msg.sender === "bot" && ((0, jsx_runtime_1.jsxs)("span", { style: {
                                             fontSize: "11px",
                                             color: "#94a3b8",
                                             marginTop: "5px",

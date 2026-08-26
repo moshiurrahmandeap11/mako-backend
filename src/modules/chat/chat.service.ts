@@ -7,7 +7,10 @@ import {
   isSimpleGreeting,
 } from "./guards/chatGuards";
 import { buildSystemPrompt } from "./prompts/systemPromptBuilder";
-import { executeLlmCascade } from "./providers/llmRunner";
+import {
+  executeLlmCascade,
+  executeLlmCascadeStream,
+} from "./providers/llmRunner";
 import { searchKnowledgeTool } from "./tools/searchKnowledge.tool";
 import { searchProductsTool } from "./tools/searchProducts.tool";
 import { webSearchTool } from "./tools/webSearch.tool";
@@ -17,6 +20,14 @@ import {
   smartExtractCartAction,
 } from "./utils/cartActionParser";
 import { getCachedResponse, setCachedResponse } from "./utils/chatCache";
+
+export interface ChatResponse {
+  sessionId: string;
+  reply: string;
+  products: any[];
+  cartAction?: any;
+  thoughts: string[];
+}
 
 export async function processChatMessage(
   merchantId: string,
@@ -37,7 +48,7 @@ export async function processChatMessage(
     select: { name: true, allowedDomains: true, widgetConfig: true },
   });
 
-  // Dynamically resolve clean business identity for multi-tenant storefronts & agencies
+  // Dynamically resolve clean business identity
   let merchantName = "our company";
   const primaryDomain = merchant?.allowedDomains?.[0] || "";
 
@@ -99,6 +110,7 @@ export async function processChatMessage(
     });
 
     return {
+      sessionId,
       reply: gratitudeReply,
       thoughts: [],
       cartAction: undefined,
@@ -127,6 +139,7 @@ export async function processChatMessage(
     });
 
     return {
+      sessionId,
       reply: hijackReply,
       thoughts: [
         `🛡️ Security Guard: Prevented role hijacking / prompt injection attempt.`,
@@ -137,7 +150,7 @@ export async function processChatMessage(
     };
   }
 
-  // FAST PATH 3: Out of Scope / Off-Topic / Essay / Academic / Coding Rejection Guard (<10ms, 0 token waste)
+  // FAST PATH 3: Out of Scope Guard (<10ms, 0 token waste)
   if (isOutOfScopeRequest(userMessage)) {
     let declineReply = "";
     if (isBengaliScript) {
@@ -157,6 +170,7 @@ export async function processChatMessage(
     });
 
     return {
+      sessionId,
       reply: declineReply,
       thoughts: [
         `🛡️ Policy Guard: Declining out-of-scope coding/homework request.`,
@@ -179,7 +193,7 @@ export async function processChatMessage(
     },
   });
 
-  // FAST PATH 4: Instant High-Speed FAQ Cache Hit (<3ms, 0 token waste)
+  // FAST PATH 4: Instant High-Speed FAQ Cache Hit
   const cached = !imageUrl ? getCachedResponse(merchantId, userMessage) : null;
   if (cached) {
     await prisma.message.create({
@@ -212,7 +226,6 @@ export async function processChatMessage(
   let ragContext = "";
   const thoughts: string[] = [];
 
-  // Language & Vision analysis thoughts
   if (isBengaliScript) {
     thoughts.push(
       `🗣️ Detected Bengali script query — Applying natural Bangla grammar.`,
@@ -254,7 +267,6 @@ export async function processChatMessage(
 
     retrievedProducts = retrievedProductsRes;
 
-    // Fallback: If query search returned 0 items, fetch top catalog items for context
     if (retrievedProducts.length === 0) {
       retrievedProducts = await prisma.product.findMany({
         where: { merchantId },
@@ -291,7 +303,7 @@ export async function processChatMessage(
       ragContext +=
         `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes
-          .map((k, i) => `[Source: ${k.url}]\n${k.content}`)
+          .map((k) => `[Source: ${k.url}]\n${k.content}`)
           .join("\n\n") +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
     } else if (
@@ -299,7 +311,6 @@ export async function processChatMessage(
       userMessage.trim().length > 3 &&
       !isSimpleGreeting(userMessage)
     ) {
-      // Trigger Live Web Search fallback if vector memory has 0 matches (with strict 1.5s timeout cap)
       thoughts.push(
         `🌐 Executing real-time web search for "${userMessage}"...`,
       );
@@ -398,15 +409,12 @@ Currently, no specific catalog items or knowledge base articles matched this que
     }
   }
 
-  // Final sanitization to guarantee no internal tags leak
   finalReply = sanitizeReplyText(finalReply);
 
-  // Bind retrieved RAG products to response metadata
   if (recommendedProducts.length === 0 && retrievedProducts.length > 0) {
     recommendedProducts = retrievedProducts;
   }
 
-  // Calculate estimated tokens if not provided by API
   let estimatedTokens = llmResult.estimatedTokens;
   if (!estimatedTokens) {
     estimatedTokens = Math.max(
@@ -457,5 +465,451 @@ Currently, no specific catalog items or knowledge base articles matched this que
     })),
     cartAction,
     thoughts: [],
+  };
+}
+
+/**
+ * Real-time SSE Streaming Chat Processor (ChatGPT / Claude style live tokens & thoughts).
+ */
+export async function processChatMessageStream(
+  merchantId: string,
+  sessionId: string,
+  userMessage: string,
+  onThought: (thought: string) => void,
+  onToken: (token: string) => void,
+  botMode: string = "shopping",
+  provider?: string,
+  customPrompt?: string,
+  template?: string,
+  imageUrl?: string,
+): Promise<ChatResponse> {
+  userMessage = (userMessage || "").trim().slice(0, 250);
+
+  const merchant = await prisma.user.findUnique({
+    where: { id: merchantId },
+    select: { name: true, allowedDomains: true, widgetConfig: true },
+  });
+
+  let merchantName = "our company";
+  const primaryDomain = merchant?.allowedDomains?.[0] || "";
+
+  if (primaryDomain) {
+    const rawDomain = primaryDomain
+      .replace(/^https?:\/\//, "")
+      .split("/")[0]
+      .split(":")[0]
+      .replace(/^www\./, "");
+    if (rawDomain && rawDomain !== "localhost" && rawDomain !== "127.0.0.1") {
+      const parts = rawDomain.split(".")[0].split(/[-_]/);
+      merchantName = parts
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(" ");
+    }
+  }
+
+  if ((!merchantName || merchantName === "our company") && merchant?.name) {
+    merchantName = merchant.name;
+  }
+
+  let conversation = await prisma.conversation.findFirst({
+    where: { merchantId, sessionId },
+    include: { messages: { orderBy: { createdAt: "asc" }, take: 20 } },
+  });
+
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: { merchantId, sessionId },
+      include: { messages: true },
+    });
+  }
+
+  const textSafe = userMessage || "";
+  const isBengaliScript = /[\u0980-\u09FF]/.test(textSafe);
+  const isBanglish =
+    /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website|bro)\b/i.test(
+      textSafe,
+    );
+
+  // Fast-path 1: Gratitude
+  if (isGratitude(userMessage)) {
+    let gratitudeReply = "";
+    if (isBengaliScript) {
+      gratitudeReply = `আপনাকে অনেক ধন্যবাদ! যেকোনো সাহায্যে আমি আছি।`;
+    } else if (isBanglish) {
+      gratitudeReply = `You are most welcome bro! Apnar ar kono sahajjo lagle bolben।`;
+    } else {
+      gratitudeReply = `You are most welcome! Let me know if you need any further assistance.`;
+    }
+
+    onToken(gratitudeReply);
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "assistant",
+        content: gratitudeReply,
+      },
+    });
+
+    return {
+      sessionId,
+      reply: gratitudeReply,
+      thoughts: [],
+      cartAction: undefined,
+      products: [],
+    };
+  }
+
+  // Fast-path 2: Role Hijacking Guard
+  if (isRoleHijackingAttempt(userMessage)) {
+    let hijackReply = "";
+    if (isBengaliScript) {
+      hijackReply = `আমি ${merchantName}-এর অফিশিয়াল সহকারী। আমি ভূমিকা পরিবর্তন করতে পারি না। কীভাবে আমাদের সেবা বা প্রজেক্টে সাহায্য করতে পারি?`;
+    } else if (isBanglish) {
+      hijackReply = `Ami ${merchantName}-er official AI assistant hishebe kaj kori. Identity ba role change kora sombhov noy। Bolun, amader website ba services niye kivabe help korte pari?`;
+    } else {
+      hijackReply = `I am the official AI assistant dedicated exclusively to ${merchantName}. I cannot change my role or act as a personal assistant. How can I help you with our services today?`;
+    }
+
+    onThought(`🛡️ Security Guard: Prevented role hijacking attempt.`);
+    onToken(hijackReply);
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "assistant",
+        content: hijackReply,
+      },
+    });
+
+    return {
+      sessionId,
+      reply: hijackReply,
+      thoughts: [`🛡️ Security Guard: Prevented role hijacking attempt.`],
+      cartAction: undefined,
+      products: [],
+    };
+  }
+
+  // Fast-path 3: Out of Scope Guard
+  if (isOutOfScopeRequest(userMessage)) {
+    let declineReply = "";
+    if (isBengaliScript) {
+      declineReply = `আমি ${merchantName}-এর এআই সহকারী। আমি শুধুমাত্র আমাদের প্রজেক্ট, সেবা ও ওয়েবসাইট সম্পর্কিত তথ্যে সাহায্য করতে পারি।`;
+    } else if (isBanglish) {
+      declineReply = `Ami ${merchantName}-er AI assistant. Ami sudhu amader services, projects ebong company information niye help korte pari.`;
+    } else {
+      declineReply = `I am the AI assistant dedicated to ${merchantName}. I can only assist you with our services, portfolio projects, and company information.`;
+    }
+
+    onThought(`🛡️ Policy Guard: Declining out-of-scope request.`);
+    onToken(declineReply);
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "assistant",
+        content: declineReply,
+      },
+    });
+
+    return {
+      sessionId,
+      reply: declineReply,
+      thoughts: [`🛡️ Policy Guard: Declining out-of-scope request.`],
+      cartAction: undefined,
+      products: [],
+    };
+  }
+
+  // Save user message to database
+  const cleanUserText =
+    userMessage || (imageUrl ? "Analyzing attached image." : "");
+  await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      role: "user",
+      content: cleanUserText,
+      toolCalls: imageUrl ? { imageUrl } : undefined,
+    },
+  });
+
+  // Fast-path 4: Cached Response
+  const cached = !imageUrl ? getCachedResponse(merchantId, userMessage) : null;
+  if (cached) {
+    onThought("⚡ Instant High-Speed Cached Response (~2ms).");
+    onToken(cached.reply);
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "assistant",
+        content: cached.reply,
+        tokensUsed: 5,
+        toolCalls:
+          cached.products && cached.products.length > 0
+            ? { recommendedProducts: cached.products }
+            : undefined,
+      },
+    });
+
+    return {
+      sessionId,
+      reply: cached.reply,
+      products: cached.products || [],
+      cartAction: null,
+      thoughts: [
+        "⚡ Instant High-Speed Cached Response (~2ms).",
+        ...cached.thoughts,
+      ],
+    };
+  }
+
+  let recommendedProducts: any[] = [];
+  let retrievedProducts: any[] = [];
+  let ragContext = "";
+  const thoughts: string[] = [];
+
+  const addThought = (t: string) => {
+    thoughts.push(t);
+    onThought(t);
+  };
+
+  if (isBengaliScript) {
+    addThought(
+      `🗣️ Detected Bengali script query — Applying natural Bangla grammar.`,
+    );
+  } else if (isBanglish) {
+    addThought(
+      `🗣️ Detected Romanized Banglish query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Enforcing native phonetics.`,
+    );
+  } else {
+    addThought(
+      `🗣️ Analyzed English query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Setting concise representative persona.`,
+    );
+  }
+
+  if (imageUrl) {
+    addThought(
+      `🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`,
+    );
+  }
+
+  // Perform Catalog & Knowledge RAG Search
+  try {
+    const ragTimeout = new Promise<[any[], any[]]>((resolve) =>
+      setTimeout(() => resolve([[], []]), 1200),
+    );
+
+    let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
+      Promise.all([
+        searchProductsTool(merchantId, userMessage || "general", undefined, 6),
+        searchKnowledgeTool(
+          merchantId,
+          userMessage || "general",
+          8,
+          primaryDomain,
+        ),
+      ]),
+      ragTimeout,
+    ]);
+
+    retrievedProducts = retrievedProductsRes;
+
+    if (retrievedProducts.length === 0) {
+      retrievedProducts = await prisma.product.findMany({
+        where: { merchantId },
+        take: 8,
+      });
+    }
+
+    if (retrievedProducts.length > 0) {
+      addThought(
+        `📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`,
+      );
+      ragContext +=
+        `\n\n### Store Catalog & Available Products:\n` +
+        retrievedProducts
+          .map((p) => {
+            const optStr =
+              p.options && Array.isArray(p.options) && p.options.length > 0
+                ? (p.options as any[])
+                    .map(
+                      (o: any) => `${o.name} (${(o.values || []).join(", ")})`,
+                    )
+                    .join("; ")
+                : "None";
+            return `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || "USD"}** | Options: ${optStr} | Category: ${p.category || "General"} | Description: ${p.description || p.title}`;
+          })
+          .join("\n") +
+        `\n\nInstructions: Use the catalog items above to recommend items, verify options/sizes, or provide details. Include product page links where appropriate.`;
+    }
+
+    if (retrievedKnowledgeRes.length > 0) {
+      addThought(
+        `🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`,
+      );
+      ragContext +=
+        `\n\n### Website Knowledge Base (Scraped Content):\n` +
+        retrievedKnowledgeRes
+          .map((k) => `[Source: ${k.url}]\n${k.content}`)
+          .join("\n\n") +
+        `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
+    } else if (
+      userMessage &&
+      userMessage.trim().length > 3 &&
+      !isSimpleGreeting(userMessage)
+    ) {
+      addThought(
+        `🌐 Executing real-time web search for "${userMessage}"...`,
+      );
+      const webSearchTimeout = new Promise<any[]>((resolve) =>
+        setTimeout(() => resolve([]), 1500),
+      );
+      const webResults = await Promise.race([
+        webSearchTool(userMessage, 3),
+        webSearchTimeout,
+      ]);
+      if (webResults.length > 0) {
+        addThought(
+          `✨ Retrieved ${webResults.length} real-time internet search results.`,
+        );
+        ragContext +=
+          `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
+          webResults
+            .map((w) => `[Source: ${w.title}](${w.url})\n${w.snippet}`)
+            .join("\n\n") +
+          `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
+      }
+    }
+
+    if (
+      retrievedProducts.length === 0 &&
+      retrievedKnowledgeRes.length === 0 &&
+      !ragContext.includes("Live Web Search Results")
+    ) {
+      ragContext = `\n\n### Website Context:
+Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ""}.
+Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
+    }
+  } catch (err) {
+    logger.error("RAG Search Error:", err);
+  }
+
+  const hasStoreProducts = retrievedProducts.length > 0;
+  const systemPrompt = buildSystemPrompt(
+    merchantName,
+    primaryDomain,
+    botMode,
+    customPrompt,
+    template,
+    hasStoreProducts,
+  );
+
+  // Execute Streaming LLM Cascade
+  const llmResult = await executeLlmCascadeStream(
+    merchantId,
+    userMessage,
+    systemPrompt + ragContext,
+    conversation.messages,
+    onToken,
+    imageUrl,
+    provider,
+    botMode,
+    template,
+  );
+
+  thoughts.push(...llmResult.thoughts);
+  if (llmResult.retrievedProducts?.length > 0) {
+    retrievedProducts = llmResult.retrievedProducts;
+  }
+
+  let finalReply = sanitizeReplyText(llmResult.finalReply);
+  let cartAction: any = null;
+
+  // Parse Cart Action tags
+  const parsedCart = await parseCartActionFromReply(
+    finalReply,
+    merchantId,
+    isBengaliScript,
+    isBanglish,
+  );
+  finalReply = parsedCart.cleanedReply;
+  if (parsedCart.cartAction) cartAction = parsedCart.cartAction;
+  if (
+    parsedCart.product &&
+    !recommendedProducts.some((p) => p.id === parsedCart.product.id)
+  ) {
+    recommendedProducts.push(parsedCart.product);
+  }
+
+  // Fail-safe Smart Action Extractor if no tag was found
+  if (!cartAction && finalReply) {
+    const smartCart = await smartExtractCartAction(
+      finalReply,
+      userMessage,
+      merchantId,
+    );
+    if (smartCart.cartAction) cartAction = smartCart.cartAction;
+    if (
+      smartCart.product &&
+      !recommendedProducts.some((p) => p.id === smartCart.product.id)
+    ) {
+      recommendedProducts.push(smartCart.product);
+    }
+  }
+
+  finalReply = sanitizeReplyText(finalReply);
+
+  if (recommendedProducts.length === 0 && retrievedProducts.length > 0) {
+    recommendedProducts = retrievedProducts;
+  }
+
+  let estimatedTokens = llmResult.estimatedTokens;
+  if (!estimatedTokens) {
+    estimatedTokens = Math.max(
+      15,
+      Math.ceil(((userMessage || "").length + (finalReply || "").length) / 3.6),
+    );
+  }
+
+  await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      role: "assistant",
+      content: finalReply,
+      tokensUsed: estimatedTokens,
+      toolCalls:
+        recommendedProducts.length > 0 || cartAction
+          ? { recommendedProducts, cartAction }
+          : undefined,
+    },
+  });
+
+  setCachedResponse(
+    merchantId,
+    userMessage,
+    finalReply,
+    thoughts,
+    recommendedProducts,
+  );
+
+  return {
+    sessionId,
+    reply: finalReply,
+    products: recommendedProducts.map((p) => ({
+      id: p.id,
+      externalId: p.externalId,
+      title: p.title,
+      price: p.price,
+      currency: p.currency || "USD",
+      imageUrl: p.imageUrl,
+      productUrl: p.productUrl,
+      inStock: p.inStock,
+      options: p.options,
+      variants: p.variants,
+    })),
+    cartAction,
+    thoughts,
   };
 }
