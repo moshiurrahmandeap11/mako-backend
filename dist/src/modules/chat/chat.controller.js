@@ -84,6 +84,7 @@ async function getWidgetConfigPublic(req, res) {
                 position: 'bottom-right',
                 addToCartEnabled: true,
                 suggestionChips: ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
+                botAvatarUrl: null,
             };
         }
         res.json({
@@ -97,6 +98,7 @@ async function getWidgetConfigPublic(req, res) {
             position: config?.position || 'bottom-right',
             addToCartEnabled: config?.addToCartEnabled !== undefined ? config.addToCartEnabled : true,
             suggestionChips: config?.suggestionChips || ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
+            botAvatarUrl: config?.botAvatarUrl || null,
             hideBranding: planTier === 'PRO' || planTier === 'ENTERPRISE',
             eventBridgeEnabled: planTier === 'PRO' || planTier === 'ENTERPRISE',
         });

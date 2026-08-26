@@ -111,6 +111,7 @@ model WidgetConfig {
   position         String   @default("bottom-right")
   addToCartEnabled Boolean  @default(true)
   suggestionChips  Json?
+  botAvatarUrl     String?
 }
 
 model Conversation {

@@ -2,9 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getConfig = getConfig;
 exports.updateConfig = updateConfig;
+exports.uploadAvatar = uploadAvatar;
 exports.resetConfig = resetConfig;
 const db_1 = require("../../config/db");
 const logger_1 = require("../../utils/logger");
+const cloudinary_service_1 = require("../../services/cloudinary.service");
 async function getConfig(req, res) {
     try {
         const merchantId = req.merchant?.id;
@@ -22,6 +24,7 @@ async function getConfig(req, res) {
                     botName: 'AI Assistant',
                     position: 'bottom-right',
                     addToCartEnabled: true,
+                    botAvatarUrl: null,
                 },
             });
         }
@@ -35,7 +38,7 @@ async function getConfig(req, res) {
 async function updateConfig(req, res) {
     try {
         const merchantId = req.merchant?.id;
-        const { primaryColor, headerBgColor, headerTextColor, launcherBgColor, launcherIconColor, greetingMessage, botName, position, addToCartEnabled, suggestionChips, } = req.body;
+        const { primaryColor, headerBgColor, headerTextColor, launcherBgColor, launcherIconColor, greetingMessage, botName, position, addToCartEnabled, suggestionChips, botAvatarUrl, } = req.body;
         const config = await db_1.prisma.widgetConfig.upsert({
             where: { merchantId },
             create: {
@@ -50,6 +53,7 @@ async function updateConfig(req, res) {
                 position: position || 'bottom-right',
                 addToCartEnabled: addToCartEnabled !== undefined ? Boolean(addToCartEnabled) : true,
                 suggestionChips: suggestionChips !== undefined ? suggestionChips : ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
+                botAvatarUrl: botAvatarUrl !== undefined ? botAvatarUrl : null,
             },
             update: {
                 ...(primaryColor !== undefined && { primaryColor }),
@@ -62,6 +66,7 @@ async function updateConfig(req, res) {
                 ...(position !== undefined && { position }),
                 ...(addToCartEnabled !== undefined && { addToCartEnabled: Boolean(addToCartEnabled) }),
                 ...(suggestionChips !== undefined && { suggestionChips }),
+                ...(botAvatarUrl !== undefined && { botAvatarUrl }),
             },
         });
         res.json({ message: 'Widget configuration updated successfully', config });
@@ -69,6 +74,35 @@ async function updateConfig(req, res) {
     catch (error) {
         logger_1.logger.error('Update Widget Config Error:', error);
         res.status(500).json({ error: 'Failed to update widget config.' });
+    }
+}
+async function uploadAvatar(req, res) {
+    try {
+        const merchantId = req.merchant?.id;
+        const { image, url } = req.body;
+        let avatarUrl = url;
+        if (image) {
+            avatarUrl = await (0, cloudinary_service_1.uploadImageToCloudinary)(image, 'mako_avatars');
+        }
+        if (!avatarUrl) {
+            res.status(400).json({ error: 'Image data (base64) or URL is required.' });
+            return;
+        }
+        const config = await db_1.prisma.widgetConfig.upsert({
+            where: { merchantId },
+            create: {
+                merchantId,
+                botAvatarUrl: avatarUrl,
+            },
+            update: {
+                botAvatarUrl: avatarUrl,
+            },
+        });
+        res.json({ message: 'Avatar uploaded successfully', avatarUrl, config });
+    }
+    catch (error) {
+        logger_1.logger.error('Upload Avatar Error:', error);
+        res.status(500).json({ error: error.message || 'Failed to upload avatar image.' });
     }
 }
 async function resetConfig(req, res) {
@@ -85,6 +119,7 @@ async function resetConfig(req, res) {
             position: 'bottom-right',
             addToCartEnabled: true,
             suggestionChips: ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
+            botAvatarUrl: null,
         };
         const config = await db_1.prisma.widgetConfig.upsert({
             where: { merchantId },

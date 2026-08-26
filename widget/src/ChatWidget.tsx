@@ -963,7 +963,23 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           >
             {/* Left: Mascot & Titles */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <BotMascotSvg />
+              {config.botAvatarUrl ? (
+                <img
+                  src={config.botAvatarUrl}
+                  alt={config.botName || "Bot Avatar"}
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    objectFit: "cover",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                    border: "1px solid rgba(0, 0, 0, 0.06)",
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <BotMascotSvg />
+              )}
 
               <div>
                 <h3

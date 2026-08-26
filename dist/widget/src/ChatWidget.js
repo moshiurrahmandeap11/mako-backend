@@ -646,7 +646,15 @@ function ChatWidget({ api }) {
                             userSelect: "none",
                             borderBottom: "1.5px solid #f1f5f9",
                             boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
-                        }, title: "Click and drag to move chat window", children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: "12px" }, children: [(0, jsx_runtime_1.jsx)(BotMascotSvg, {}), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: {
+                        }, title: "Click and drag to move chat window", children: [(0, jsx_runtime_1.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: "12px" }, children: [config.botAvatarUrl ? ((0, jsx_runtime_1.jsx)("img", { src: config.botAvatarUrl, alt: config.botName || "Bot Avatar", style: {
+                                            width: "36px",
+                                            height: "36px",
+                                            borderRadius: "10px",
+                                            objectFit: "cover",
+                                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                                            border: "1px solid rgba(0, 0, 0, 0.06)",
+                                            flexShrink: 0,
+                                        } })) : ((0, jsx_runtime_1.jsx)(BotMascotSvg, {})), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h3", { style: {
                                                     margin: 0,
                                                     fontSize: "15px",
                                                     fontWeight: "700",

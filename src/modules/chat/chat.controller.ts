@@ -48,6 +48,7 @@ export async function getWidgetConfigPublic(req: WidgetAuthRequest, res: Respons
         position: 'bottom-right',
         addToCartEnabled: true,
         suggestionChips: ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
+        botAvatarUrl: null,
       };
     }
 
@@ -62,6 +63,7 @@ export async function getWidgetConfigPublic(req: WidgetAuthRequest, res: Respons
       position: config?.position || 'bottom-right',
       addToCartEnabled: config?.addToCartEnabled !== undefined ? config.addToCartEnabled : true,
       suggestionChips: (config as any)?.suggestionChips || ["Show me your portfolio projects", "What services do you provide?", "How can I contact you?"],
+      botAvatarUrl: (config as any)?.botAvatarUrl || null,
       hideBranding: planTier === 'PRO' || planTier === 'ENTERPRISE',
       eventBridgeEnabled: planTier === 'PRO' || planTier === 'ENTERPRISE',
     });
