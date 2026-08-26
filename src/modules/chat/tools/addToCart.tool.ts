@@ -28,27 +28,48 @@ export async function addToCartTool(
     | undefined;
   const productVariants = (product as any).variants as Array<any> | undefined;
 
+  // Clean and filter valid provided options
+  const cleanSelectedOptions: Record<string, string> = {};
+  if (selectedOptions && typeof selectedOptions === "object") {
+    for (const [k, v] of Object.entries(selectedOptions)) {
+      if (
+        v &&
+        String(v).trim().length > 0 &&
+        !/^(null|undefined|none|default)$/i.test(String(v))
+      ) {
+        cleanSelectedOptions[k] = String(v).trim();
+      }
+    }
+  }
+
+  // Clean and validate variantId
+  let cleanVariantId = variantId ? String(variantId).trim() : undefined;
+  if (
+    cleanVariantId &&
+    /^(size|color|option|quantity|qty|options|null|undefined|none|default|[:,\s]+)$/i.test(
+      cleanVariantId,
+    )
+  ) {
+    cleanVariantId = undefined;
+  }
+
   // Check if options are required and if user has provided all of them
   const hasOptions = Array.isArray(productOptions) && productOptions.length > 0;
-  const numProvidedOpts = selectedOptions
-    ? Object.keys(selectedOptions).length
-    : 0;
+  const numProvidedOpts = Object.keys(cleanSelectedOptions).length;
   const requiresSelection =
-    hasOptions &&
-    (!selectedOptions || numProvidedOpts < productOptions.length) &&
-    !variantId;
+    hasOptions && numProvidedOpts < productOptions.length && !cleanVariantId;
 
   // Resolve specific variant ID if not provided, but matching selected options
-  let resolvedVariantId = variantId;
+  let resolvedVariantId = cleanVariantId;
   if (
     !resolvedVariantId &&
-    selectedOptions &&
+    numProvidedOpts > 0 &&
     Array.isArray(productVariants) &&
     productVariants.length > 0
   ) {
     const matched = productVariants.find((v) => {
       if (!v.options) return false;
-      return Object.entries(selectedOptions).every(
+      return Object.entries(cleanSelectedOptions).every(
         ([k, val]) =>
           String(v.options[k]).toLowerCase() === String(val).toLowerCase(),
       );

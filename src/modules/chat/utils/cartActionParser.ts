@@ -90,23 +90,32 @@ export async function parseCartActionFromReply(
         targetProdId = parts[0].replace(/^productId:\s*/i, "").trim();
 
         if (parts.length > 1) {
-          const secondPart = parts.slice(1).join(", ");
-          const kvMatches = Array.from(
-            secondPart.matchAll(/([a-zA-Z0-9_-]+)\s*:\s*([^,]+)/g),
-          );
-          if (kvMatches.length > 0) {
-            for (const match of kvMatches) {
-              const k = match[1].trim();
-              const v = match[2].trim();
-              targetOptions = { ...(targetOptions || {}), [k]: v };
+          for (let i = 1; i < parts.length; i++) {
+            const part = parts[i].trim();
+            if (!part) continue;
+            const colonIdx = part.indexOf(":");
+            if (colonIdx > 0) {
+              const k = part.slice(0, colonIdx).trim();
+              const v = part.slice(colonIdx + 1).trim();
+              if (
+                v &&
+                v.length > 0 &&
+                !/^(null|undefined|none|default)$/i.test(v)
+              ) {
+                targetOptions = { ...(targetOptions || {}), [k]: v };
+              }
+            } else if (/^(xs|s|m|l|xl|xxl|2xl|3xl|\d{2})$/i.test(part)) {
+              targetOptions = {
+                ...(targetOptions || {}),
+                Size: part.toUpperCase(),
+              };
+            } else if (
+              !/^(size|color|option|options|null|undefined|none|default|qty|quantity)$/i.test(
+                part,
+              )
+            ) {
+              targetVariantId = part;
             }
-          } else if (/^(xs|s|m|l|xl|xxl|2xl|3xl|\d{2})$/i.test(secondPart)) {
-            targetOptions = {
-              ...(targetOptions || {}),
-              Size: secondPart.toUpperCase(),
-            };
-          } else {
-            targetVariantId = secondPart;
           }
         }
       }
@@ -128,41 +137,42 @@ export async function parseCartActionFromReply(
         if (res.cartAction) cartAction = res.cartAction;
         if (res.product) product = res.product;
 
-        // If the reply became empty after stripping tag, provide clean message
-        if (!finalReply || finalReply.length < 3) {
-          const prodTitle = res.product?.title || "Product";
-          const prodUrl = res.product?.productUrl || "#";
-          const hasUnselectedOptions =
-            res.product?.options &&
-            (res.product.options as any[]).length > 0 &&
-            (!targetOptions || Object.keys(targetOptions).length === 0);
+        const prodTitle = res.product?.title || "Product";
+        const prodUrl = res.product?.productUrl || "#";
+        const optNames =
+          (res.product?.options as any[])
+            ?.map((o: any) => o.name)
+            .join(" and ") || "options";
 
-          if (hasUnselectedOptions) {
-            const optNames =
-              (res.product?.options as any[])
-                ?.map((o: any) => o.name)
-                .join(" o ") || "Size";
+        // Deterministic Guardrail: If options are still required, the assistant MUST NOT claim item was added!
+        if (cartAction && cartAction.requiresSelection) {
+          const saysAdded =
+            /\b(added\s*to\s*(your\s*)?cart|cart\s*e\s*add\s*kora|jog\s*kora\s*hoyeche|cart\s*e\s*add\s*kore)\b/i.test(
+              finalReply,
+            );
+          if (saysAdded || !finalReply || finalReply.length < 10) {
             if (isBengaliScript) {
-              finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames}টি পছন্দ?`;
+              finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames} পছন্দ?`;
             } else if (isBanglish) {
-              finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames} ta lagbe?`;
+              finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames} lagbe?`;
             } else {
               finalReply = `Which ${optNames} would you prefer for [${prodTitle}](${prodUrl})?`;
             }
+          }
+        } else if (!finalReply || finalReply.length < 3) {
+          // If options satisfied and finalReply was empty, provide clean confirmation
+          const optNote =
+            targetOptions && Object.keys(targetOptions).length > 0
+              ? ` (${Object.entries(targetOptions)
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(", ")})`
+              : "";
+          if (isBengaliScript) {
+            finalReply = `[${prodTitle}](${prodUrl})${optNote} কার্টে যোগ করা হয়েছে! 🛍️`;
+          } else if (isBanglish) {
+            finalReply = `[${prodTitle}](${prodUrl})${optNote} cart e add kora hoyeche! 🛍️`;
           } else {
-            const optNote =
-              targetOptions && Object.keys(targetOptions).length > 0
-                ? ` (${Object.entries(targetOptions)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(", ")})`
-                : "";
-            if (isBengaliScript) {
-              finalReply = `[${prodTitle}](${prodUrl})${optNote} কার্টে যোগ করা হয়েছে! 🛍️`;
-            } else if (isBanglish) {
-              finalReply = `[${prodTitle}](${prodUrl})${optNote} cart e add kora hoyeche! 🛍️`;
-            } else {
-              finalReply = `Added [${prodTitle}](${prodUrl})${optNote} to your cart! 🛍️`;
-            }
+            finalReply = `Added [${prodTitle}](${prodUrl})${optNote} to your cart! 🛍️`;
           }
         }
       }
