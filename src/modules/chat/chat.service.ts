@@ -296,35 +296,9 @@ export async function processChatMessage(
           .map((k) => `[Source: ${k.url}]\n${k.content}`)
           .join("\n\n") +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
-    } else if (
-      userMessage &&
-      userMessage.trim().length > 3 &&
-      !isSimpleGreeting(userMessage)
-    ) {
-      thoughts.push(`Searched real-time web information`);
-      const webSearchTimeout = new Promise<any[]>((resolve) =>
-        setTimeout(() => resolve([]), 1500),
-      );
-      const webResults = await Promise.race([
-        webSearchTool(userMessage, 3),
-        webSearchTimeout,
-      ]);
-      if (webResults.length > 0) {
-        thoughts.push(`Incorporated latest web insights`);
-        ragContext +=
-          `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
-          webResults
-            .map((w) => `[Source: ${w.title}](${w.url})\n${w.snippet}`)
-            .join("\n\n") +
-          `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
-      }
     }
 
-    if (
-      retrievedProducts.length === 0 &&
-      retrievedKnowledgeRes.length === 0 &&
-      !ragContext.includes("Live Web Search Results")
-    ) {
+    if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
       ragContext = `\n\n### Website Context:
 Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ""}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
