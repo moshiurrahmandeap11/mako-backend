@@ -388,9 +388,6 @@ async function executeDomSimulationAddToCart(
       const btn = document.querySelector(sel) as HTMLElement;
       if (btn && btn.offsetParent !== null && typeof btn.click === "function") {
         btn.focus();
-        btn.dispatchEvent(
-          new MouseEvent("click", { bubbles: true, cancelable: true }),
-        );
         btn.click();
         return true;
       }
@@ -411,9 +408,6 @@ async function executeDomSimulationAddToCart(
         (b as HTMLElement).offsetParent !== null
       ) {
         (b as HTMLElement).focus();
-        (b as HTMLElement).dispatchEvent(
-          new MouseEvent("click", { bubbles: true, cancelable: true }),
-        );
         (b as HTMLElement).click();
         return true;
       }

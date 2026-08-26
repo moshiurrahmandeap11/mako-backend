@@ -201,6 +201,46 @@ const MessageSquareSvg = () => (
   </svg>
 );
 
+function parseSafeOptions(
+  rawOptions: any,
+): Array<{ name: string; values: string[] }> {
+  if (!rawOptions) return [];
+  let parsed = rawOptions;
+  if (typeof rawOptions === "string") {
+    try {
+      parsed = JSON.parse(rawOptions);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) {
+    if (typeof parsed === "object" && parsed !== null) {
+      return Object.entries(parsed).map(([key, val]) => ({
+        name: String(key),
+        values: Array.isArray(val) ? val.map(String) : [String(val)],
+      }));
+    }
+    return [];
+  }
+  return parsed
+    .filter((opt) => Boolean(opt && typeof opt === "object"))
+    .map((opt) => {
+      let vals: string[] = [];
+      if (Array.isArray(opt.values)) {
+        vals = opt.values.map(String);
+      } else if (opt.value) {
+        vals = [String(opt.value)];
+      } else if (typeof opt === "string") {
+        return { name: "Option", values: [opt] };
+      }
+      return {
+        name: String(opt.name || "Option"),
+        values: vals.filter(Boolean),
+      };
+    })
+    .filter((opt) => opt.values.length > 0);
+}
+
 function renderMarkdownText(text: string) {
   if (!text) return null;
 
@@ -875,15 +915,16 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           variants: res.cartAction.variants,
         };
 
-        const allOptions = res.cartAction.options || targetProd.options || [];
-        const hasOptions = Array.isArray(allOptions) && allOptions.length > 0;
+        const rawOptions = res.cartAction.options || targetProd.options || [];
+        const safeOptions = parseSafeOptions(rawOptions);
+        const hasOptions = safeOptions.length > 0;
         const selectedOptsKeys =
           res.cartAction.selectedOptions &&
           typeof res.cartAction.selectedOptions === "object"
             ? Object.keys(res.cartAction.selectedOptions)
             : [];
         const hasAllSelectedOpts =
-          hasOptions && selectedOptsKeys.length >= allOptions.length;
+          hasOptions && selectedOptsKeys.length >= safeOptions.length;
 
         if (
           res.cartAction.requiresSelection ||
@@ -892,8 +933,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           const defaultOpts: Record<string, string> = {
             ...(res.cartAction.selectedOptions || {}),
           };
-          allOptions.forEach((opt: any) => {
-            if (!defaultOpts[opt.name] && opt.values && opt.values.length > 0) {
+          safeOptions.forEach((opt) => {
+            if (!defaultOpts[opt.name] && opt.values.length > 0) {
               defaultOpts[opt.name] = opt.values[0];
             }
           });
@@ -901,7 +942,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
           setModalQuantity(res.cartAction.quantity || 1);
           setModalProduct({
             ...targetProd,
-            options: allOptions,
+            options: safeOptions,
             productUrl: res.cartAction.productUrl || targetProd.productUrl,
           });
         } else {
@@ -1882,7 +1923,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   )}
                 </div>
 
-                {(modalProduct.options || []).map((opt) => (
+                {parseSafeOptions(modalProduct.options).map((opt) => (
                   <div key={opt.name} style={{ marginBottom: "12px" }}>
                     <label
                       style={{
@@ -1896,7 +1937,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     >
                       {opt.name}:{" "}
                       <span style={{ color: "#0f172a", textTransform: "none" }}>
-                        {selectedOptionsState[opt.name]}
+                        {selectedOptionsState[opt.name] || opt.values[0]}
                       </span>
                     </label>
                     <div
@@ -2012,7 +2053,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    const selectedVariant = modalProduct.variants?.find((v) => {
+                    const variantsList = Array.isArray(modalProduct.variants)
+                      ? modalProduct.variants
+                      : [];
+                    const selectedVariant = variantsList.find((v: any) => {
                       if (!v.options) return false;
                       return Object.entries(selectedOptionsState).every(
                         ([k, val]) =>
