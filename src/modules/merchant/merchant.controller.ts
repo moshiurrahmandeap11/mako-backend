@@ -101,12 +101,10 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     if (!merchant.passwordHash) {
-      res
-        .status(401)
-        .json({
-          error:
-            "This account is set up with social authentication. Please log in with Google or GitHub.",
-        });
+      res.status(401).json({
+        error:
+          "This account is set up with social authentication. Please log in with Google or GitHub.",
+      });
       return;
     }
 
@@ -173,12 +171,7 @@ export async function me(
       return;
     }
 
-    const adminEmail = (env.ADMIN_EMAIL || "admin@ahsanul.dev")
-      .trim()
-      .toLowerCase();
-    const isAdmin =
-      merchant.role === "ADMIN" ||
-      merchant.email.trim().toLowerCase() === adminEmail;
+    const isAdmin = merchant.role === "ADMIN";
 
     const domainStatuses = await Promise.all(
       (merchant.allowedDomains || []).map(async (domain) => {

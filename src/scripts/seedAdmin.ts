@@ -1,31 +1,36 @@
-import { auth } from '../config/auth';
-import { prisma } from '../config/db';
-import { logger } from '../utils/logger';
-import { env } from '../config/env';
+import { auth } from "../config/auth";
+import { prisma } from "../config/db";
+import { logger } from "../utils/logger";
 
-export async function seedAdmin() {
-  const adminEmail = (env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim();
-  const adminPassword = 'labtobit@#01';
-  const adminName = 'Labto Admin';
+export async function seedAdmin(targetEmail?: string, password?: string) {
+  const adminEmail = (
+    targetEmail ||
+    process.env.ADMIN_EMAIL ||
+    "labtobit@gmail.com"
+  ).trim();
+  const adminName = "Labto Super Admin";
 
   try {
-    logger.info('Checking for existing Admin user...');
+    logger.info(`Promoting user ${adminEmail} to ADMIN role...`);
     let existingUser = await prisma.user.findUnique({
       where: { email: adminEmail },
     });
 
-    if (!existingUser) {
-      logger.info('Creating Admin account via Better Auth...');
+    if (!existingUser && password) {
+      logger.info("Creating Admin account via Better Auth...");
       try {
         await auth.api.signUpEmail({
           body: {
             email: adminEmail,
-            password: adminPassword,
+            password: password,
             name: adminName,
           },
         });
       } catch (err: any) {
-        logger.warn('Sign up error (user might already exist partially):', err?.message);
+        logger.warn(
+          "Sign up error (user might already exist partially):",
+          err?.message,
+        );
       }
     }
 
@@ -34,14 +39,16 @@ export async function seedAdmin() {
       where: { email: adminEmail },
       data: {
         emailVerified: true,
-        role: 'ADMIN',
-        planTier: 'ENTERPRISE',
+        role: "ADMIN",
+        planTier: "ENTERPRISE",
       },
     });
 
-    logger.info(`Admin user ready: ${updated.email} | Role: ${updated.role} | Verified: ${updated.emailVerified}`);
+    logger.info(
+      `Admin user ready: ${updated.email} | Role: ${updated.role} | Verified: ${updated.emailVerified}`,
+    );
   } catch (error) {
-    logger.error('Error seeding Admin user:', error);
+    logger.error("Error seeding Admin user:", error);
   } finally {
     await prisma.$disconnect();
   }
@@ -49,7 +56,7 @@ export async function seedAdmin() {
 
 if (require.main === module) {
   seedAdmin().then(() => {
-    logger.info('Seed process finished.');
+    logger.info("Seed process finished.");
     process.exit(0);
   });
 }

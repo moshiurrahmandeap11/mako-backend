@@ -1,8 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
-import { fromNodeHeaders } from 'better-auth/node';
-import { auth } from '../config/auth';
-import { prisma } from '../config/db';
-import { logger } from '../utils/logger';
+import { fromNodeHeaders } from "better-auth/node";
+import { NextFunction, Request, Response } from "express";
+import { auth } from "../config/auth";
+import { prisma } from "../config/db";
+import { logger } from "../utils/logger";
 
 export interface DashboardAuthRequest extends Request {
   merchant?: {
@@ -14,7 +14,10 @@ export interface DashboardAuthRequest extends Request {
   };
 }
 
-const userMetaCache = new Map<string, { tier: string; role: string; expires: number }>();
+const userMetaCache = new Map<
+  string,
+  { tier: string; role: string; expires: number }
+>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function clearPlanTierCache(userId?: string) {
@@ -28,7 +31,7 @@ export function clearPlanTierCache(userId?: string) {
 export async function authenticateDashboard(
   req: DashboardAuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const session = await auth.api.getSession({
@@ -36,13 +39,13 @@ export async function authenticateDashboard(
     });
 
     if (!session) {
-      res.status(401).json({ error: 'Unauthorized. No active session found.' });
+      res.status(401).json({ error: "Unauthorized. No active session found." });
       return;
     }
 
     const userId = session.user.id;
-    let planTier = 'FREE';
-    let role = 'MERCHANT';
+    let planTier = "FREE";
+    let role = "MERCHANT";
     const now = Date.now();
     const cached = userMetaCache.get(userId);
 
@@ -54,13 +57,17 @@ export async function authenticateDashboard(
         where: { id: userId },
         select: { planTier: true, role: true, email: true },
       });
-      planTier = dbUser?.planTier || 'FREE';
-      role = dbUser?.role || (dbUser?.email === 'admin@ahsanul.dev' ? 'ADMIN' : 'MERCHANT');
-      
+      planTier = dbUser?.planTier || "FREE";
+      role = dbUser?.role || "MERCHANT";
+
       // Cleanup to prevent memory leaks over time
       if (userMetaCache.size > 1000) userMetaCache.clear();
-      
-      userMetaCache.set(userId, { tier: planTier, role, expires: now + CACHE_TTL_MS });
+
+      userMetaCache.set(userId, {
+        tier: planTier,
+        role,
+        expires: now + CACHE_TTL_MS,
+      });
     }
 
     req.merchant = {
@@ -73,26 +80,24 @@ export async function authenticateDashboard(
 
     next();
   } catch (error) {
-    logger.warn('Dashboard Auth Failed:', error);
-    res.status(401).json({ error: 'Unauthorized. Invalid or expired session.' });
+    logger.warn("Dashboard Auth Failed:", error);
+    res
+      .status(401)
+      .json({ error: "Unauthorized. Invalid or expired session." });
   }
 }
-
-import { env } from '../config/env';
 
 export function requireAdmin(
   req: DashboardAuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
-  const adminEmail = (env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
-  const userEmail = req.merchant?.email?.trim().toLowerCase();
   const isMerchantAdmin = Boolean(
-    req.merchant && (req.merchant.role === 'ADMIN' || (userEmail && userEmail === adminEmail))
+    req.merchant && req.merchant.role === "ADMIN",
   );
 
   if (!isMerchantAdmin) {
-    res.status(403).json({ error: 'Forbidden. Admin access required.' });
+    res.status(403).json({ error: "Forbidden. Admin access required." });
     return;
   }
   next();
