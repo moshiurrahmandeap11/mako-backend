@@ -28,10 +28,10 @@ const BotMascotSvg = () => (
     fill="none"
     style={{ flexShrink: 0 }}
   >
-    <rect width="32" height="32" rx="10" fill="#E8F8F0" />
+    <rect width="32" height="32" rx="8" fill="#E8F8F0" />
     <path d="M16 5V8" stroke="#1DBF73" strokeWidth="2" strokeLinecap="round" />
     <circle cx="16" cy="4" r="1.5" fill="#1DBF73" />
-    <rect x="7" y="8" width="18" height="15" rx="5" fill="#0f172a" />
+    <rect x="7" y="8" width="18" height="15" rx="4" fill="#0f172a" />
     <circle cx="12" cy="15" r="2" fill="#1DBF73" />
     <circle cx="20" cy="15" r="2" fill="#1DBF73" />
     <path
@@ -69,8 +69,8 @@ const BrainSvg = () => (
 
 const CloseSvg = () => (
   <svg
-    width="18"
-    height="18"
+    width="20"
+    height="20"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -1114,7 +1114,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             }}
             style={{
               backgroundColor: config.headerBgColor || "#ffffff",
-              padding: "18px 20px",
+              padding: "16px 12px 16px 18px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -1171,7 +1171,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             </div>
 
             {/* Right: Actions (Refresh & Close SVGs) */}
-            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
               <button
                 onClick={handleResetSession}
                 title="Restart chat"
