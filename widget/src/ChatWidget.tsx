@@ -69,8 +69,8 @@ const BrainSvg = () => (
 
 const CloseSvg = () => (
   <svg
-    width="16"
-    height="16"
+    width="18"
+    height="18"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -85,8 +85,8 @@ const CloseSvg = () => (
 
 const RefreshSvg = () => (
   <svg
-    width="15"
-    height="15"
+    width="18"
+    height="18"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -1121,7 +1121,6 @@ export function ChatWidget({ api }: ChatWidgetProps) {
               cursor: isMobile ? "default" : isDragging ? "grabbing" : "grab",
               userSelect: "none",
               borderBottom: "1.5px solid #f1f5f9",
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
             }}
             title="Click and drag to move chat window"
           >
@@ -1134,10 +1133,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   style={{
                     width: "36px",
                     height: "36px",
-                    borderRadius: "10px",
+                    borderRadius: "8px",
                     objectFit: "cover",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                    border: "1px solid rgba(0, 0, 0, 0.06)",
+                    border: "1px solid rgba(0, 0, 0, 0.08)",
                     flexShrink: 0,
                   }}
                 />
@@ -1173,22 +1171,33 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             </div>
 
             {/* Right: Actions (Refresh & Close SVGs) */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <button
                 onClick={handleResetSession}
                 title="Restart chat"
                 style={{
-                  background: "#f8fafc",
-                  border: "1.5px solid #e2e8f0",
-                  borderRadius: "50%",
-                  width: "34px",
-                  height: "34px",
+                  background: "transparent",
+                  border: "none",
+                  borderRadius: "6px",
+                  width: "30px",
+                  height: "30px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   color: "#64748b",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
+                  padding: 0,
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "#0f172a";
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "#f1f5f9";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "#64748b";
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "transparent";
                 }}
               >
                 <RefreshSvg />
@@ -1198,17 +1207,28 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 onClick={handleClose}
                 title="Close chat"
                 style={{
-                  background: "#f8fafc",
-                  border: "1.5px solid #e2e8f0",
-                  borderRadius: "50%",
-                  width: "34px",
-                  height: "34px",
+                  background: "transparent",
+                  border: "none",
+                  borderRadius: "6px",
+                  width: "30px",
+                  height: "30px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#0f172a",
+                  color: "#64748b",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
+                  padding: 0,
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "#0f172a";
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "#f1f5f9";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "#64748b";
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "transparent";
                 }}
               >
                 <CloseSvg />
@@ -1430,10 +1450,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         maxWidth: "85%",
                         wordBreak: "break-word",
                         whiteSpace: "pre-wrap",
-                        boxShadow:
-                          msg.sender === "user"
-                            ? "0 4px 14px rgba(0,0,0,0.12)"
-                            : "none",
+                        boxShadow: "none",
                         fontSize: "14px",
                         lineHeight: "1.55",
                         fontWeight: "400",
@@ -1535,8 +1552,8 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         onClick={() => handleSend(chip.query)}
                         style={{
                           backgroundColor: "#ffffff",
-                          color: "#0f172a",
-                          border: "1.5px solid rgba(29, 191, 115, 0.3)",
+                          color: "#334155",
+                          border: "1px solid #e2e8f0",
                           borderRadius: "8px",
                           padding: "7px 13px",
                           fontSize: "12.5px",
@@ -1545,31 +1562,23 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "6px",
-                          transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+                          transition: "all 0.15s ease",
+                          boxShadow: "none",
                           userSelect: "none",
                         }}
                         onMouseEnter={(e) => {
                           (
                             e.currentTarget as HTMLElement
-                          ).style.backgroundColor = "#E8F8F0";
+                          ).style.backgroundColor = "#f8fafc";
                           (e.currentTarget as HTMLElement).style.borderColor =
-                            "#1DBF73";
-                          (e.currentTarget as HTMLElement).style.transform =
-                            "translateY(-1px)";
-                          (e.currentTarget as HTMLElement).style.boxShadow =
-                            "0 4px 12px rgba(29, 191, 115, 0.18)";
+                            "#cbd5e1";
                         }}
                         onMouseLeave={(e) => {
                           (
                             e.currentTarget as HTMLElement
                           ).style.backgroundColor = "#ffffff";
                           (e.currentTarget as HTMLElement).style.borderColor =
-                            "rgba(29, 191, 115, 0.3)";
-                          (e.currentTarget as HTMLElement).style.transform =
-                            "none";
-                          (e.currentTarget as HTMLElement).style.boxShadow =
-                            "0 2px 4px rgba(29, 191, 115, 0.06)";
+                            "#e2e8f0";
                         }}
                       >
                         <MessageSquareSvg />
@@ -1608,7 +1617,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                 border: "1.5px solid #cbd5e1",
                 borderRadius: "8px",
                 padding: "4px 6px 4px 14px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                boxShadow: "none",
               }}
             >
               <input
@@ -1652,9 +1661,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     : "#cbd5e1",
                   color: "#ffffff",
                   border: "none",
-                  borderRadius: "50%",
-                  width: "36px",
-                  height: "36px",
+                  borderRadius: "8px",
+                  width: "34px",
+                  height: "34px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
