@@ -510,7 +510,7 @@ function ChatWidget({ api }) {
                 }
                 else {
                     (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, targetProd.productUrl).then((result) => {
-                        if (result.message && !result.platform?.includes("cross_page")) {
+                        if (result.message && result.platform !== "dom_simulation") {
                             showToast(result.message);
                         }
                     });
@@ -1166,8 +1166,24 @@ function ChatWidget({ api }) {
                                             return Object.entries(selectedOptionsState).every(([k, val]) => String(v.options?.[k]).toLowerCase() ===
                                                 String(val).toLowerCase());
                                         });
+                                        const optSummary = Object.entries(selectedOptionsState)
+                                            .map(([k, v]) => `${k}: ${v}`)
+                                            .join(", ");
+                                        const confirmMsg = {
+                                            id: `bot_confirm_${Date.now()}`,
+                                            sender: "bot",
+                                            text: optSummary
+                                                ? `Added **[${modalProduct.title}](${modalProduct.productUrl || `/products/${modalProduct.id}`})** (${optSummary}, Quantity: ${modalQuantity}) to your cart! 🛍️`
+                                                : `Added **[${modalProduct.title}](${modalProduct.productUrl || `/products/${modalProduct.id}`})** (Quantity: ${modalQuantity}) to your cart! 🛍️`,
+                                            products: [modalProduct],
+                                            time: "Just now",
+                                        };
+                                        setMessages((prev) => [...prev, confirmMsg]);
+                                        setTimeout(() => scrollToBottom(true), 50);
                                         (0, cartBridge_1.requestAddToCart)(modalProduct.externalId || modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState, modalProduct.productUrl).then((res) => {
-                                            showToast(res.message || `Added '${modalProduct.title}' to cart!`);
+                                            if (res.platform !== "dom_simulation") {
+                                                showToast(res.message || `Added '${modalProduct.title}' to cart!`);
+                                            }
                                         });
                                         setModalProduct(null);
                                     }, style: {

@@ -422,7 +422,7 @@ async function requestAddToCart(productId, quantity = 1, variantId, selectedOpti
             return wooResult;
         }
     }
-    // 3. Check & Execute Smart DOM Simulation on Current Page
+    // 3. Check & Execute Smart DOM Simulation on Current Page (if user is on the product page)
     const domSuccess = await executeDomSimulationAddToCart(selectedOptions);
     if (domSuccess) {
         executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
@@ -432,35 +432,11 @@ async function requestAddToCart(productId, quantity = 1, variantId, selectedOpti
             message: "Item added to cart!",
         };
     }
-    // 4. Cross-Page Navigation for Custom Stores (if user is on homepage, /cart, /collection, or different product page)
-    if (productUrl && productUrl !== "#" && typeof window !== "undefined") {
-        try {
-            const targetUrl = new URL(productUrl, window.location.origin);
-            if (targetUrl.pathname !== window.location.pathname) {
-                sessionStorage.setItem("labto_auto_add", JSON.stringify({
-                    productId,
-                    variantId,
-                    options: selectedOptions,
-                    quantity: quantity || 1,
-                    timestamp: Date.now(),
-                }));
-                window.location.href = targetUrl.href;
-                return {
-                    success: true,
-                    platform: "dom_simulation",
-                    message: "Opening product page to add item...",
-                };
-            }
-        }
-        catch (err) {
-            console.warn("[Labto AI Cart] Cross page navigation error:", err);
-        }
-    }
-    // 5. Fallback: Global Event Dispatch & LocalStorage update
+    // 4. Background Custom / Headless / React Store Event & LocalStorage Addition (No Page Redirection)
     executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
     return {
         success: true,
         platform: "custom_event",
-        message: "Added to cart!",
+        message: "Item added to cart!",
     };
 }

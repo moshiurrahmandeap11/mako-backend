@@ -844,7 +844,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             res.cartAction.selectedOptions,
             targetProd.productUrl,
           ).then((result) => {
-            if (result.message && !result.platform?.includes("cross_page")) {
+            if (result.message && result.platform !== "dom_simulation") {
               showToast(result.message);
             }
           });
@@ -1928,6 +1928,23 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                           String(val).toLowerCase(),
                       );
                     });
+
+                    const optSummary = Object.entries(selectedOptionsState)
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(", ");
+
+                    const confirmMsg: MessageItem = {
+                      id: `bot_confirm_${Date.now()}`,
+                      sender: "bot",
+                      text: optSummary
+                        ? `Added **[${modalProduct.title}](${modalProduct.productUrl || `/products/${modalProduct.id}`})** (${optSummary}, Quantity: ${modalQuantity}) to your cart! 🛍️`
+                        : `Added **[${modalProduct.title}](${modalProduct.productUrl || `/products/${modalProduct.id}`})** (Quantity: ${modalQuantity}) to your cart! 🛍️`,
+                      products: [modalProduct],
+                      time: "Just now",
+                    };
+                    setMessages((prev) => [...prev, confirmMsg]);
+                    setTimeout(() => scrollToBottom(true), 50);
+
                     requestAddToCart(
                       (modalProduct as any).externalId || modalProduct.id,
                       modalQuantity,
@@ -1935,9 +1952,12 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       selectedOptionsState,
                       modalProduct.productUrl,
                     ).then((res) => {
-                      showToast(
-                        res.message || `Added '${modalProduct.title}' to cart!`,
-                      );
+                      if (res.platform !== "dom_simulation") {
+                        showToast(
+                          res.message ||
+                            `Added '${modalProduct.title}' to cart!`,
+                        );
+                      }
                     });
                     setModalProduct(null);
                   }}
