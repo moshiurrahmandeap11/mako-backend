@@ -183,26 +183,28 @@ export async function parseCartActionFromReply(
 
 /**
  * Fail-safe Smart Action Extractor:
- * If no cartAction was parsed from tags, but the AI confirmed adding a product in finalReply.
+ * Dynamically resolves product entity from catalog, checks option requirements,
+ * and generates appropriate cartAction triggers for popups or instant additions.
  */
 export async function smartExtractCartAction(
   finalReply: string,
   userMessage: string,
   merchantId: string,
 ): Promise<{ cartAction: any | null; product?: any }> {
-  const isQuestionOrOffer =
-    /\b(kore\s*dite\s*parbo|add\s*korte\s*chan|add\s*korbo\s*kina|add\s*kore\s*dibo|lagbe|pochondo|can\s*add\s*it|would\s*you\s*like)\b/i.test(
-      finalReply,
-    );
-  const isConfirmingAdd =
-    !isQuestionOrOffer &&
-    /\b(cart\s*e\s*add\s*kora\s*hoyeche|cart\s*e\s*add\s*kore\s*diyechi|cart\s*e\s*jog\s*kora\s*hoyeche|added\s*to\s*(your\s*)?cart|has\s*been\s*added)\b/i.test(
-      finalReply,
-    );
-
-  if (!isConfirmingAdd) return { cartAction: null };
-
   try {
+    const combinedText = `${userMessage} ${finalReply}`;
+    
+    // Check for any purchase, add to cart, or option selection intent
+    const hasCartIntent =
+      /\b(add\s*to\s*cart|add|buy|purchase|order|nite\s*chai|cart\s*e|kore\s*dao|kore\s*den|kore\s*dibo|kore\s*fellam|kora\s*hoyeche|added\s*to\s*cart|select\s*korte\s*hobe|select\s*koren|select\s*korle)\b/i.test(
+        combinedText,
+      );
+
+    if (!hasCartIntent) {
+      return { cartAction: null };
+    }
+
+    // 1. Try to find product title from Markdown link [Title](url)
     const linkMatch = finalReply.match(/\[([^\]]+)\]\(([^)]+)\)/);
     let targetProdId = "";
     if (linkMatch && linkMatch[2]) {
@@ -213,6 +215,7 @@ export async function smartExtractCartAction(
     }
 
     let matchedProd: any = null;
+
     if (targetProdId) {
       matchedProd = await prisma.product.findFirst({
         where: {
@@ -224,13 +227,55 @@ export async function smartExtractCartAction(
           ],
         },
       });
-    } else if (linkMatch && linkMatch[1]) {
-      matchedProd = await prisma.product.findFirst({
-        where: {
-          merchantId,
-          title: { contains: linkMatch[1].trim(), mode: "insensitive" },
+    }
+
+    // 2. Try to find product from bold markers **Title** or *Title*
+    if (!matchedProd) {
+      const boldMatches = Array.from(
+        finalReply.matchAll(/\*\*([^*]+)\*\*|\*([^*]+)\*/g),
+      );
+      for (const bMatch of boldMatches) {
+        const candidateTitle = (bMatch[1] || bMatch[2] || "").trim();
+        if (candidateTitle.length > 2) {
+          matchedProd = await prisma.product.findFirst({
+            where: {
+              merchantId,
+              title: { contains: candidateTitle, mode: "insensitive" },
+            },
+          });
+          if (matchedProd) break;
+        }
+      }
+    }
+
+    // 3. Fallback: Search all merchant products to see if any title appears in finalReply or userMessage
+    if (!matchedProd) {
+      const merchantProducts = await prisma.product.findMany({
+        where: { merchantId },
+        take: 30,
+        select: {
+          id: true,
+          externalId: true,
+          title: true,
+          price: true,
+          currency: true,
+          imageUrl: true,
+          productUrl: true,
+          options: true,
+          variants: true,
         },
       });
+
+      for (const prod of merchantProducts) {
+        const prodTitleLower = prod.title.toLowerCase();
+        if (
+          finalReply.toLowerCase().includes(prodTitleLower) ||
+          userMessage.toLowerCase().includes(prodTitleLower)
+        ) {
+          matchedProd = prod;
+          break;
+        }
+      }
     }
 
     if (matchedProd) {
@@ -241,8 +286,8 @@ export async function smartExtractCartAction(
         for (const opt of matchedProd.options as any[]) {
           const optName = opt.name;
           for (const val of opt.values || []) {
-            const reg = new RegExp(`\\b${val}\\b`, "i");
-            if (reg.test(finalReply) || reg.test(userMessage)) {
+            const reg = new RegExp(`\\b${val.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
+            if (reg.test(userMessage) || reg.test(finalReply)) {
               targetOptions = { ...(targetOptions || {}), [optName]: val };
             }
           }
@@ -256,6 +301,7 @@ export async function smartExtractCartAction(
         undefined,
         targetOptions,
       );
+
       return { cartAction: res.cartAction || null, product: res.product };
     }
   } catch (err) {

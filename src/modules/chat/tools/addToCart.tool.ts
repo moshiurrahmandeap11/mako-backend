@@ -23,9 +23,16 @@ export async function addToCartTool(
     return { success: false, message: 'Product not found.' };
   }
 
+  const productOptions = (product as any).options as Array<{ name: string; values: string[] }> | undefined;
+  const productVariants = (product as any).variants as Array<any> | undefined;
+
+  // Check if options are required and if user has provided all of them
+  const hasOptions = Array.isArray(productOptions) && productOptions.length > 0;
+  const numProvidedOpts = selectedOptions ? Object.keys(selectedOptions).length : 0;
+  const requiresSelection = hasOptions && (!selectedOptions || numProvidedOpts < productOptions.length) && !variantId;
+
   // Resolve specific variant ID if not provided, but matching selected options
   let resolvedVariantId = variantId;
-  const productVariants = (product as any).variants as Array<any> | undefined;
   if (!resolvedVariantId && selectedOptions && Array.isArray(productVariants) && productVariants.length > 0) {
     const matched = productVariants.find((v) => {
       if (!v.options) return false;
@@ -41,22 +48,28 @@ export async function addToCartTool(
     message: `Added ${quantity} x '${product.title}' to cart!`,
     cartAction: {
       productId: product.externalId || product.id,
+      title: product.title,
+      price: Number(product.price),
+      currency: product.currency || 'USD',
+      imageUrl: product.imageUrl,
+      productUrl: product.productUrl,
       variantId: resolvedVariantId,
       quantity,
-      selectedOptions,
-      options: (product as any).options || undefined,
-      variants: (product as any).variants || undefined,
+      selectedOptions: selectedOptions || undefined,
+      options: productOptions || undefined,
+      variants: productVariants || undefined,
+      requiresSelection,
     },
     product: {
       id: product.id,
       externalId: product.externalId,
       title: product.title,
       price: Number(product.price),
-      currency: product.currency,
+      currency: product.currency || 'USD',
       imageUrl: product.imageUrl,
       productUrl: product.productUrl,
-      options: (product as any).options || undefined,
-      variants: (product as any).variants || undefined,
+      options: productOptions || undefined,
+      variants: productVariants || undefined,
     },
   };
 }

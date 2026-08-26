@@ -864,10 +864,12 @@ export function ChatWidget({ api }: ChatWidgetProps) {
             p.productUrl?.includes(actionProdId),
         ) || {
           id: actionProdId,
-          title: "Product",
-          price: 0,
-          currency: "USD",
-          productUrl: "#",
+          externalId: res.cartAction.productId,
+          title: res.cartAction.title || "Product",
+          price: res.cartAction.price || 0,
+          currency: res.cartAction.currency || "USD",
+          productUrl: res.cartAction.productUrl || "#",
+          imageUrl: res.cartAction.imageUrl,
           inStock: true,
           options: res.cartAction.options,
           variants: res.cartAction.variants,
@@ -875,28 +877,40 @@ export function ChatWidget({ api }: ChatWidgetProps) {
 
         const allOptions = res.cartAction.options || targetProd.options || [];
         const hasOptions = Array.isArray(allOptions) && allOptions.length > 0;
-        const hasSelectedOpts =
+        const selectedOptsKeys =
           res.cartAction.selectedOptions &&
-          typeof res.cartAction.selectedOptions === "object" &&
-          Object.keys(res.cartAction.selectedOptions).length > 0;
+          typeof res.cartAction.selectedOptions === "object"
+            ? Object.keys(res.cartAction.selectedOptions)
+            : [];
+        const hasAllSelectedOpts =
+          hasOptions && selectedOptsKeys.length >= allOptions.length;
 
-        if (hasOptions && !hasSelectedOpts && !res.cartAction.variantId) {
-          const defaultOpts: Record<string, string> = {};
+        if (
+          res.cartAction.requiresSelection ||
+          (hasOptions && !hasAllSelectedOpts && !res.cartAction.variantId)
+        ) {
+          const defaultOpts: Record<string, string> = {
+            ...(res.cartAction.selectedOptions || {}),
+          };
           allOptions.forEach((opt: any) => {
-            if (opt.values && opt.values.length > 0) {
+            if (!defaultOpts[opt.name] && opt.values && opt.values.length > 0) {
               defaultOpts[opt.name] = opt.values[0];
             }
           });
           setSelectedOptionsState(defaultOpts);
           setModalQuantity(res.cartAction.quantity || 1);
-          setModalProduct({ ...targetProd, options: allOptions });
+          setModalProduct({
+            ...targetProd,
+            options: allOptions,
+            productUrl: res.cartAction.productUrl || targetProd.productUrl,
+          });
         } else {
           requestAddToCart(
             res.cartAction.productId,
             res.cartAction.quantity || 1,
             res.cartAction.variantId,
             res.cartAction.selectedOptions,
-            targetProd.productUrl,
+            res.cartAction.productUrl || targetProd.productUrl,
           ).then((result) => {
             if (result.message && result.platform !== "dom_simulation") {
               showToast(result.message);
