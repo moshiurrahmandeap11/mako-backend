@@ -465,12 +465,6 @@ export function initAutoAddWatcher(): void {
       if (clicked) {
         clearInterval(interval);
         isAutoAdding = false;
-        executeEventAndLocalStorageAddToCart(
-          data.productId,
-          data.quantity || 1,
-          data.variantId,
-          data.options,
-        );
       }
     }, 300);
   } catch {
@@ -607,12 +601,6 @@ export async function requestAddToCart(
     quantity,
   );
   if (domSuccess) {
-    executeEventAndLocalStorageAddToCart(
-      productId,
-      quantity,
-      variantId,
-      selectedOptions,
-    );
     return {
       success: true,
       platform: "dom_simulation",
