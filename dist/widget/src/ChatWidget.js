@@ -427,17 +427,35 @@ function ChatWidget({ api }) {
             time: "Just now",
         };
         const botMsgId = `bot_${Date.now()}`;
+        const startTime = Date.now();
+        let calculatedThinkingSeconds = 1;
         const botMsg = {
             id: botMsgId,
             sender: "bot",
             text: "",
             thoughts: [],
+            thinkingSeconds: 1,
             time: "Just now",
             isStreaming: true,
         };
         setMessages((prev) => [...prev, userMsg, botMsg]);
         setInputValue("");
         setIsLoading(true);
+        let tokenBuffer = "";
+        let streamTimer = null;
+        const startBufferDrain = () => {
+            if (!streamTimer) {
+                streamTimer = setInterval(() => {
+                    if (tokenBuffer.length > 0) {
+                        const step = Math.max(1, Math.min(tokenBuffer.length, Math.ceil(tokenBuffer.length / 2)));
+                        const chunk = tokenBuffer.slice(0, step);
+                        tokenBuffer = tokenBuffer.slice(step);
+                        setMessages((prev) => prev.map((m) => m.id === botMsgId ? { ...m, text: (m.text || "") + chunk } : m));
+                        scrollToBottom(false);
+                    }
+                }, 16);
+            }
+        };
         const onThought = (thought) => {
             setMessages((prev) => prev.map((m) => m.id === botMsgId
                 ? { ...m, thoughts: [...(m.thoughts || []), thought] }
@@ -445,12 +463,21 @@ function ChatWidget({ api }) {
             scrollToBottom(true);
         };
         const onToken = (token) => {
-            setIsLoading(false);
-            setMessages((prev) => prev.map((m) => m.id === botMsgId ? { ...m, text: (m.text || "") + token } : m));
-            scrollToBottom(false);
+            if (isLoading) {
+                setIsLoading(false);
+                calculatedThinkingSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+                setMessages((prev) => prev.map((m) => m.id === botMsgId ? { ...m, thinkingSeconds: calculatedThinkingSeconds } : m));
+            }
+            tokenBuffer += token;
+            startBufferDrain();
         };
         const onDone = (res) => {
+            if (streamTimer) {
+                clearInterval(streamTimer);
+                streamTimer = null;
+            }
             setIsLoading(false);
+            calculatedThinkingSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
             setMessages((prev) => prev.map((m) => m.id === botMsgId
                 ? {
                     ...m,
@@ -459,6 +486,7 @@ function ChatWidget({ api }) {
                     thoughts: res.thoughts && res.thoughts.length > 0
                         ? res.thoughts
                         : m.thoughts,
+                    thinkingSeconds: calculatedThinkingSeconds,
                     isStreaming: false,
                 }
                 : m));
@@ -504,6 +532,10 @@ function ChatWidget({ api }) {
             scrollToBottom(true);
         };
         const onError = (err) => {
+            if (streamTimer) {
+                clearInterval(streamTimer);
+                streamTimer = null;
+            }
             setIsLoading(false);
             let errorMsg = "Sorry, I ran into an error. Please try again.";
             if (err?.message?.includes("revoked") ||
@@ -769,79 +801,79 @@ function ChatWidget({ api }) {
                                     display: "flex",
                                     flexDirection: "column",
                                     alignItems: msg.sender === "user" ? "flex-end" : "flex-start",
-                                }, children: [msg.sender === "bot" &&
-                                        msg.thoughts &&
-                                        msg.thoughts.length > 0 && ((0, jsx_runtime_1.jsxs)("details", { open: msg.isStreaming, style: {
-                                            marginBottom: "8px",
-                                            fontSize: "11px",
-                                            color: "#475569",
+                                }, children: [msg.sender === "bot" && msg.isStreaming && !msg.text && ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                            fontSize: "12px",
+                                            fontWeight: "400",
+                                            color: "#64748b",
                                             backgroundColor: "#f8fafc",
                                             border: "1px solid #e2e8f0",
-                                            borderRadius: "10px",
+                                            borderRadius: "14px",
                                             padding: "6px 12px",
+                                            marginBottom: "6px",
+                                        }, children: [(0, jsx_runtime_1.jsx)("span", { style: {
+                                                    display: "inline-block",
+                                                    width: "11px",
+                                                    height: "11px",
+                                                    borderRadius: "50%",
+                                                    border: "2px solid #cbd5e1",
+                                                    borderTopColor: primaryColor,
+                                                    animation: "spin 0.8s linear infinite",
+                                                } }), (0, jsx_runtime_1.jsx)("span", { children: "Thinking..." })] })), msg.sender === "bot" &&
+                                        msg.thoughts &&
+                                        msg.thoughts.length > 0 &&
+                                        (msg.text || !msg.isStreaming) && ((0, jsx_runtime_1.jsxs)("details", { style: {
+                                            marginBottom: "8px",
+                                            fontSize: "11.5px",
+                                            color: "#64748b",
+                                            backgroundColor: "#f8fafc",
+                                            border: "1px solid #e2e8f0",
+                                            borderRadius: "12px",
+                                            padding: "5px 11px",
                                             maxWidth: "92%",
                                             lineHeight: "1.4",
                                         }, children: [(0, jsx_runtime_1.jsxs)("summary", { style: {
                                                     cursor: "pointer",
-                                                    fontWeight: "600",
+                                                    fontWeight: "500",
                                                     outline: "none",
                                                     display: "flex",
                                                     alignItems: "center",
-                                                    gap: "6px",
+                                                    gap: "5px",
                                                     userSelect: "none",
-                                                    color: "#334155",
-                                                }, children: [(0, jsx_runtime_1.jsx)(BrainSvg, {}), " AI Reasoning (", msg.thoughts.length, " ", "steps)"] }), (0, jsx_runtime_1.jsx)("div", { style: {
+                                                    color: "#475569",
+                                                }, children: [(0, jsx_runtime_1.jsx)(BrainSvg, {}), " Thought for ", msg.thinkingSeconds || 1, "s"] }), (0, jsx_runtime_1.jsx)("div", { style: {
                                                     marginTop: "6px",
                                                     display: "flex",
                                                     flexDirection: "column",
                                                     gap: "4px",
                                                     borderTop: "1px solid #e2e8f0",
                                                     paddingTop: "6px",
-                                                }, children: msg.thoughts.map((t, idx) => ((0, jsx_runtime_1.jsx)("div", { style: {
+                                                    color: "#64748b",
+                                                }, children: msg.thoughts.map((t, idx) => ((0, jsx_runtime_1.jsxs)("div", { style: {
                                                         display: "flex",
                                                         alignItems: "center",
-                                                        gap: "4px",
-                                                        color: "#475569",
-                                                    }, children: (0, jsx_runtime_1.jsx)("span", { children: t }) }, idx))) })] })), (0, jsx_runtime_1.jsx)("div", { style: {
+                                                        gap: "5px",
+                                                    }, children: [(0, jsx_runtime_1.jsx)("span", { style: { color: "#94a3b8" }, children: "\u2022" }), (0, jsx_runtime_1.jsx)("span", { children: t })] }, idx))) })] })), Boolean(msg.text || msg.sender === "user") && ((0, jsx_runtime_1.jsx)("div", { style: {
                                             backgroundColor: msg.sender === "user" ? primaryColor : "#f1f5f9",
-                                            color: msg.sender === "user" ? "#ffffff" : "#0f172a",
-                                            padding: "14px 18px",
+                                            color: msg.sender === "user" ? "#ffffff" : "#1e293b",
+                                            padding: "13px 17px",
                                             borderRadius: msg.sender === "user"
-                                                ? "20px 20px 4px 20px"
-                                                : "20px 20px 20px 4px",
+                                                ? "18px 18px 4px 18px"
+                                                : "18px 18px 18px 4px",
                                             maxWidth: "85%",
                                             wordBreak: "break-word",
                                             whiteSpace: "pre-wrap",
                                             boxShadow: msg.sender === "user"
-                                                ? "0 4px 14px rgba(0,0,0,0.15)"
+                                                ? "0 4px 14px rgba(0,0,0,0.12)"
                                                 : "none",
-                                            fontSize: "14.5px",
-                                            lineHeight: "1.5",
-                                            fontWeight: "450",
+                                            fontSize: "14px",
+                                            lineHeight: "1.55",
+                                            fontWeight: "400",
+                                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
                                             border: msg.sender === "user" ? "none" : "1px solid #e2e8f0",
-                                        }, children: msg.isStreaming && !msg.text ? ((0, jsx_runtime_1.jsxs)("div", { style: {
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "8px",
-                                                color: "#64748b",
-                                                fontSize: "13px",
-                                            }, children: [(0, jsx_runtime_1.jsx)("span", { style: {
-                                                        display: "inline-block",
-                                                        width: "12px",
-                                                        height: "12px",
-                                                        borderRadius: "50%",
-                                                        border: "2px solid #cbd5e1",
-                                                        borderTopColor: primaryColor,
-                                                        animation: "spin 0.8s linear infinite",
-                                                    } }), (0, jsx_runtime_1.jsx)("span", { children: "Thinking..." })] })) : msg.isStreaming ? ((0, jsx_runtime_1.jsxs)("div", { children: [renderMarkdownText(msg.text), (0, jsx_runtime_1.jsx)("span", { style: {
-                                                        display: "inline-block",
-                                                        width: "5px",
-                                                        height: "13px",
-                                                        backgroundColor: primaryColor,
-                                                        marginLeft: "4px",
-                                                        verticalAlign: "middle",
-                                                        borderRadius: "1px",
-                                                    } })] })) : ((0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === "bot", shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) })) }), msg.sender === "bot" && ((0, jsx_runtime_1.jsxs)("span", { style: {
+                                        }, children: msg.isStreaming ? (renderMarkdownText(msg.text)) : ((0, jsx_runtime_1.jsx)(TypewriterMessageText, { text: msg.text, isBot: msg.sender === "bot", shouldAnimate: Boolean(msg.shouldAnimate), onType: () => scrollToBottom(false) })) })), msg.sender === "bot" && ((0, jsx_runtime_1.jsxs)("span", { style: {
                                             fontSize: "11px",
                                             color: "#94a3b8",
                                             marginTop: "5px",

@@ -13,6 +13,7 @@ interface MessageItem {
   text: string;
   products?: ProductCard[];
   thoughts?: string[];
+  thinkingSeconds?: number;
   time: string;
   shouldAnimate?: boolean;
   isStreaming?: boolean;
@@ -713,11 +714,15 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     };
 
     const botMsgId = `bot_${Date.now()}`;
+    const startTime = Date.now();
+    let calculatedThinkingSeconds = 1;
+
     const botMsg: MessageItem = {
       id: botMsgId,
       sender: "bot",
       text: "",
       thoughts: [],
+      thinkingSeconds: 1,
       time: "Just now",
       isStreaming: true,
     };
@@ -725,6 +730,31 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     setMessages((prev) => [...prev, userMsg, botMsg]);
     setInputValue("");
     setIsLoading(true);
+
+    let tokenBuffer = "";
+    let streamTimer: any = null;
+
+    const startBufferDrain = () => {
+      if (!streamTimer) {
+        streamTimer = setInterval(() => {
+          if (tokenBuffer.length > 0) {
+            const step = Math.max(
+              1,
+              Math.min(tokenBuffer.length, Math.ceil(tokenBuffer.length / 2)),
+            );
+            const chunk = tokenBuffer.slice(0, step);
+            tokenBuffer = tokenBuffer.slice(step);
+
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === botMsgId ? { ...m, text: (m.text || "") + chunk } : m,
+              ),
+            );
+            scrollToBottom(false);
+          }
+        }, 16);
+      }
+    };
 
     const onThought = (thought: string) => {
       setMessages((prev) =>
@@ -738,17 +768,35 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     };
 
     const onToken = (token: string) => {
-      setIsLoading(false);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === botMsgId ? { ...m, text: (m.text || "") + token } : m,
-        ),
-      );
-      scrollToBottom(false);
+      if (isLoading) {
+        setIsLoading(false);
+        calculatedThinkingSeconds = Math.max(
+          1,
+          Math.round((Date.now() - startTime) / 1000),
+        );
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === botMsgId
+              ? { ...m, thinkingSeconds: calculatedThinkingSeconds }
+              : m,
+          ),
+        );
+      }
+      tokenBuffer += token;
+      startBufferDrain();
     };
 
     const onDone = (res: any) => {
+      if (streamTimer) {
+        clearInterval(streamTimer);
+        streamTimer = null;
+      }
       setIsLoading(false);
+      calculatedThinkingSeconds = Math.max(
+        1,
+        Math.round((Date.now() - startTime) / 1000),
+      );
+
       setMessages((prev) =>
         prev.map((m) =>
           m.id === botMsgId
@@ -760,6 +808,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                   res.thoughts && res.thoughts.length > 0
                     ? res.thoughts
                     : m.thoughts,
+                thinkingSeconds: calculatedThinkingSeconds,
                 isStreaming: false,
               }
             : m,
@@ -820,6 +869,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
     };
 
     const onError = (err: any) => {
+      if (streamTimer) {
+        clearInterval(streamTimer);
+        streamTimer = null;
+      }
       setIsLoading(false);
       let errorMsg = "Sorry, I ran into an error. Please try again.";
       if (
@@ -1221,20 +1274,52 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                       msg.sender === "user" ? "flex-end" : "flex-start",
                   }}
                 >
-                  {/* AI Reasoning Accordion */}
+                  {/* AI Reasoning / Live Thinking State (While reasoning) */}
+                  {msg.sender === "bot" && msg.isStreaming && !msg.text && (
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        fontSize: "12px",
+                        fontWeight: "400",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "14px",
+                        padding: "6px 12px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: "11px",
+                          height: "11px",
+                          borderRadius: "50%",
+                          border: "2px solid #cbd5e1",
+                          borderTopColor: primaryColor,
+                          animation: "spin 0.8s linear infinite",
+                        }}
+                      />
+                      <span>Thinking...</span>
+                    </div>
+                  )}
+
+                  {/* AI Reasoning Collapsed Pill (When thought completed) */}
                   {msg.sender === "bot" &&
                     msg.thoughts &&
-                    msg.thoughts.length > 0 && (
+                    msg.thoughts.length > 0 &&
+                    (msg.text || !msg.isStreaming) && (
                       <details
-                        open={msg.isStreaming}
                         style={{
                           marginBottom: "8px",
-                          fontSize: "11px",
-                          color: "#475569",
+                          fontSize: "11.5px",
+                          color: "#64748b",
                           backgroundColor: "#f8fafc",
                           border: "1px solid #e2e8f0",
-                          borderRadius: "10px",
-                          padding: "6px 12px",
+                          borderRadius: "12px",
+                          padding: "5px 11px",
                           maxWidth: "92%",
                           lineHeight: "1.4",
                         }}
@@ -1242,17 +1327,16 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         <summary
                           style={{
                             cursor: "pointer",
-                            fontWeight: "600",
+                            fontWeight: "500",
                             outline: "none",
                             display: "flex",
                             alignItems: "center",
-                            gap: "6px",
+                            gap: "5px",
                             userSelect: "none",
-                            color: "#334155",
+                            color: "#475569",
                           }}
                         >
-                          <BrainSvg /> AI Reasoning ({msg.thoughts.length}{" "}
-                          steps)
+                          <BrainSvg /> Thought for {msg.thinkingSeconds || 1}s
                         </summary>
                         <div
                           style={{
@@ -1262,6 +1346,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                             gap: "4px",
                             borderTop: "1px solid #e2e8f0",
                             paddingTop: "6px",
+                            color: "#64748b",
                           }}
                         >
                           {msg.thoughts.map((t, idx) => (
@@ -1270,10 +1355,10 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                               style={{
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "4px",
-                                color: "#475569",
+                                gap: "5px",
                               }}
                             >
+                              <span style={{ color: "#94a3b8" }}>•</span>
                               <span>{t}</span>
                             </div>
                           ))}
@@ -1282,77 +1367,45 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                     )}
 
                   {/* Text Bubble */}
-                  <div
-                    style={{
-                      backgroundColor:
-                        msg.sender === "user" ? primaryColor : "#f1f5f9",
-                      color: msg.sender === "user" ? "#ffffff" : "#0f172a",
-                      padding: "14px 18px",
-                      borderRadius:
-                        msg.sender === "user"
-                          ? "20px 20px 4px 20px"
-                          : "20px 20px 20px 4px",
-                      maxWidth: "85%",
-                      wordBreak: "break-word",
-                      whiteSpace: "pre-wrap",
-                      boxShadow:
-                        msg.sender === "user"
-                          ? "0 4px 14px rgba(0,0,0,0.15)"
-                          : "none",
-                      fontSize: "14.5px",
-                      lineHeight: "1.5",
-                      fontWeight: "450",
-                      border:
-                        msg.sender === "user" ? "none" : "1px solid #e2e8f0",
-                    }}
-                  >
-                    {msg.isStreaming && !msg.text ? (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          color: "#64748b",
-                          fontSize: "13px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            display: "inline-block",
-                            width: "12px",
-                            height: "12px",
-                            borderRadius: "50%",
-                            border: "2px solid #cbd5e1",
-                            borderTopColor: primaryColor,
-                            animation: "spin 0.8s linear infinite",
-                          }}
+                  {Boolean(msg.text || msg.sender === "user") && (
+                    <div
+                      style={{
+                        backgroundColor:
+                          msg.sender === "user" ? primaryColor : "#f1f5f9",
+                        color: msg.sender === "user" ? "#ffffff" : "#1e293b",
+                        padding: "13px 17px",
+                        borderRadius:
+                          msg.sender === "user"
+                            ? "18px 18px 4px 18px"
+                            : "18px 18px 18px 4px",
+                        maxWidth: "85%",
+                        wordBreak: "break-word",
+                        whiteSpace: "pre-wrap",
+                        boxShadow:
+                          msg.sender === "user"
+                            ? "0 4px 14px rgba(0,0,0,0.12)"
+                            : "none",
+                        fontSize: "14px",
+                        lineHeight: "1.55",
+                        fontWeight: "400",
+                        fontFamily:
+                          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                        border:
+                          msg.sender === "user" ? "none" : "1px solid #e2e8f0",
+                      }}
+                    >
+                      {msg.isStreaming ? (
+                        renderMarkdownText(msg.text)
+                      ) : (
+                        <TypewriterMessageText
+                          text={msg.text}
+                          isBot={msg.sender === "bot"}
+                          shouldAnimate={Boolean(msg.shouldAnimate)}
+                          onType={() => scrollToBottom(false)}
                         />
-                        <span>Thinking...</span>
-                      </div>
-                    ) : msg.isStreaming ? (
-                      <div>
-                        {renderMarkdownText(msg.text)}
-                        <span
-                          style={{
-                            display: "inline-block",
-                            width: "5px",
-                            height: "13px",
-                            backgroundColor: primaryColor,
-                            marginLeft: "4px",
-                            verticalAlign: "middle",
-                            borderRadius: "1px",
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <TypewriterMessageText
-                        text={msg.text}
-                        isBot={msg.sender === "bot"}
-                        shouldAnimate={Boolean(msg.shouldAnimate)}
-                        onType={() => scrollToBottom(false)}
-                      />
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Subtitle / Timestamp under Bot Bubble */}
                   {msg.sender === "bot" && (

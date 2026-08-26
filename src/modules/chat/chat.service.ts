@@ -227,23 +227,15 @@ export async function processChatMessage(
   const thoughts: string[] = [];
 
   if (isBengaliScript) {
-    thoughts.push(
-      `🗣️ Detected Bengali script query — Applying natural Bangla grammar.`,
-    );
+    thoughts.push(`Analyzed user inquiry in Bengali`);
   } else if (isBanglish) {
-    thoughts.push(
-      `🗣️ Detected Romanized Banglish query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Enforcing native phonetics.`,
-    );
+    thoughts.push(`Understood user inquiry in Banglish`);
   } else {
-    thoughts.push(
-      `🗣️ Analyzed English query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Setting concise representative persona.`,
-    );
+    thoughts.push(`Understood user inquiry`);
   }
 
   if (imageUrl) {
-    thoughts.push(
-      `🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`,
-    );
+    thoughts.push(`Analyzed attached image for visual context`);
   }
 
   // Perform Catalog & Knowledge RAG Search
@@ -276,7 +268,7 @@ export async function processChatMessage(
 
     if (retrievedProducts.length > 0) {
       thoughts.push(
-        `📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`,
+        `Found matching products in store catalog (${retrievedProducts.length} items)`,
       );
       ragContext +=
         `\n\n### Store Catalog & Available Products:\n` +
@@ -297,9 +289,7 @@ export async function processChatMessage(
     }
 
     if (retrievedKnowledgeRes.length > 0) {
-      thoughts.push(
-        `🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`,
-      );
+      thoughts.push(`Retrieved relevant website knowledge and policies`);
       ragContext +=
         `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes
@@ -311,9 +301,7 @@ export async function processChatMessage(
       userMessage.trim().length > 3 &&
       !isSimpleGreeting(userMessage)
     ) {
-      thoughts.push(
-        `🌐 Executing real-time web search for "${userMessage}"...`,
-      );
+      thoughts.push(`Searched real-time web information`);
       const webSearchTimeout = new Promise<any[]>((resolve) =>
         setTimeout(() => resolve([]), 1500),
       );
@@ -322,9 +310,7 @@ export async function processChatMessage(
         webSearchTimeout,
       ]);
       if (webResults.length > 0) {
-        thoughts.push(
-          `✨ Retrieved ${webResults.length} real-time internet search results.`,
-        );
+        thoughts.push(`Incorporated latest web insights`);
         ragContext +=
           `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
           webResults
@@ -676,23 +662,15 @@ export async function processChatMessageStream(
   };
 
   if (isBengaliScript) {
-    addThought(
-      `🗣️ Detected Bengali script query — Applying natural Bangla grammar.`,
-    );
+    addThought(`Analyzed user inquiry in Bengali`);
   } else if (isBanglish) {
-    addThought(
-      `🗣️ Detected Romanized Banglish query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Enforcing native phonetics.`,
-    );
+    addThought(`Understood user inquiry in Banglish`);
   } else {
-    addThought(
-      `🗣️ Analyzed English query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Setting concise representative persona.`,
-    );
+    addThought(`Understood user inquiry`);
   }
 
   if (imageUrl) {
-    addThought(
-      `🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`,
-    );
+    addThought(`Analyzed attached image for visual context`);
   }
 
   // Perform Catalog & Knowledge RAG Search
@@ -725,7 +703,7 @@ export async function processChatMessageStream(
 
     if (retrievedProducts.length > 0) {
       addThought(
-        `📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`,
+        `Found matching products in store catalog (${retrievedProducts.length} items)`,
       );
       ragContext +=
         `\n\n### Store Catalog & Available Products:\n` +
@@ -746,9 +724,7 @@ export async function processChatMessageStream(
     }
 
     if (retrievedKnowledgeRes.length > 0) {
-      addThought(
-        `🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`,
-      );
+      addThought(`Retrieved relevant website knowledge and policies`);
       ragContext +=
         `\n\n### Website Knowledge Base (Scraped Content):\n` +
         retrievedKnowledgeRes
@@ -760,9 +736,7 @@ export async function processChatMessageStream(
       userMessage.trim().length > 3 &&
       !isSimpleGreeting(userMessage)
     ) {
-      addThought(
-        `🌐 Executing real-time web search for "${userMessage}"...`,
-      );
+      addThought(`Searched real-time web information`);
       const webSearchTimeout = new Promise<any[]>((resolve) =>
         setTimeout(() => resolve([]), 1500),
       );
@@ -771,9 +745,7 @@ export async function processChatMessageStream(
         webSearchTimeout,
       ]);
       if (webResults.length > 0) {
-        addThought(
-          `✨ Retrieved ${webResults.length} real-time internet search results.`,
-        );
+        addThought(`Incorporated latest web insights`);
         ragContext +=
           `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
           webResults

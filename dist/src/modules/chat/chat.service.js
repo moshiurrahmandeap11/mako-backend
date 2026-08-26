@@ -181,16 +181,16 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
     let ragContext = "";
     const thoughts = [];
     if (isBengaliScript) {
-        thoughts.push(`🗣️ Detected Bengali script query — Applying natural Bangla grammar.`);
+        thoughts.push(`Analyzed user inquiry in Bengali`);
     }
     else if (isBanglish) {
-        thoughts.push(`🗣️ Detected Romanized Banglish query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Enforcing native phonetics.`);
+        thoughts.push(`Understood user inquiry in Banglish`);
     }
     else {
-        thoughts.push(`🗣️ Analyzed English query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Setting concise representative persona.`);
+        thoughts.push(`Understood user inquiry`);
     }
     if (imageUrl) {
-        thoughts.push(`🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`);
+        thoughts.push(`Analyzed attached image for visual context`);
     }
     // Perform Catalog & Knowledge RAG Search
     try {
@@ -210,7 +210,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
             });
         }
         if (retrievedProducts.length > 0) {
-            thoughts.push(`📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`);
+            thoughts.push(`Found matching products in store catalog (${retrievedProducts.length} items)`);
             ragContext +=
                 `\n\n### Store Catalog & Available Products:\n` +
                     retrievedProducts
@@ -226,7 +226,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
                     `\n\nInstructions: Use the catalog items above to recommend items, verify options/sizes, or provide details. Include product page links where appropriate.`;
         }
         if (retrievedKnowledgeRes.length > 0) {
-            thoughts.push(`🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`);
+            thoughts.push(`Retrieved relevant website knowledge and policies`);
             ragContext +=
                 `\n\n### Website Knowledge Base (Scraped Content):\n` +
                     retrievedKnowledgeRes
@@ -237,14 +237,14 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
         else if (userMessage &&
             userMessage.trim().length > 3 &&
             !(0, chatGuards_1.isSimpleGreeting)(userMessage)) {
-            thoughts.push(`🌐 Executing real-time web search for "${userMessage}"...`);
+            thoughts.push(`Searched real-time web information`);
             const webSearchTimeout = new Promise((resolve) => setTimeout(() => resolve([]), 1500));
             const webResults = await Promise.race([
                 (0, webSearch_tool_1.webSearchTool)(userMessage, 3),
                 webSearchTimeout,
             ]);
             if (webResults.length > 0) {
-                thoughts.push(`✨ Retrieved ${webResults.length} real-time internet search results.`);
+                thoughts.push(`Incorporated latest web insights`);
                 ragContext +=
                     `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
                         webResults
@@ -507,16 +507,16 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
         onThought(t);
     };
     if (isBengaliScript) {
-        addThought(`🗣️ Detected Bengali script query — Applying natural Bangla grammar.`);
+        addThought(`Analyzed user inquiry in Bengali`);
     }
     else if (isBanglish) {
-        addThought(`🗣️ Detected Romanized Banglish query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Enforcing native phonetics.`);
+        addThought(`Understood user inquiry in Banglish`);
     }
     else {
-        addThought(`🗣️ Analyzed English query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Setting concise representative persona.`);
+        addThought(`Understood user inquiry`);
     }
     if (imageUrl) {
-        addThought(`🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`);
+        addThought(`Analyzed attached image for visual context`);
     }
     // Perform Catalog & Knowledge RAG Search
     try {
@@ -536,7 +536,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
             });
         }
         if (retrievedProducts.length > 0) {
-            addThought(`📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`);
+            addThought(`Found matching products in store catalog (${retrievedProducts.length} items)`);
             ragContext +=
                 `\n\n### Store Catalog & Available Products:\n` +
                     retrievedProducts
@@ -552,7 +552,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
                     `\n\nInstructions: Use the catalog items above to recommend items, verify options/sizes, or provide details. Include product page links where appropriate.`;
         }
         if (retrievedKnowledgeRes.length > 0) {
-            addThought(`🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`);
+            addThought(`Retrieved relevant website knowledge and policies`);
             ragContext +=
                 `\n\n### Website Knowledge Base (Scraped Content):\n` +
                     retrievedKnowledgeRes
@@ -563,14 +563,14 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
         else if (userMessage &&
             userMessage.trim().length > 3 &&
             !(0, chatGuards_1.isSimpleGreeting)(userMessage)) {
-            addThought(`🌐 Executing real-time web search for "${userMessage}"...`);
+            addThought(`Searched real-time web information`);
             const webSearchTimeout = new Promise((resolve) => setTimeout(() => resolve([]), 1500));
             const webResults = await Promise.race([
                 (0, webSearch_tool_1.webSearchTool)(userMessage, 3),
                 webSearchTimeout,
             ]);
             if (webResults.length > 0) {
-                addThought(`✨ Retrieved ${webResults.length} real-time internet search results.`);
+                addThought(`Incorporated latest web insights`);
                 ragContext +=
                     `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
                         webResults
