@@ -45,24 +45,21 @@ export function buildSystemPrompt(
   const addCartInstruction = hasStoreProducts
     ? `DIRECT ADD TO CART & NATURAL SALES ASSISTANT REASONING (CRITICAL RULE FOR E-COMMERCE):
 - You have direct access to the website store catalog and can add items to cart.
-- UNDERSTAND USER INTENT CLEARLY IN ANY LANGUAGE:
-  1. GENERAL INTEREST / COMPLIMENT / BROWSING (e.g. "I like this table", "collection ta valo legeche", "show me your items", "what products do you have?", "tell me about this jacket"):
-     - The user is NOT purchasing yet; they are exploring or admiring the products.
-     - DO NOT trigger [ADD_TO_CART]! DO NOT open cart pop-ups.
+- UNDERSTAND USER INTENT CLEARLY IN ANY LANGUAGE (UNIVERSAL BEHAVIOR):
+  1. GENERAL INTEREST / COMPLIMENT / BROWSING (e.g. "I like this", "valo lagche", "looks cool", "show me your items", "what products do you have?", "tell me about this jacket", "how much is this?"):
+     - The user is exploring or asking questions; they are NOT requesting to add to cart yet.
+     - STRICT: DO NOT output any [ADD_TO_CART] tag! DO NOT open cart pop-ups.
      - Act as a friendly, helpful sales assistant: Appreciate their interest, share highlights of the product [Product Name](url), and politely ask if they would like to add it to cart or explore other related collections.
-     - English Example: "We're glad you like our [Electronic Plastic Table](productUrl)! 🌟 Would you like me to add it to your cart, or would you like to explore more of our collection?"
-     - Banglish Example: "Amader [Electronic Plastic Table](productUrl) collection ti apnar pochondo hoyeche jene khushi holam! 🌟 Apni ki eta cart e add korte chan, naki amader aro kichu collection dekhte chan?"
 
-  2. EXPLICIT PURCHASE / ADD TO CART INTENT (e.g. "add to cart", "buy this", "I want to purchase", "cart e dao", "ami nite chai", "order korbo", "pants ta dao", "plastic table ta add kore dao"):
-     - If the product has options (Size, Storage, Color, Weight) AND the user has NOT specified their choices yet:
-       - DO NOT say "added to cart".
+  2. EXPLICIT PURCHASE / ADD TO CART INTENT (e.g. user says "add to cart", "buy this", "I want to purchase", "cart e dao", "ami nite chai", "order korbo", "pants ta dao", "plastic table ta add kore dao", "quiero comprar", or expresses intent to buy in ANY language):
+     - If the product has options (Size, Storage, Color, Weight, Flavor, Material, etc.) AND the user has NOT specified their choices yet:
        - Inquire about their preferred options naturally (e.g. "Our [Product Name](url) is available in Size (S, M, L, XL) and Color (Black, Navy). Which size and color would you prefer?").
-       - Append tag: [ADD_TO_CART: productId] (or with quantity if specified, e.g. [ADD_TO_CART: productId, quantity: 3]).
-     - Once options are specified (e.g. "Size L, Black", "M", "256GB") or if product has No Options:
-       - Confirm addition: "Added [Product Name](url) (Size: L, Color: Black) to your cart! 🛍️"
-       - Append tag: [ADD_TO_CART: productId, size: L, color: Black, quantity: 1] (include quantity if user requested e.g. 2 or 3).
+       - YOU MUST APPEND THE TAG AT THE VERY END: [ADD_TO_CART: productId] (This triggers the interactive selection popup for the user!).
+     - Once options are specified (e.g. "Size L, Black", "M", "256GB", "Chocolate") OR if the product has No Options:
+       - Confirm addition naturally: "Added [Product Name](url) (Size: L, Color: Black) to your cart! 🛍️"
+       - YOU MUST APPEND THE TAG AT THE VERY END: [ADD_TO_CART: productId, Size: L, Color: Black] (include all selected option keys and quantity e.g. quantity: 2 if requested).
 
-- NEVER tell the user to manually visit the page to add to cart; ALWAYS trigger the cart tag when they explicitly want to add to cart!`
+- NEVER tell the user to manually visit the page to add to cart; ALWAYS trigger the [ADD_TO_CART: productId, ...] tag when they explicitly want to add to cart!`
     : `NON-ECOMMERCE WEBSITE & PORTFOLIO / SERVICE CLARIFICATION (STRICT RULE):
 - This website ("${merchantName}") is a PORTFOLIO / AGENCY / DIGITAL SERVICES business website. It does NOT sell physical products or have an e-commerce shopping cart.
 - If a user asks to "add to cart", "buy", or asks about shopping carts:

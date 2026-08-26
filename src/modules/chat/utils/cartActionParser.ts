@@ -1,4 +1,3 @@
-import { prisma } from "../../../config/db";
 import { logger } from "../../../utils/logger";
 import { addToCartTool } from "../tools/addToCart.tool";
 
@@ -182,134 +181,13 @@ export async function parseCartActionFromReply(
 }
 
 /**
- * Fail-safe Smart Action Extractor:
- * Dynamically resolves product entity from catalog, checks option requirements,
- * and generates appropriate cartAction triggers for popups or instant additions.
+ * Fallback stub for legacy calls if any.
+ * All action decisions are natively driven by the AI's structured tags in parseCartActionFromReply.
  */
 export async function smartExtractCartAction(
-  finalReply: string,
-  userMessage: string,
-  merchantId: string,
+  _finalReply: string,
+  _userMessage: string,
+  _merchantId: string,
 ): Promise<{ cartAction: any | null; product?: any }> {
-  try {
-    const combinedText = `${userMessage} ${finalReply}`;
-
-    // Check for any purchase, add to cart, or option selection intent
-    const hasCartIntent =
-      /\b(add\s*to\s*cart|add|buy|purchase|order|nite\s*chai|cart\s*e|kore\s*dao|kore\s*den|kore\s*dibo|kore\s*fellam|kora\s*hoyeche|added\s*to\s*cart|select\s*korte\s*hobe|select\s*koren|select\s*korle)\b/i.test(
-        combinedText,
-      );
-
-    if (!hasCartIntent) {
-      return { cartAction: null };
-    }
-
-    // 1. Try to find product title from Markdown link [Title](url)
-    const linkMatch = finalReply.match(/\[([^\]]+)\]\(([^)]+)\)/);
-    let targetProdId = "";
-    if (linkMatch && linkMatch[2]) {
-      const urlIdMatch = linkMatch[2].match(/\/product[s]?\/([^\/\?#]+)/i);
-      if (urlIdMatch) {
-        targetProdId = urlIdMatch[1];
-      }
-    }
-
-    let matchedProd: any = null;
-
-    if (targetProdId) {
-      matchedProd = await prisma.product.findFirst({
-        where: {
-          merchantId,
-          OR: [
-            { externalId: targetProdId },
-            { id: targetProdId },
-            { productUrl: { contains: targetProdId } },
-          ],
-        },
-      });
-    }
-
-    // 2. Try to find product from bold markers **Title** or *Title*
-    if (!matchedProd) {
-      const boldMatches = Array.from(
-        finalReply.matchAll(/\*\*([^*]+)\*\*|\*([^*]+)\*/g),
-      );
-      for (const bMatch of boldMatches) {
-        const candidateTitle = (bMatch[1] || bMatch[2] || "").trim();
-        if (candidateTitle.length > 2) {
-          matchedProd = await prisma.product.findFirst({
-            where: {
-              merchantId,
-              title: { contains: candidateTitle, mode: "insensitive" },
-            },
-          });
-          if (matchedProd) break;
-        }
-      }
-    }
-
-    // 3. Fallback: Search all merchant products to see if any title appears in finalReply or userMessage
-    if (!matchedProd) {
-      const merchantProducts = await prisma.product.findMany({
-        where: { merchantId },
-        take: 30,
-        select: {
-          id: true,
-          externalId: true,
-          title: true,
-          price: true,
-          currency: true,
-          imageUrl: true,
-          productUrl: true,
-          options: true,
-          variants: true,
-        },
-      });
-
-      for (const prod of merchantProducts) {
-        const prodTitleLower = prod.title.toLowerCase();
-        if (
-          finalReply.toLowerCase().includes(prodTitleLower) ||
-          userMessage.toLowerCase().includes(prodTitleLower)
-        ) {
-          matchedProd = prod;
-          break;
-        }
-      }
-    }
-
-    if (matchedProd) {
-      let targetOptions: Record<string, string> | undefined = undefined;
-
-      // Dynamically match all options against the product's actual schema array
-      if (matchedProd.options && Array.isArray(matchedProd.options)) {
-        for (const opt of matchedProd.options as any[]) {
-          const optName = opt.name;
-          for (const val of opt.values || []) {
-            const reg = new RegExp(
-              `\\b${val.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`,
-              "i",
-            );
-            if (reg.test(userMessage) || reg.test(finalReply)) {
-              targetOptions = { ...(targetOptions || {}), [optName]: val };
-            }
-          }
-        }
-      }
-
-      const res = await addToCartTool(
-        merchantId,
-        matchedProd.externalId || matchedProd.id,
-        1,
-        undefined,
-        targetOptions,
-      );
-
-      return { cartAction: res.cartAction || null, product: res.product };
-    }
-  } catch (err) {
-    logger.error("Smart Action Extractor Error:", err);
-  }
-
   return { cartAction: null };
 }
