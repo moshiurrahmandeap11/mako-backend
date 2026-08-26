@@ -240,7 +240,7 @@ function renderMarkdownText(text: string) {
     }
 
     if (match[1] && match[2]) {
-      let linkTitle = match[1].trim();
+      let linkTitle = match[1].replace(/^\*+|\*+$/g, "").trim();
       const linkUrl = match[2];
 
       // Fix Problem 2: If link title is a raw MongoDB/Prisma object ID or hostname domain, replace with clean title
