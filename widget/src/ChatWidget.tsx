@@ -1442,7 +1442,7 @@ export function ChatWidget({ api }: ChatWidgetProps) {
                         backgroundColor:
                           msg.sender === "user" ? primaryColor : "#f1f5f9",
                         color: msg.sender === "user" ? "#ffffff" : "#1e293b",
-                        padding: "13px 17px",
+                        padding: "8px 12px",
                         borderRadius:
                           msg.sender === "user"
                             ? "8px 8px 2px 8px"

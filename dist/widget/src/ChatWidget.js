@@ -926,7 +926,7 @@ function ChatWidget({ api }) {
                                                     }, children: [(0, jsx_runtime_1.jsx)("span", { style: { color: "#94a3b8" }, children: "\u2022" }), (0, jsx_runtime_1.jsx)("span", { children: t })] }, idx))) })] })), Boolean(msg.text || msg.sender === "user") && ((0, jsx_runtime_1.jsx)("div", { className: msg.sender === "user" ? "mbot-msg-user" : "", style: {
                                             backgroundColor: msg.sender === "user" ? primaryColor : "#f1f5f9",
                                             color: msg.sender === "user" ? "#ffffff" : "#1e293b",
-                                            padding: "13px 17px",
+                                            padding: "8px 12px",
                                             borderRadius: msg.sender === "user"
                                                 ? "8px 8px 2px 8px"
                                                 : "8px 8px 8px 2px",
