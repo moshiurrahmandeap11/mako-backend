@@ -566,18 +566,23 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
             }
         });
     }
-    // 3. Extract Knowledge Headings, Paragraphs, and Clickable Links
+    // 3. Extract Knowledge Headings, Semantic Containers, Paragraphs, and Clickable Links
     const headings = [];
-    $('h1, h2, h3, h4').each((_, el) => {
+    $('h1, h2, h3, h4, h5, h6').each((_, el) => {
         const text = $(el).text().trim().replace(/\s+/g, ' ');
         if (text && text.length > 2)
             headings.push(`### ${text}`);
     });
-    const paragraphs = [];
-    $('p, li, blockquote, [data-description]').each((_, el) => {
+    const contentBlocks = [];
+    const seenBlockTexts = new Set();
+    // Deep Semantic Container Traversal across modern SPAs & static sites
+    $('p, li, blockquote, [data-description], dd, dt, table tr, td, th, div[class*="desc" i], div[class*="detail" i], div[class*="spec" i], div[class*="feature" i], div[class*="content" i], div[class*="faq" i], div[class*="policy" i], section p, article p').each((_, el) => {
         const text = $(el).text().trim().replace(/\s+/g, ' ');
-        if (text && text.length > 15)
-            paragraphs.push(text);
+        // Filter out tiny noise and duplicates
+        if (text && text.length > 12 && !seenBlockTexts.has(text.toLowerCase())) {
+            seenBlockTexts.add(text.toLowerCase());
+            contentBlocks.push(text);
+        }
     });
     const pageLinksSet = new Set();
     $('a').each((_, el) => {
@@ -591,17 +596,17 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
             catch { }
         }
     });
-    const pageLinks = Array.from(pageLinksSet).slice(0, 35);
+    const pageLinks = Array.from(pageLinksSet).slice(0, 40);
     const headerPrefix = `# Page Title: ${pageTitle}\nPage URL: ${currentUrlStr}\n${metaDescription ? `Description: ${metaDescription}\n` : ''}`;
     const linksSection = pageLinks.length > 0 ? `\n\n### Page Links & Navigation:\n${pageLinks.join('\n')}` : '';
-    const pageMarkdown = `${headerPrefix}\n\n${headings.join('\n')}\n\n${paragraphs.slice(0, 20).join('\n\n')}${linksSection}`;
-    // 4. Save structured chunks to KnowledgeChunk with vector embeddings
+    const pageMarkdown = `${headerPrefix}\n\n${headings.join('\n')}\n\n${contentBlocks.slice(0, 30).join('\n\n')}${linksSection}`;
+    // 4. Save Granular Structured Chunks (~380-450 chars) to KnowledgeChunk with vector embeddings
     let chunksCreated = 0;
     let currentChunk = `${headerPrefix}\n\n`;
-    const elementsToChunk = [...headings, ...paragraphs.slice(0, 25), ...pageLinks];
+    const elementsToChunk = [...headings, ...contentBlocks, ...pageLinks];
     for (const el of elementsToChunk) {
         currentChunk += el + '\n\n';
-        if (currentChunk.length >= 650) {
+        if (currentChunk.length >= 380) {
             try {
                 const kChunk = await db_1.prisma.knowledgeChunk.create({
                     data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
@@ -621,7 +626,7 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
             currentChunk = `${headerPrefix}\n\n`;
         }
     }
-    if (currentChunk.trim().length > headerPrefix.length + 15) {
+    if (currentChunk.trim().length > headerPrefix.length + 10) {
         try {
             const kChunk = await db_1.prisma.knowledgeChunk.create({
                 data: { merchantId, url: currentUrlStr, content: currentChunk.trim() },
@@ -769,7 +774,7 @@ async function scrapeWebsite(targetUrl, merchantId) {
     }
     const visitedUrls = new Set();
     const queue = [parsedUrl.href];
-    const maxPages = 40;
+    const maxPages = 100;
     // ── Tier 1 & Tier 2: Opportunistic Sitemaps & robots.txt Discovery ──
     try {
         const sitemapUrls = await discoverAllSitemapUrls(parsedUrl.origin);

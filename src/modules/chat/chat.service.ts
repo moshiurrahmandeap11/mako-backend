@@ -1,39 +1,42 @@
-import Anthropic from '@anthropic-ai/sdk';
-import OpenAI from 'openai';
-import yaml from 'js-yaml';
-import fs from 'fs';
-import path from 'path';
-import { prisma } from '../../config/db';
-import { env } from '../../config/env';
-import { logger } from '../../utils/logger';
-import { keyRotator } from '../../utils/keyRotator';
-import { autoLearnFromConversation } from '../../services/autoLearning.service';
-import { scrapeSingleUrl } from '../../services/scraper.service';
-import { searchProductsTool } from './tools/searchProducts.tool';
-import { searchKnowledgeTool } from './tools/searchKnowledge.tool';
-import { addToCartTool } from './tools/addToCart.tool';
-import { webSearchTool } from './tools/webSearch.tool';
+import Anthropic from "@anthropic-ai/sdk";
+import fs from "fs";
+import yaml from "js-yaml";
+import OpenAI from "openai";
+import path from "path";
+import { prisma } from "../../config/db";
+import { env } from "../../config/env";
+import { keyRotator } from "../../utils/keyRotator";
+import { logger } from "../../utils/logger";
+import { addToCartTool } from "./tools/addToCart.tool";
+import { searchKnowledgeTool } from "./tools/searchKnowledge.tool";
+import { searchProductsTool } from "./tools/searchProducts.tool";
+import { webSearchTool } from "./tools/webSearch.tool";
 
 // High-Speed In-Memory Cache for frequent queries & FAQs (1-hour TTL)
-const queryResponseCache = new Map<string, { reply: string; thoughts: string[]; products: any[]; timestamp: number }>();
+const queryResponseCache = new Map<
+  string,
+  { reply: string; thoughts: string[]; products: any[]; timestamp: number }
+>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-const anthropic = env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }) : null;
+const anthropic = env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+  : null;
 
 const groq = env.GROQ_API_KEY
   ? new OpenAI({
       apiKey: env.GROQ_API_KEY,
-      baseURL: 'https://api.groq.com/openai/v1',
+      baseURL: "https://api.groq.com/openai/v1",
     })
   : null;
 
 const openrouter = env.OPENROUTER_API_KEY
   ? new OpenAI({
       apiKey: env.OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
+      baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'Labto AI Widget',
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Labto AI Widget",
       },
     })
   : null;
@@ -41,11 +44,14 @@ const openrouter = env.OPENROUTER_API_KEY
 // Helper to load YAML prompt configuration based on chosen template
 function loadAiPromptsYaml(template?: string): any {
   try {
-    let filename = 'customer_support_and_sales.yml'; // Default fallback
-    if (template === 'Customer Support') filename = 'customer_support.yml';
-    else if (template === 'FAQ / Knowledge Base') filename = 'faq_knowledge_base.yml';
-    else if (template === 'Booking & Scheduling') filename = 'booking_and_scheduling.yml';
-    else if (template === 'Customer Support & Sales') filename = 'customer_support_and_sales.yml';
+    let filename = "customer_support_and_sales.yml"; // Default fallback
+    if (template === "Customer Support") filename = "customer_support.yml";
+    else if (template === "FAQ / Knowledge Base")
+      filename = "faq_knowledge_base.yml";
+    else if (template === "Booking & Scheduling")
+      filename = "booking_and_scheduling.yml";
+    else if (template === "Customer Support & Sales")
+      filename = "customer_support_and_sales.yml";
 
     const candidatePaths = [
       path.resolve(process.cwd(), `config/prompts/${filename}`),
@@ -56,12 +62,12 @@ function loadAiPromptsYaml(template?: string): any {
 
     for (const yamlPath of candidatePaths) {
       if (fs.existsSync(yamlPath)) {
-        const content = fs.readFileSync(yamlPath, 'utf8');
+        const content = fs.readFileSync(yamlPath, "utf8");
         return yaml.load(content);
       }
     }
   } catch (err) {
-    logger.error('Failed to load YAML prompt config:', err);
+    logger.error("Failed to load YAML prompt config:", err);
   }
   return null;
 }
@@ -71,13 +77,18 @@ function isSimpleGreeting(message: string): boolean {
   if (/\b(thanks|thank|thx|dhonnobad|shukriya)\b/i.test(clean)) {
     return false;
   }
-  const greetingRegex = /^\s*\b(hi|hello|hey|yo|sup|hola|hi there|hello there|hi bro|hey bro|hello bro|kemon achis|kemon acho|kemon aco|kire|kire bro|ki khobor|good morning|good afternoon|good evening|kemon acis|kemne acho|kemon|assalamu alaikum|salam)\b\s*$/i;
-  return greetingRegex.test(clean) || (clean.length <= 15 && /\b(hi|hello|hey|hola|salam)\b/i.test(clean));
+  const greetingRegex =
+    /^\s*\b(hi|hello|hey|yo|sup|hola|hi there|hello there|hi bro|hey bro|hello bro|kemon achis|kemon acho|kemon aco|kire|kire bro|ki khobor|good morning|good afternoon|good evening|kemon acis|kemne acho|kemon|assalamu alaikum|salam)\b\s*$/i;
+  return (
+    greetingRegex.test(clean) ||
+    (clean.length <= 15 && /\b(hi|hello|hey|hola|salam)\b/i.test(clean))
+  );
 }
 
 function isGratitude(message: string): boolean {
   const clean = message.toLowerCase().trim();
-  const gratitudeRegex = /\b(thanks|thank\s*you|thx|thank\s*u|dhonnobad|many\s*thanks|shukriya)\b/i;
+  const gratitudeRegex =
+    /\b(thanks|thank\s*you|thx|thank\s*u|dhonnobad|many\s*thanks|shukriya)\b/i;
   return gratitudeRegex.test(clean);
 }
 
@@ -116,9 +127,33 @@ function isOutOfScopeRequest(message: string): boolean {
   ];
 
   const inScopeKeywords = [
-    'portfolio', 'project', 'service', 'hire', 'work', 'experience', 'pricing', 'charge', 'cost',
-    'contact', 'email', 'phone', 'location', 'about', 'who is', 'tech stack', 'react', 'next', 'node',
-    'developer', 'designer', 'case study', 'casestudies', 'abid', 'nirob', 'labto', 'labtobit'
+    "portfolio",
+    "project",
+    "service",
+    "hire",
+    "work",
+    "experience",
+    "pricing",
+    "charge",
+    "cost",
+    "contact",
+    "email",
+    "phone",
+    "location",
+    "about",
+    "who is",
+    "tech stack",
+    "react",
+    "next",
+    "node",
+    "developer",
+    "designer",
+    "case study",
+    "casestudies",
+    "abid",
+    "nirob",
+    "labto",
+    "labtobit",
   ];
 
   const hasInScopeKeyword = inScopeKeywords.some((k) => clean.includes(k));
@@ -132,15 +167,21 @@ function getSystemPrompt(
   primaryDomain: string,
   botMode: string,
   customPrompt?: string,
-  template?: string
+  template?: string,
 ): string {
   const yamlConfig = loadAiPromptsYaml(template);
-  const defaultPersona = yamlConfig?.system_instructions?.persona || `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
-  const basePersona = customPrompt ? `${defaultPersona}\nMerchant Custom Notes: ${customPrompt}` : defaultPersona;
-  const personaPrompt = `You are the official AI Assistant for "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ''}. ${basePersona}`;
+  const defaultPersona =
+    yamlConfig?.system_instructions?.persona ||
+    `You are the official AI Customer Support and Sales Specialist for this business. Help visitors with website inquiries, portfolio projects, store products, pricing, agency services, and company information.`;
+  const basePersona = customPrompt
+    ? `${defaultPersona}\nMerchant Custom Notes: ${customPrompt}`
+    : defaultPersona;
+  const personaPrompt = `You are the official AI Assistant for "${merchantName}"${primaryDomain ? ` (Website: ${primaryDomain})` : ""}. ${basePersona}`;
 
   const rules = yamlConfig?.system_instructions?.strict_rules;
-  const formatRule = rules?.formatting?.instructions || `Use clean GitHub Flavored Markdown formatting with bold titles and clickable link badges.`;
+  const formatRule =
+    rules?.formatting?.instructions ||
+    `Use clean GitHub Flavored Markdown formatting with bold titles and clickable link badges.`;
   const cartRule = rules?.cart_action?.instructions || ``;
 
   const langRule = `STRICT SCRIPT & LANGUAGE MATCHING & BANGLISH FLUENCY (CRITICAL):
@@ -193,7 +234,7 @@ function getSystemPrompt(
   - RIGHT: "Amader main project gulo holo: [AESHUT](url), [Regar](url), [Lusion Studio](url), ebong [Echo Platform](url)..."`;
 
   const scopeLockRule = `CRITICAL STRICT BUSINESS BOUNDARY & HARD BAN ON USER WORD-COUNT OVERRIDES (STRICT RULE):
-- You are EXCLUSIVELY the customer support and business sales representative for "${merchantName}" (${primaryDomain || 'this website'}).
+- You are EXCLUSIVELY the customer support and business sales representative for "${merchantName}" (${primaryDomain || "this website"}).
 - You must ONLY assist with questions directly related to ${merchantName}'s services, portfolio projects, case studies, pricing, tech stack, skills, or contact info.
 - HARD BAN ON ESSAYS & WORD COUNT REQUESTS: NEVER fulfill requests to write 500-word paragraphs, essays ("গরুর রচনা", school homework), general coding scripts, stories, poems, or trivia.
 - IF A USER ASKS TO WRITE "500 WORDS", AN ESSAY, OR ANY OFF-TOPIC PARAGRAPH: YOU MUST IMMEDIATELY AND POLITELY DECLINE IN 1 SHORT SENTENCE. NEVER WRITE THE PARAGRAPH.
@@ -233,7 +274,7 @@ function getSystemPrompt(
 Strict Rules:
 1. CASUAL GREETINGS & SHORT CHATS: ${casualGreetingRule}
 2. FIRST-PERSON PERSPECTIVE: ${firstPersonPerspectiveRule}
-3. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ''}. When asked for the website name or company name, answer clearly with "${merchantName}".
+3. WEBSITE IDENTITY: You represent "${merchantName}"${primaryDomain ? ` (${primaryDomain})` : ""}. When asked for the website name or company name, answer clearly with "${merchantName}".
 4. FACTUALITY & REAL CONTENT ONLY: Only mention products, showcase projects, portfolio items, services, or pages that are explicitly present in the provided Website Knowledge Base or Store Catalog. NEVER invent fake project names or non-existent services.
 5. PROACTIVE PRODUCT & COLLECTION SHOWCASING: ${productShowcaseRule}
 6. STRICT CLICKABLE LINKS & CONTEXT: ${linkAndContextRule}
@@ -243,21 +284,21 @@ Strict Rules:
 10. LANGUAGE & SCRIPT MATCHING: ${langRule}
 11. FORMATTING RULE: ${formatRule}
 12. NO HASHTAG HEADERS: NEVER output raw markdown header hashes like #, ##, or ###. Use bold text (**Title**) for headings instead.
-${cartRule ? `13. MERCHANT CUSTOM CART RULE: ${cartRule}` : ''}`.trim();
+${cartRule ? `13. MERCHANT CUSTOM CART RULE: ${cartRule}` : ""}`.trim();
 }
 
 export async function processChatMessage(
   merchantId: string,
   sessionId: string,
   userMessage: string,
-  botMode: string = 'shopping',
+  botMode: string = "shopping",
   provider?: string,
   customPrompt?: string,
   template?: string,
-  imageUrl?: string
+  imageUrl?: string,
 ) {
   // Enforce strict 250 character limit on all prompts
-  userMessage = (userMessage || '').trim().slice(0, 250);
+  userMessage = (userMessage || "").trim().slice(0, 250);
 
   // Fetch merchant profile for branding & domain identity
   const merchant = await prisma.user.findUnique({
@@ -266,29 +307,31 @@ export async function processChatMessage(
   });
 
   // Dynamically resolve clean business identity for multi-tenant storefronts & agencies
-  let merchantName = 'our company';
-  const primaryDomain = merchant?.allowedDomains?.[0] || '';
+  let merchantName = "our company";
+  const primaryDomain = merchant?.allowedDomains?.[0] || "";
 
   if (primaryDomain) {
     const rawDomain = primaryDomain
-      .replace(/^https?:\/\//, '')
-      .split('/')[0]
-      .split(':')[0]
-      .replace(/^www\./, '');
-    if (rawDomain && rawDomain !== 'localhost' && rawDomain !== '127.0.0.1') {
-      const parts = rawDomain.split('.')[0].split(/[-_]/);
-      merchantName = parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+      .replace(/^https?:\/\//, "")
+      .split("/")[0]
+      .split(":")[0]
+      .replace(/^www\./, "");
+    if (rawDomain && rawDomain !== "localhost" && rawDomain !== "127.0.0.1") {
+      const parts = rawDomain.split(".")[0].split(/[-_]/);
+      merchantName = parts
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(" ");
     }
   }
 
-  if ((!merchantName || merchantName === 'our company') && merchant?.name) {
+  if ((!merchantName || merchantName === "our company") && merchant?.name) {
     merchantName = merchant.name;
   }
 
   // 1. Get or create conversation record
   let conversation = await prisma.conversation.findFirst({
     where: { merchantId, sessionId },
-    include: { messages: { orderBy: { createdAt: 'asc' }, take: 20 } },
+    include: { messages: { orderBy: { createdAt: "asc" }, take: 20 } },
   });
 
   if (!conversation) {
@@ -298,13 +341,16 @@ export async function processChatMessage(
     });
   }
 
-  const textSafe = userMessage || '';
+  const textSafe = userMessage || "";
   const isBengaliScript = /[\u0980-\u09FF]/.test(textSafe);
-  const isBanglish = /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website|bro)\b/i.test(textSafe);
+  const isBanglish =
+    /\b(koto|ki|koro|tmra|apni|amader|lagbe|project|daw|ache|na|bolo|tumi|kemne|kivabe|dam|taka|bhai|vai|website|bro)\b/i.test(
+      textSafe,
+    );
 
   // FAST PATH 1.5: Instant Gratitude Responses (<10ms)
   if (isGratitude(userMessage)) {
-    let gratitudeReply = '';
+    let gratitudeReply = "";
     if (isBengaliScript) {
       gratitudeReply = `আপনাকে অনেক ধন্যবাদ! যেকোনো সাহায্যে আমি আছি।`;
     } else if (isBanglish) {
@@ -316,7 +362,7 @@ export async function processChatMessage(
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
-        role: 'assistant',
+        role: "assistant",
         content: gratitudeReply,
       },
     });
@@ -332,7 +378,7 @@ export async function processChatMessage(
 
   // FAST PATH 2: Anti-Jailbreak / Role Hijacking Guard (<10ms, 0 token waste)
   if (isRoleHijackingAttempt(userMessage)) {
-    let hijackReply = '';
+    let hijackReply = "";
     if (isBengaliScript) {
       hijackReply = `আমি ${merchantName}-এর অফিশিয়াল সহকারী। আমি ভূমিকা পরিবর্তন করতে পারি না। কীভাবে আমাদের সেবা বা প্রজেক্টে সাহায্য করতে পারি?`;
     } else if (isBanglish) {
@@ -344,14 +390,16 @@ export async function processChatMessage(
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
-        role: 'assistant',
+        role: "assistant",
         content: hijackReply,
       },
     });
 
     return {
       reply: hijackReply,
-      thoughts: [`🛡️ Security Guard: Prevented role hijacking / prompt injection attempt.`],
+      thoughts: [
+        `🛡️ Security Guard: Prevented role hijacking / prompt injection attempt.`,
+      ],
       cartAction: undefined,
       recommendedProducts: [],
       tokensUsed: 15,
@@ -360,7 +408,7 @@ export async function processChatMessage(
 
   // FAST PATH 3: Out of Scope / Off-Topic / Essay / Academic / Coding Rejection Guard (<10ms, 0 token waste)
   if (isOutOfScopeRequest(userMessage)) {
-    let declineReply = '';
+    let declineReply = "";
     if (isBengaliScript) {
       declineReply = `আমি ${merchantName}-এর এআই সহকারী। আমি শুধুমাত্র আমাদের প্রজেক্ট, সেবা ও ওয়েবসাইট সম্পর্কিত তথ্যে সাহায্য করতে পারি।`;
     } else if (isBanglish) {
@@ -372,14 +420,16 @@ export async function processChatMessage(
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
-        role: 'assistant',
+        role: "assistant",
         content: declineReply,
       },
     });
 
     return {
       reply: declineReply,
-      thoughts: [`🛡️ Policy Guard: Declining out-of-scope coding/homework request.`],
+      thoughts: [
+        `🛡️ Policy Guard: Declining out-of-scope coding/homework request.`,
+      ],
       cartAction: undefined,
       recommendedProducts: [],
       tokensUsed: 12,
@@ -387,29 +437,36 @@ export async function processChatMessage(
   }
 
   // Save user message to database (keep content clean without raw 200KB base64 strings)
-  const cleanUserText = userMessage || (imageUrl ? 'Analyzing attached image.' : '');
+  const cleanUserText =
+    userMessage || (imageUrl ? "Analyzing attached image." : "");
   await prisma.message.create({
     data: {
       conversationId: conversation.id,
-      role: 'user',
+      role: "user",
       content: cleanUserText,
       toolCalls: imageUrl ? { imageUrl } : undefined,
     },
   });
 
   // FAST PATH 4: Instant High-Speed FAQ Cache Hit (<3ms, 0 token waste)
-  const normalizedQuery = (userMessage || '').trim().toLowerCase().replace(/[?!.,]/g, '');
+  const normalizedQuery = (userMessage || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[?!.,]/g, "");
   const cacheKey = `${merchantId}:${normalizedQuery}`;
   const cached = normalizedQuery ? queryResponseCache.get(cacheKey) : null;
 
-  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS && !imageUrl) {
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS && !imageUrl) {
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
-        role: 'assistant',
+        role: "assistant",
         content: cached.reply,
         tokensUsed: 5,
-        toolCalls: cached.products && cached.products.length > 0 ? { recommendedProducts: cached.products } : undefined,
+        toolCalls:
+          cached.products && cached.products.length > 0
+            ? { recommendedProducts: cached.products }
+            : undefined,
       },
     });
 
@@ -418,44 +475,60 @@ export async function processChatMessage(
       reply: cached.reply,
       products: cached.products || [],
       cartAction: null,
-      thoughts: ['⚡ Instant High-Speed Cached Response (~2ms).', ...cached.thoughts],
+      thoughts: [
+        "⚡ Instant High-Speed Cached Response (~2ms).",
+        ...cached.thoughts,
+      ],
     };
   }
 
   let recommendedProducts: any[] = [];
   let retrievedProducts: any[] = [];
-  let ragContext = '';
+  let ragContext = "";
   let cartAction: any = null;
-  let finalReply = '';
+  let finalReply = "";
 
   const thoughts: string[] = [];
 
   // 1. Dynamic Language & Script Analysis
 
   if (isBengaliScript) {
-    thoughts.push(`🗣️ Detected Bengali script query — Applying natural Bangla grammar.`);
+    thoughts.push(
+      `🗣️ Detected Bengali script query — Applying natural Bangla grammar.`,
+    );
   } else if (isBanglish) {
-    thoughts.push(`🗣️ Detected Romanized Banglish query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? '...' : ''}") — Enforcing native phonetics.`);
+    thoughts.push(
+      `🗣️ Detected Romanized Banglish query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Enforcing native phonetics.`,
+    );
   } else {
-    thoughts.push(`🗣️ Analyzed English query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? '...' : ''}") — Setting concise representative persona.`);
+    thoughts.push(
+      `🗣️ Analyzed English query ("${textSafe.substring(0, 30)}${textSafe.length > 30 ? "..." : ""}") — Setting concise representative persona.`,
+    );
   }
 
   if (imageUrl) {
-    thoughts.push(`🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`);
+    thoughts.push(
+      `🖼️ Multimodal Vision: Analyzing attached image in the context of ${merchantName}.`,
+    );
   }
 
   // Perform Catalog & Knowledge RAG Search
   try {
     const ragTimeout = new Promise<[any[], any[]]>((resolve) =>
-      setTimeout(() => resolve([[], []]), 1200)
+      setTimeout(() => resolve([[], []]), 1200),
     );
 
     let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
       Promise.all([
-        searchProductsTool(merchantId, userMessage || 'general', undefined, 6),
-        searchKnowledgeTool(merchantId, userMessage || 'general', 8, primaryDomain)
+        searchProductsTool(merchantId, userMessage || "general", undefined, 6),
+        searchKnowledgeTool(
+          merchantId,
+          userMessage || "general",
+          8,
+          primaryDomain,
+        ),
       ]),
-      ragTimeout
+      ragTimeout,
     ]);
 
     retrievedProducts = retrievedProductsRes;
@@ -469,65 +542,112 @@ export async function processChatMessage(
     }
 
     if (retrievedProducts.length > 0) {
-      thoughts.push(`📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`);
-      ragContext += `\n\n### Store Catalog & Available Products:\n` +
-        retrievedProducts.map((p) => {
-          const optStr = p.options && Array.isArray(p.options) && p.options.length > 0
-            ? (p.options as any[]).map((o: any) => `${o.name} (${(o.values || []).join(', ')})`).join('; ')
-            : 'None';
-          return `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || 'USD'}** | Options: ${optStr} | Category: ${p.category || 'General'} | Description: ${p.description || p.title}`;
-        }).join('\n') +
+      thoughts.push(
+        `📦 Catalog Match: Retrieved ${retrievedProducts.length} matching store products/showcase items.`,
+      );
+      ragContext +=
+        `\n\n### Store Catalog & Available Products:\n` +
+        retrievedProducts
+          .map((p) => {
+            const optStr =
+              p.options && Array.isArray(p.options) && p.options.length > 0
+                ? (p.options as any[])
+                    .map(
+                      (o: any) => `${o.name} (${(o.values || []).join(", ")})`,
+                    )
+                    .join("; ")
+                : "None";
+            return `- **[${p.title}](${p.productUrl || `/products/${p.id}`})** | ID: \`${p.id}\` | Price: **$${p.price} ${p.currency || "USD"}** | Options: ${optStr} | Category: ${p.category || "General"} | Description: ${p.description || p.title}`;
+          })
+          .join("\n") +
         `\n\nInstructions: Use the catalog items above to recommend items, verify options/sizes, or provide details. Include product page links where appropriate.`;
-    } 
+    }
 
     if (retrievedKnowledgeRes.length > 0) {
-      thoughts.push(`🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`);
-      ragContext += `\n\n### Website Knowledge Base (Scraped Content):\n` +
-        retrievedKnowledgeRes.map((k, i) => `[Source: ${k.url}]\n${k.content}`).join('\n\n') +
+      thoughts.push(
+        `🧠 Vector Memory: Retrieved ${retrievedKnowledgeRes.length} diverse pgvector chunks matching query intent.`,
+      );
+      ragContext +=
+        `\n\n### Website Knowledge Base (Scraped Content):\n` +
+        retrievedKnowledgeRes
+          .map((k, i) => `[Source: ${k.url}]\n${k.content}`)
+          .join("\n\n") +
         `\n\nInstructions: Use the scraped website knowledge above to answer the user's questions about company info, portfolio, policies, FAQs, or general site services.`;
-    } else if (userMessage && userMessage.trim().length > 3 && !isSimpleGreeting(userMessage)) {
+    } else if (
+      userMessage &&
+      userMessage.trim().length > 3 &&
+      !isSimpleGreeting(userMessage)
+    ) {
       // Trigger Live Web Search fallback if vector memory has 0 matches (with strict 1.5s timeout cap)
-      thoughts.push(`🌐 Executing real-time web search for "${userMessage}"...`);
-      const webSearchTimeout = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 1500));
-      const webResults = await Promise.race([webSearchTool(userMessage, 3), webSearchTimeout]);
+      thoughts.push(
+        `🌐 Executing real-time web search for "${userMessage}"...`,
+      );
+      const webSearchTimeout = new Promise<any[]>((resolve) =>
+        setTimeout(() => resolve([]), 1500),
+      );
+      const webResults = await Promise.race([
+        webSearchTool(userMessage, 3),
+        webSearchTimeout,
+      ]);
       if (webResults.length > 0) {
-        thoughts.push(`✨ Retrieved ${webResults.length} real-time internet search results.`);
-        ragContext += `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
-          webResults.map(w => `[Source: ${w.title}](${w.url})\n${w.snippet}`).join('\n\n') +
+        thoughts.push(
+          `✨ Retrieved ${webResults.length} real-time internet search results.`,
+        );
+        ragContext +=
+          `\n\n### Live Web Search Results (Real-Time Internet Search):\n` +
+          webResults
+            .map((w) => `[Source: ${w.title}](${w.url})\n${w.snippet}`)
+            .join("\n\n") +
           `\n\nInstructions: Use the live web search results above to answer the user's real-time internet query with up-to-date information. Always include source links where appropriate.`;
       }
     }
 
-    if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0 && !ragContext.includes('Live Web Search Results')) {
+    if (
+      retrievedProducts.length === 0 &&
+      retrievedKnowledgeRes.length === 0 &&
+      !ragContext.includes("Live Web Search Results")
+    ) {
       ragContext = `\n\n### Website Context:
-Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ''}.
+Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ""}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
     }
   } catch (err) {
-    logger.error('RAG Search Error:', err);
+    logger.error("RAG Search Error:", err);
   }
 
   // Resolve LLM Provider & Vision Support (Gemini as #1 Primary Choice for Superior Multilingual & Banglish Fluency)
-  let selectedProvider = provider || '';
+  let selectedProvider = provider || "";
   if (!selectedProvider) {
-    if (keyRotator.hasGeminiKeys()) selectedProvider = 'gemini';
-    else if (keyRotator.hasGroqKeys()) selectedProvider = 'groq';
-    else if (keyRotator.hasOpenRouterKeys()) selectedProvider = 'openrouter';
-    else if (keyRotator.hasAnthropicKeys()) selectedProvider = 'claude';
+    if (keyRotator.hasGeminiKeys()) selectedProvider = "gemini";
+    else if (keyRotator.hasGroqKeys()) selectedProvider = "groq";
+    else if (keyRotator.hasOpenRouterKeys()) selectedProvider = "openrouter";
+    else if (keyRotator.hasAnthropicKeys()) selectedProvider = "claude";
   }
 
-  const systemPrompt = getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, template);
+  const systemPrompt = getSystemPrompt(
+    merchantName,
+    primaryDomain,
+    botMode,
+    customPrompt,
+    template,
+  );
 
   // Construct historical messages
   const messagesParam: any[] = conversation.messages.map((m) => {
-    let text = m.content || '';
-    if (text.includes('data:image/')) {
+    let text = m.content || "";
+    if (text.includes("data:image/")) {
       text = text
-        .replace(/!\[Uploaded Image\]\(data:image\/[^)]+\)/g, '[Image Attached]')
-        .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image Attached]');
+        .replace(
+          /!\[Uploaded Image\]\(data:image\/[^)]+\)/g,
+          "[Image Attached]",
+        )
+        .replace(
+          /data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g,
+          "[Image Attached]",
+        );
     }
     return {
-      role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+      role: m.role === "user" ? ("user" as const) : ("assistant" as const),
       content: text,
     };
   });
@@ -538,106 +658,149 @@ Currently, no specific catalog items or knowledge base articles matched this que
     : `Please analyze this attached image in the context of ${merchantName}.`;
   const userContent = imageUrl
     ? [
-        { type: 'text', text: formattedUserText },
-        { type: 'image_url', image_url: { url: imageUrl } },
+        { type: "text", text: formattedUserText },
+        { type: "image_url", image_url: { url: imageUrl } },
       ]
     : formattedUserText;
 
-  messagesParam.push({ role: 'user', content: userContent as any });
+  messagesParam.push({ role: "user", content: userContent as any });
 
   let executionSuccess = false;
   let estimatedTokens = 0;
 
   // Attempt 1: Primary High-Intelligence Multilingual Provider (Google Gemini 1.5 Flash)
-  if ((selectedProvider === 'gemini' || keyRotator.hasGeminiKeys()) && !executionSuccess) {
+  if (
+    (selectedProvider === "gemini" || keyRotator.hasGeminiKeys()) &&
+    !executionSuccess
+  ) {
     try {
       const result = await keyRotator.executeGeminiCompletion(
-        'gemini-1.5-flash',
-        [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        850
+        "gemini-1.5-flash",
+        [
+          { role: "system", content: systemPrompt + ragContext },
+          ...messagesParam,
+        ],
+        850,
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(`⚡ Synthesized response via Google Gemini 3.6 Flash (~0.3s).`);
+      thoughts.push(
+        `⚡ Synthesized response via Google Gemini 3.6 Flash (~0.3s).`,
+      );
     } catch (error) {
-      logger.error('Gemini provider pool failed, falling back to Groq pool:', error);
-      selectedProvider = 'groq';
+      logger.error(
+        "Gemini provider pool failed, falling back to Groq pool:",
+        error,
+      );
+      selectedProvider = "groq";
     }
   }
 
   // Attempt 2: High-Speed Groq Pool (llama3-70b-8192 / llama-3.2-11b-vision-preview)
-  if (!executionSuccess && (selectedProvider === 'groq' || keyRotator.hasGroqKeys())) {
+  if (
+    !executionSuccess &&
+    (selectedProvider === "groq" || keyRotator.hasGroqKeys())
+  ) {
     try {
-      const model = imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+      const model = imageUrl
+        ? "llama-3.2-11b-vision-preview"
+        : "llama-3.3-70b-versatile";
       const result = await keyRotator.executeGroqCompletion(
         model,
-        [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        850
+        [
+          { role: "system", content: systemPrompt + ragContext },
+          ...messagesParam,
+        ],
+        850,
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
       thoughts.push(`⚡ Synthesized response via Groq LLaMA 3.3 70B (~0.4s).`);
     } catch (error) {
-      logger.error('Groq provider pool failed, falling back to OpenRouter pool:', error);
-      selectedProvider = 'openrouter';
+      logger.error(
+        "Groq provider pool failed, falling back to OpenRouter pool:",
+        error,
+      );
+      selectedProvider = "openrouter";
     }
   }
 
   // Attempt 3: Fallback to OpenRouter (meta-llama/llama-3.3-70b-instruct)
-  if (!executionSuccess && (selectedProvider === 'openrouter' || keyRotator.hasOpenRouterKeys())) {
+  if (
+    !executionSuccess &&
+    (selectedProvider === "openrouter" || keyRotator.hasOpenRouterKeys())
+  ) {
     try {
       const result = await keyRotator.executeOpenRouterCompletion(
-        'meta-llama/llama-3.3-70b-instruct',
-        [{ role: 'system', content: systemPrompt + ragContext }, ...messagesParam],
-        850
+        "meta-llama/llama-3.3-70b-instruct",
+        [
+          { role: "system", content: systemPrompt + ragContext },
+          ...messagesParam,
+        ],
+        850,
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(`⚡ Synthesized response via OpenRouter LLaMA 3.3 70B (~0.5s).`);
+      thoughts.push(
+        `⚡ Synthesized response via OpenRouter LLaMA 3.3 70B (~0.5s).`,
+      );
     } catch (error) {
-      logger.error('OpenRouter provider pool failed, falling back to Anthropic:', error);
-      selectedProvider = 'claude';
+      logger.error(
+        "OpenRouter provider pool failed, falling back to Anthropic:",
+        error,
+      );
+      selectedProvider = "claude";
     }
   }
 
   // Attempt 4: Fallback to Anthropic Claude 3.5 Sonnet
-  if (!executionSuccess && (selectedProvider === 'claude' || keyRotator.hasAnthropicKeys())) {
+  if (
+    !executionSuccess &&
+    (selectedProvider === "claude" || keyRotator.hasAnthropicKeys())
+  ) {
     try {
       const anthropicMessages = conversation.messages.map((m) => ({
-        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-        content: m.content || '',
+        role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+        content: m.content || "",
       }));
-      anthropicMessages.push({ role: 'user' as const, content: userMessage });
+      anthropicMessages.push({ role: "user" as const, content: userMessage });
 
       const result = await keyRotator.executeAnthropicCompletion(
-        'claude-3-5-sonnet-20241022',
+        "claude-3-5-sonnet-20241022",
         systemPrompt + ragContext,
         anthropicMessages,
-        850
+        850,
       );
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(`⚡ Synthesized response via Anthropic Claude 3.5 Sonnet (~0.7s).`);
+      thoughts.push(
+        `⚡ Synthesized response via Anthropic Claude 3.5 Sonnet (~0.7s).`,
+      );
     } catch (error) {
-      logger.error('Anthropic provider pool failed:', error);
-      selectedProvider = 'fallback';
+      logger.error("Anthropic provider pool failed:", error);
+      selectedProvider = "fallback";
     }
   }
 
   // Fallback to local DB text search when API calls fail or keys are missing
-  if (selectedProvider === 'fallback' || !finalReply) {
-    const searchRes = await searchProductsTool(merchantId, userMessage, undefined, 5);
+  if (selectedProvider === "fallback" || !finalReply) {
+    const searchRes = await searchProductsTool(
+      merchantId,
+      userMessage,
+      undefined,
+      5,
+    );
     retrievedProducts = searchRes;
     if (searchRes.length > 0) {
       finalReply = `Here are some products matching "${userMessage}":`;
     } else {
-      if (botMode === 'support' || template === 'Customer Support') {
+      if (botMode === "support" || template === "Customer Support") {
         finalReply = `I am here to assist with questions about our company, services, and projects.`;
-      } else if (botMode === 'sales') {
+      } else if (botMode === "sales") {
         finalReply = `Welcome! How can I assist you with our services and projects today?`;
       } else {
         finalReply = `Welcome! How can I help you explore our website today?`;
@@ -647,28 +810,36 @@ Currently, no specific catalog items or knowledge base articles matched this que
 
   // Process Add-to-cart triggers and sanitize response
   finalReply = finalReply
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
     .trim();
 
   // Remove raw markdown hashtags (#, ##, ###), convert raw * bullets to •, and clean trailing fragments
   finalReply = finalReply
-    .replace(/#+\s*/g, '')
-    .replace(/^[\t ]*\*[\t ]+/gm, '• ')
-    .replace(/\n[\t ]*\*[\t ]+/g, '\n• ')
-    .replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, '')
+    .replace(/#+\s*/g, "")
+    .replace(/^[\t ]*\*[\t ]+/gm, "• ")
+    .replace(/\n[\t ]*\*[\t ]+/g, "\n• ")
+    .replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, "")
     .trim();
 
   // Strip trailing incomplete bullet item (e.g. "\n5. " or "\n5. E-Commerce" without terminal punctuation)
-  finalReply = finalReply.replace(/(\n|^)\s*(\d+\.|•|-)\s*[^\n.!?।]*$/g, '').trim();
+  finalReply = finalReply
+    .replace(/(\n|^)\s*(\d+\.|•|-)\s*[^\n.!?।]*$/g, "")
+    .trim();
 
   // If output was abruptly cut off mid-sentence (ends with unclosed bracket or no terminal punctuation), trim to last complete sentence
-  if (finalReply && (!/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(finalReply) || /\([^\)]*$/.test(finalReply))) {
+  if (
+    finalReply &&
+    (!/[.!?\]\)\u0987\u0988\u0989\u098A\u098B\u098C\u098F\u0990\u0993\u0994।]$/.test(
+      finalReply,
+    ) ||
+      /\([^\)]*$/.test(finalReply))
+  ) {
     const lastPunctIndex = Math.max(
-      finalReply.lastIndexOf('.'),
-      finalReply.lastIndexOf('!'),
-      finalReply.lastIndexOf('?'),
-      finalReply.lastIndexOf('।')
+      finalReply.lastIndexOf("."),
+      finalReply.lastIndexOf("!"),
+      finalReply.lastIndexOf("?"),
+      finalReply.lastIndexOf("।"),
     );
     if (lastPunctIndex > 50) {
       finalReply = finalReply.substring(0, lastPunctIndex + 1).trim();
@@ -683,15 +854,15 @@ Currently, no specific catalog items or knowledge base articles matched this que
 
   if (jsonCartMatch || tagCartMatch) {
     try {
-      let targetProdId = '';
+      let targetProdId = "";
       let targetVariantId: string | undefined = undefined;
       let targetOptions: Record<string, string> | undefined = undefined;
       let targetQty = 1;
 
       if (jsonCartMatch) {
-        if (jsonCartMatch[1] && jsonCartMatch[1].startsWith('{')) {
+        if (jsonCartMatch[1] && jsonCartMatch[1].startsWith("{")) {
           const parsed = JSON.parse(jsonCartMatch[1]);
-          targetProdId = parsed.productId || parsed.id || '';
+          targetProdId = parsed.productId || parsed.id || "";
           targetVariantId = parsed.variantId;
           targetOptions = parsed.selectedOptions || parsed.options;
           targetQty = parsed.quantity || 1;
@@ -700,19 +871,26 @@ Currently, no specific catalog items or knowledge base articles matched this que
         }
       } else if (tagCartMatch) {
         const rawContent = tagCartMatch[1].trim();
-        const parts = rawContent.split(',').map((s) => s.trim());
-        targetProdId = parts[0].replace(/^productId:\s*/i, '').trim();
+        const parts = rawContent.split(",").map((s) => s.trim());
+        targetProdId = parts[0].replace(/^productId:\s*/i, "").trim();
 
         if (parts.length > 1) {
-          const secondPart = parts.slice(1).join(', ');
+          const secondPart = parts.slice(1).join(", ");
           if (/size:\s*([a-zA-Z0-9]+)/i.test(secondPart)) {
             const m = secondPart.match(/size:\s*([a-zA-Z0-9]+)/i);
-            if (m) targetOptions = { ...(targetOptions || {}), Size: m[1].toUpperCase() };
+            if (m)
+              targetOptions = {
+                ...(targetOptions || {}),
+                Size: m[1].toUpperCase(),
+              };
           } else if (/color:\s*([a-zA-Z0-9]+)/i.test(secondPart)) {
             const m = secondPart.match(/color:\s*([a-zA-Z0-9]+)/i);
             if (m) targetOptions = { ...(targetOptions || {}), Color: m[1] };
           } else if (/^(xs|s|m|l|xl|xxl|\d{2})$/i.test(secondPart)) {
-            targetOptions = { ...(targetOptions || {}), Size: secondPart.toUpperCase() };
+            targetOptions = {
+              ...(targetOptions || {}),
+              Size: secondPart.toUpperCase(),
+            };
           } else {
             targetVariantId = secondPart;
           }
@@ -721,34 +899,51 @@ Currently, no specific catalog items or knowledge base articles matched this que
 
       // Hard sanitization: Strip all raw tags and markdown blocks from user-visible reply
       finalReply = finalReply
-        .replace(/```json:cart_action[\s\S]*?```/gi, '')
-        .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, '')
+        .replace(/```json:cart_action[\s\S]*?```/gi, "")
+        .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, "")
         .trim();
 
       if (targetProdId) {
-        const res = await addToCartTool(merchantId, targetProdId, targetQty, targetVariantId, targetOptions);
+        const res = await addToCartTool(
+          merchantId,
+          targetProdId,
+          targetQty,
+          targetVariantId,
+          targetOptions,
+        );
         if (res.cartAction) cartAction = res.cartAction;
-        if (res.product && !recommendedProducts.some((p) => p.id === res.product.id)) {
+        if (
+          res.product &&
+          !recommendedProducts.some((p) => p.id === res.product.id)
+        ) {
           recommendedProducts.push(res.product);
         }
 
         // If the reply became empty after stripping tag, provide clean message
         if (!finalReply || finalReply.length < 3) {
-          const prodTitle = res.product?.title || 'Product';
-          const prodUrl = res.product?.productUrl || '#';
-          const hasUnselectedOptions = res.product?.options && (res.product.options as any[]).length > 0 && (!targetOptions || Object.keys(targetOptions).length === 0);
+          const prodTitle = res.product?.title || "Product";
+          const prodUrl = res.product?.productUrl || "#";
+          const hasUnselectedOptions =
+            res.product?.options &&
+            (res.product.options as any[]).length > 0 &&
+            (!targetOptions || Object.keys(targetOptions).length === 0);
 
           if (hasUnselectedOptions) {
-            const optNames = (res.product?.options as any[])?.map((o: any) => o.name).join(', ') || 'Size';
+            const optNames =
+              (res.product?.options as any[])
+                ?.map((o: any) => o.name)
+                .join(", ") || "Size";
             if (isBengaliScript) {
-              finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames || 'সাইজ'}টি পছন্দ?`;
+              finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames || "সাইজ"}টি পছন্দ?`;
             } else if (isBanglish) {
-              finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames || 'size'} ta lagbe?`;
+              finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames || "size"} ta lagbe?`;
             } else {
-              finalReply = `Which ${optNames || 'size'} would you prefer for [${prodTitle}](${prodUrl})?`;
+              finalReply = `Which ${optNames || "size"} would you prefer for [${prodTitle}](${prodUrl})?`;
             }
           } else {
-            const sizeNote = targetOptions?.Size ? ` (Size: ${targetOptions.Size})` : '';
+            const sizeNote = targetOptions?.Size
+              ? ` (Size: ${targetOptions.Size})`
+              : "";
             if (isBengaliScript) {
               finalReply = `[${prodTitle}](${prodUrl})${sizeNote} কার্টে যোগ করা হয়েছে! 🛍️`;
             } else if (isBanglish) {
@@ -760,21 +955,26 @@ Currently, no specific catalog items or knowledge base articles matched this que
         }
       }
     } catch (err) {
-      logger.error('Parsing Add to Cart Tag Error:', err);
+      logger.error("Parsing Add to Cart Tag Error:", err);
     }
   }
 
   // Fail-safe Smart Action Extractor:
   // If no cartAction was parsed from tags, but the AI confirmed adding a product in finalReply
   if (!cartAction && finalReply) {
-    const isQuestionOrOffer = /\b(kore\s*dite\s*parbo|add\s*korte\s*chan|add\s*korbo\s*kina|add\s*kore\s*dibo|lagbe|pochondo|can\s*add\s*it|would\s*you\s*like)\b/i.test(finalReply);
-    const isConfirmingAdd = !isQuestionOrOffer && (
-      /\b(cart\s*e\s*add\s*kora\s*hoyeche|cart\s*e\s*add\s*kore\s*diyechi|cart\s*e\s*jog\s*kora\s*hoyeche|added\s*to\s*(your\s*)?cart|has\s*been\s*added)\b/i.test(finalReply)
-    );
+    const isQuestionOrOffer =
+      /\b(kore\s*dite\s*parbo|add\s*korte\s*chan|add\s*korbo\s*kina|add\s*kore\s*dibo|lagbe|pochondo|can\s*add\s*it|would\s*you\s*like)\b/i.test(
+        finalReply,
+      );
+    const isConfirmingAdd =
+      !isQuestionOrOffer &&
+      /\b(cart\s*e\s*add\s*kora\s*hoyeche|cart\s*e\s*add\s*kore\s*diyechi|cart\s*e\s*jog\s*kora\s*hoyeche|added\s*to\s*(your\s*)?cart|has\s*been\s*added)\b/i.test(
+        finalReply,
+      );
     if (isConfirmingAdd) {
       try {
         const linkMatch = finalReply.match(/\[([^\]]+)\]\(([^)]+)\)/);
-        let targetProdId = '';
+        let targetProdId = "";
         if (linkMatch && linkMatch[2]) {
           const urlIdMatch = linkMatch[2].match(/\/product[s]?\/([^\/\?#]+)/i);
           if (urlIdMatch) {
@@ -787,38 +987,58 @@ Currently, no specific catalog items or knowledge base articles matched this que
           matchedProd = await prisma.product.findFirst({
             where: {
               merchantId,
-              OR: [{ externalId: targetProdId }, { id: targetProdId }, { productUrl: { contains: targetProdId } }],
+              OR: [
+                { externalId: targetProdId },
+                { id: targetProdId },
+                { productUrl: { contains: targetProdId } },
+              ],
             },
           });
         } else if (linkMatch && linkMatch[1]) {
           matchedProd = await prisma.product.findFirst({
-            where: { merchantId, title: { contains: linkMatch[1].trim(), mode: 'insensitive' } },
+            where: {
+              merchantId,
+              title: { contains: linkMatch[1].trim(), mode: "insensitive" },
+            },
           });
         }
 
         if (matchedProd) {
           let targetOptions: Record<string, string> | undefined = undefined;
-          const sizeMatch = finalReply.match(/Size:\s*([a-zA-Z0-9]+)/i) || userMessage.match(/^(xs|s|m|l|xl|xxl|\d{2})$/i);
+          const sizeMatch =
+            finalReply.match(/Size:\s*([a-zA-Z0-9]+)/i) ||
+            userMessage.match(/^(xs|s|m|l|xl|xxl|\d{2})$/i);
           if (sizeMatch) {
-            targetOptions = { Size: (sizeMatch[1] || sizeMatch[0]).toUpperCase() };
+            targetOptions = {
+              Size: (sizeMatch[1] || sizeMatch[0]).toUpperCase(),
+            };
           }
 
-          const res = await addToCartTool(merchantId, matchedProd.externalId || matchedProd.id, 1, undefined, targetOptions);
+          const res = await addToCartTool(
+            merchantId,
+            matchedProd.externalId || matchedProd.id,
+            1,
+            undefined,
+            targetOptions,
+          );
           if (res.cartAction) cartAction = res.cartAction;
-          if (res.product && !recommendedProducts.some((p) => p.id === res.product.id)) {
+          if (
+            res.product &&
+            !recommendedProducts.some((p) => p.id === res.product.id)
+          ) {
             recommendedProducts.push(res.product);
           }
         }
       } catch (err) {
-        logger.error('Smart Action Extractor Error:', err);
+        logger.error("Smart Action Extractor Error:", err);
       }
     }
   }
 
   // Safe fallback sanitization (ensure no tag EVER leaks)
   finalReply = finalReply
-    .replace(/```json:cart_action[\s\S]*?```/gi, '')
-    .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, '')
+    .replace(/```json:cart_action[\s\S]*?```/gi, "")
+    .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, "")
     .trim();
 
   // Bind retrieved RAG products to the assistant response metadata
@@ -830,7 +1050,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
   if (!estimatedTokens) {
     estimatedTokens = Math.max(
       15,
-      Math.ceil(((userMessage || '').length + (finalReply || '').length) / 3.6)
+      Math.ceil(((userMessage || "").length + (finalReply || "").length) / 3.6),
     );
   }
 
@@ -838,10 +1058,13 @@ Currently, no specific catalog items or knowledge base articles matched this que
   await prisma.message.create({
     data: {
       conversationId: conversation.id,
-      role: 'assistant',
+      role: "assistant",
       content: finalReply,
       tokensUsed: estimatedTokens,
-      toolCalls: recommendedProducts.length > 0 || cartAction ? { recommendedProducts, cartAction } : undefined,
+      toolCalls:
+        recommendedProducts.length > 0 || cartAction
+          ? { recommendedProducts, cartAction }
+          : undefined,
     },
   });
 
@@ -855,7 +1078,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
         externalId: p.externalId,
         title: p.title,
         price: p.price,
-        currency: p.currency || 'USD',
+        currency: p.currency || "USD",
         imageUrl: p.imageUrl,
         productUrl: p.productUrl,
         inStock: p.inStock,
@@ -866,7 +1089,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
     });
   }
 
-  thoughts.push('✨ Formulated optimal response.');
+  thoughts.push("✨ Formulated optimal response.");
 
   return {
     sessionId,
@@ -876,7 +1099,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
       externalId: p.externalId,
       title: p.title,
       price: p.price,
-      currency: p.currency || 'USD',
+      currency: p.currency || "USD",
       imageUrl: p.imageUrl,
       productUrl: p.productUrl,
       inStock: p.inStock,

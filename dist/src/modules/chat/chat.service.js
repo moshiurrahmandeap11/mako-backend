@@ -155,13 +155,13 @@ function getSystemPrompt(merchantName, primaryDomain, botMode, customPrompt, tem
   1. IDENTIFY THE EXACT PRODUCT from the Store Catalog:
      - Match the product the user is referring to (by name, keyword, or context from previous conversation).
   2. CHECK THE PRODUCT'S OPTIONS (from the "Options:" field in Catalog data):
-     - IF Options is NOT "None" (e.g. Size, Storage, Weight, Color) AND user has not chosen their specific option yet:
-       - YOU MUST NEVER claim it was added to cart! DO NOT say "cart e add kora hoyeche".
-       - INSTEAD, YOU MUST ASK THE USER for their preferred option in natural language (e.g. "Amader [Product Name](url) er Size (S, M, L, XL) available ache. Apnar kon size ta lagbe?").
-       - Append tag: [ADD_TO_CART: productId]
-     - ONCE the user specifies their option (e.g. "S", "M", "size L", "1kg", "256GB", "Black"):
-       - Friendly message: Confirm the item with their chosen option (e.g. "[Product Name](url) (Size: S) cart e add kora hoyeche!").
-       - Append tag: [ADD_TO_CART: productId, size: S] (or color / storage value).
+     - IF Options is NOT "None" (e.g. Size, Color, Storage, Weight, Material) AND user has not specified all required choices:
+       - YOU MUST NEVER claim it was added to cart if options are missing! DO NOT say "cart e add kora hoyeche".
+       - INSTEAD, ASK THE USER for their preferred choices (e.g. "Amader [Product Name](url) er Size ebong Color available ache. Apnar kon size o color lagbe?").
+       - Append tag: [ADD_TO_CART: productId] (or include known choices: [ADD_TO_CART: productId, Size: S])
+     - ONCE the user specifies their choices (e.g. Size: S, Color: Black):
+       - Friendly message: Confirm the item with their chosen options (e.g. "[Product Name](url) (Size: S, Color: Black) cart e add kora hoyeche!").
+       - Append tag: [ADD_TO_CART: productId, Size: S, Color: Black]
   3. If the product's Options is "None" (no size/color required):
      - Friendly message: "[Product Name](url) cart e add kora hoyeche!"
      - Append tag: [ADD_TO_CART: productId]
@@ -616,23 +616,25 @@ Currently, no specific catalog items or knowledge base articles matched this que
                 const rawContent = tagCartMatch[1].trim();
                 const parts = rawContent.split(',').map((s) => s.trim());
                 targetProdId = parts[0].replace(/^productId:\s*/i, '').trim();
+                // Dynamically resolve any options passed in tag (e.g. Size: M, Color: Black, Storage: 256GB, or raw values)
                 if (parts.length > 1) {
-                    const secondPart = parts.slice(1).join(', ');
-                    if (/size:\s*([a-zA-Z0-9]+)/i.test(secondPart)) {
-                        const m = secondPart.match(/size:\s*([a-zA-Z0-9]+)/i);
-                        if (m)
-                            targetOptions = { ...(targetOptions || {}), Size: m[1].toUpperCase() };
-                    }
-                    else if (/color:\s*([a-zA-Z0-9]+)/i.test(secondPart)) {
-                        const m = secondPart.match(/color:\s*([a-zA-Z0-9]+)/i);
-                        if (m)
-                            targetOptions = { ...(targetOptions || {}), Color: m[1] };
-                    }
-                    else if (/^(xs|s|m|l|xl|xxl|\d{2})$/i.test(secondPart)) {
-                        targetOptions = { ...(targetOptions || {}), Size: secondPart.toUpperCase() };
-                    }
-                    else {
-                        targetVariantId = secondPart;
+                    targetOptions = targetOptions || {};
+                    for (let i = 1; i < parts.length; i++) {
+                        const p = parts[i];
+                        if (p.includes(':')) {
+                            const [k, ...vParts] = p.split(':');
+                            const key = k.trim();
+                            const val = vParts.join(':').trim();
+                            if (key && val) {
+                                targetOptions[key] = val;
+                            }
+                        }
+                        else if (/^(xs|s|m|l|xl|xxl|\d{2})$/i.test(p)) {
+                            targetOptions['Size'] = p.toUpperCase();
+                        }
+                        else if (!targetVariantId && /^[a-zA-Z0-9_-]{8,}$/.test(p)) {
+                            targetVariantId = p;
+                        }
                     }
                 }
             }
@@ -642,6 +644,36 @@ Currently, no specific catalog items or knowledge base articles matched this que
                 .replace(/\[ADD_TO_CART:\s*[^\]]+\]/gi, '')
                 .trim();
             if (targetProdId) {
+                // Fetch target product to access full options schema
+                const productRecord = await db_1.prisma.product.findFirst({
+                    where: {
+                        merchantId,
+                        OR: [
+                            { id: targetProdId },
+                            { externalId: targetProdId },
+                            { productUrl: { contains: targetProdId } },
+                            { title: { contains: targetProdId, mode: 'insensitive' } },
+                        ],
+                    },
+                });
+                // Dynamic Schema Option Matching across text & prompt
+                if (productRecord && productRecord.options && Array.isArray(productRecord.options)) {
+                    targetOptions = targetOptions || {};
+                    const schemaOpts = productRecord.options;
+                    for (const opt of schemaOpts) {
+                        if (!targetOptions[opt.name] && Array.isArray(opt.values)) {
+                            // Check if userMessage or finalReply explicitly mentions any of this option's values
+                            for (const val of opt.values) {
+                                const escapedVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                const valRegex = new RegExp(`\\b${escapedVal}\\b`, 'i');
+                                if (valRegex.test(userMessage) || valRegex.test(finalReply)) {
+                                    targetOptions[opt.name] = val;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
                 const res = await (0, addToCart_tool_1.addToCartTool)(merchantId, targetProdId, targetQty, targetVariantId, targetOptions);
                 if (res.cartAction)
                     cartAction = res.cartAction;
@@ -656,25 +688,27 @@ Currently, no specific catalog items or knowledge base articles matched this que
                     if (hasUnselectedOptions) {
                         const optNames = res.product?.options?.map((o) => o.name).join(', ') || 'Size';
                         if (isBengaliScript) {
-                            finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames || 'সাইজ'}টি পছন্দ?`;
+                            finalReply = `[${prodTitle}](${prodUrl})-এর জন্য আপনার কোন ${optNames}টি পছন্দ?`;
                         }
                         else if (isBanglish) {
-                            finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames || 'size'} ta lagbe?`;
+                            finalReply = `[${prodTitle}](${prodUrl}) er jonno apnar kon ${optNames} ta lagbe?`;
                         }
                         else {
-                            finalReply = `Which ${optNames || 'size'} would you prefer for [${prodTitle}](${prodUrl})?`;
+                            finalReply = `Which ${optNames} would you prefer for [${prodTitle}](${prodUrl})?`;
                         }
                     }
                     else {
-                        const sizeNote = targetOptions?.Size ? ` (Size: ${targetOptions.Size})` : '';
+                        const optionSummary = targetOptions && Object.keys(targetOptions).length > 0
+                            ? ` (${Object.entries(targetOptions).map(([k, v]) => `${k}: ${v}`).join(', ')})`
+                            : '';
                         if (isBengaliScript) {
-                            finalReply = `[${prodTitle}](${prodUrl})${sizeNote} কার্টে যোগ করা হয়েছে! 🛍️`;
+                            finalReply = `[${prodTitle}](${prodUrl})${optionSummary} কার্টে যোগ করা হয়েছে! 🛍️`;
                         }
                         else if (isBanglish) {
-                            finalReply = `[${prodTitle}](${prodUrl})${sizeNote} cart e add kora hoyeche! 🛍️`;
+                            finalReply = `[${prodTitle}](${prodUrl})${optionSummary} cart e add kora hoyeche! 🛍️`;
                         }
                         else {
-                            finalReply = `[${prodTitle}](${prodUrl})${sizeNote} has been added to your cart! 🛍️`;
+                            finalReply = `[${prodTitle}](${prodUrl})${optionSummary} has been added to your cart! 🛍️`;
                         }
                     }
                 }
@@ -715,9 +749,21 @@ Currently, no specific catalog items or knowledge base articles matched this que
                 }
                 if (matchedProd) {
                     let targetOptions = undefined;
-                    const sizeMatch = finalReply.match(/Size:\s*([a-zA-Z0-9]+)/i) || userMessage.match(/^(xs|s|m|l|xl|xxl|\d{2})$/i);
-                    if (sizeMatch) {
-                        targetOptions = { Size: (sizeMatch[1] || sizeMatch[0]).toUpperCase() };
+                    if (matchedProd.options && Array.isArray(matchedProd.options)) {
+                        const schemaOpts = matchedProd.options;
+                        for (const opt of schemaOpts) {
+                            if (Array.isArray(opt.values)) {
+                                for (const val of opt.values) {
+                                    const escapedVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                    const valRegex = new RegExp(`\\b${escapedVal}\\b`, 'i');
+                                    if (valRegex.test(userMessage) || valRegex.test(finalReply)) {
+                                        targetOptions = targetOptions || {};
+                                        targetOptions[opt.name] = val;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
                     const res = await (0, addToCart_tool_1.addToCartTool)(merchantId, matchedProd.externalId || matchedProd.id, 1, undefined, targetOptions);
                     if (res.cartAction)

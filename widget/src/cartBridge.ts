@@ -5,7 +5,7 @@
 
 export interface AddToCartResult {
   success: boolean;
-  platform: 'shopify' | 'woocommerce' | 'dom_simulation' | 'custom_event';
+  platform: "shopify" | "woocommerce" | "dom_simulation" | "custom_event";
   message: string;
 }
 
@@ -13,13 +13,19 @@ export interface AddToCartResult {
  * Checks if the current host page is running on Shopify
  */
 export function isShopifyStore(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
   const win = window as any;
-  if (win.Shopify && (win.Shopify.shop || win.Shopify.theme || win.Shopify.routes)) {
+  if (
+    win.Shopify &&
+    (win.Shopify.shop || win.Shopify.theme || win.Shopify.routes)
+  ) {
     return true;
   }
   // Check if meta tags or script tags exist
-  if (document.querySelector('meta[name="shopify-digital-wallet"]') || document.querySelector('link[href*="cdn.shopify.com"]')) {
+  if (
+    document.querySelector('meta[name="shopify-digital-wallet"]') ||
+    document.querySelector('link[href*="cdn.shopify.com"]')
+  ) {
     return true;
   }
   return false;
@@ -29,15 +35,27 @@ export function isShopifyStore(): boolean {
  * Checks if the current host page is running on WooCommerce / WordPress
  */
 export function isWooCommerceStore(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
   const win = window as any;
-  if (win.wc_add_to_cart_params || win.woocommerce_params || win.wc_cart_fragments_params) {
+  if (
+    win.wc_add_to_cart_params ||
+    win.woocommerce_params ||
+    win.wc_cart_fragments_params
+  ) {
     return true;
   }
-  if (document.body && (document.body.classList.contains('woocommerce') || document.body.classList.contains('woocommerce-page'))) {
+  if (
+    document.body &&
+    (document.body.classList.contains("woocommerce") ||
+      document.body.classList.contains("woocommerce-page"))
+  ) {
     return true;
   }
-  if (document.querySelector('.woocommerce, [class*="woocommerce"], form.variations_form')) {
+  if (
+    document.querySelector(
+      '.woocommerce, [class*="woocommerce"], form.variations_form',
+    )
+  ) {
     return true;
   }
   return false;
@@ -49,10 +67,10 @@ export function isWooCommerceStore(): boolean {
 async function executeShopifyAddToCart(
   itemIdentifier: string,
   quantity: number = 1,
-  properties?: Record<string, string>
+  properties?: Record<string, string>,
 ): Promise<AddToCartResult> {
   try {
-    const rawId = itemIdentifier.replace(/[^0-9]/g, '');
+    const rawId = itemIdentifier.replace(/[^0-9]/g, "");
     const variantId = rawId ? Number(rawId) : itemIdentifier;
 
     const payload = {
@@ -65,50 +83,76 @@ async function executeShopifyAddToCart(
       ],
     };
 
-    const res = await fetch('/cart/add.js', {
-      method: 'POST',
+    const res = await fetch("/cart/add.js", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        "Content-Type": "application/json",
+        Accept: "application/json",
       },
       body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
       const errJson = await res.json().catch(() => ({}));
-      throw new Error(errJson.description || errJson.message || `Shopify responded with status ${res.status}`);
+      throw new Error(
+        errJson.description ||
+          errJson.message ||
+          `Shopify responded with status ${res.status}`,
+      );
     }
 
     const data = await res.json();
 
     // Fetch fresh cart state & dispatch standard theme cart events
-    fetch('/cart.js')
+    fetch("/cart.js")
       .then((r) => r.json())
       .then((cartData) => {
-        document.dispatchEvent(new CustomEvent('cart:updated', { detail: { cart: cartData }, bubbles: true }));
-        document.dispatchEvent(new CustomEvent('cart:refresh', { detail: { cart: cartData }, bubbles: true }));
-        document.dispatchEvent(new CustomEvent('cart:change', { detail: { cart: cartData }, bubbles: true }));
-        window.dispatchEvent(new CustomEvent('shopify:cart:updated', { detail: { cart: cartData } }));
+        document.dispatchEvent(
+          new CustomEvent("cart:updated", {
+            detail: { cart: cartData },
+            bubbles: true,
+          }),
+        );
+        document.dispatchEvent(
+          new CustomEvent("cart:refresh", {
+            detail: { cart: cartData },
+            bubbles: true,
+          }),
+        );
+        document.dispatchEvent(
+          new CustomEvent("cart:change", {
+            detail: { cart: cartData },
+            bubbles: true,
+          }),
+        );
+        window.dispatchEvent(
+          new CustomEvent("shopify:cart:updated", {
+            detail: { cart: cartData },
+          }),
+        );
       })
       .catch(() => {});
 
     // Try opening the Shopify Theme Cart Drawer if present
     setTimeout(() => {
       const drawerSelectors = [
-        '[data-cart-drawer-toggle]',
+        "[data-cart-drawer-toggle]",
         '[aria-controls="CartDrawer"]',
-        '.cart-drawer-open',
-        '.js-drawer-open-cart',
-        '.header__icon--cart',
-        'cart-drawer',
-        '#cart-icon-bubble',
+        ".cart-drawer-open",
+        ".js-drawer-open-cart",
+        ".header__icon--cart",
+        "cart-drawer",
+        "#cart-icon-bubble",
         'a[href="/cart"]',
       ];
       for (const sel of drawerSelectors) {
         const elem = document.querySelector(sel) as HTMLElement;
-        if (elem && typeof elem.click === 'function') {
+        if (elem && typeof elem.click === "function") {
           // Trigger theme drawer
-          if (elem.tagName.toLowerCase() === 'cart-drawer' && typeof (elem as any).open === 'function') {
+          if (
+            elem.tagName.toLowerCase() === "cart-drawer" &&
+            typeof (elem as any).open === "function"
+          ) {
             (elem as any).open();
             break;
           }
@@ -118,15 +162,18 @@ async function executeShopifyAddToCart(
 
     return {
       success: true,
-      platform: 'shopify',
-      message: 'Item added to Shopify cart successfully!',
+      platform: "shopify",
+      message: "Item added to Shopify cart successfully!",
     };
   } catch (err: any) {
-    console.warn('[Labto AI Cart] Shopify Ajax Add failed, falling back to DOM/events:', err);
+    console.warn(
+      "[Labto AI Cart] Shopify Ajax Add failed, falling back to DOM/events:",
+      err,
+    );
     return {
       success: false,
-      platform: 'shopify',
-      message: err.message || 'Failed to add item to Shopify cart',
+      platform: "shopify",
+      message: err.message || "Failed to add item to Shopify cart",
     };
   }
 }
@@ -138,32 +185,32 @@ async function executeWooCommerceAddToCart(
   productId: string,
   quantity: number = 1,
   variantId?: string,
-  selectedOptions?: Record<string, string>
+  selectedOptions?: Record<string, string>,
 ): Promise<AddToCartResult> {
   try {
     const formData = new URLSearchParams();
-    const cleanProductId = productId.replace(/[^0-9]/g, '') || productId;
-    formData.append('product_id', cleanProductId);
-    formData.append('quantity', String(quantity || 1));
+    const cleanProductId = productId.replace(/[^0-9]/g, "") || productId;
+    formData.append("product_id", cleanProductId);
+    formData.append("quantity", String(quantity || 1));
 
     if (variantId) {
-      const cleanVarId = variantId.replace(/[^0-9]/g, '') || variantId;
-      formData.append('variation_id', cleanVarId);
+      const cleanVarId = variantId.replace(/[^0-9]/g, "") || variantId;
+      formData.append("variation_id", cleanVarId);
     }
 
     if (selectedOptions) {
       Object.entries(selectedOptions).forEach(([k, v]) => {
-        const key = k.toLowerCase().replace(/\s+/g, '_');
+        const key = k.toLowerCase().replace(/\s+/g, "_");
         formData.append(`attribute_${key}`, v);
       });
     }
 
     // Try standard WooCommerce AJAX endpoint
-    const res = await fetch('/?wc-ajax=add_to_cart', {
-      method: 'POST',
+    const res = await fetch("/?wc-ajax=add_to_cart", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        Accept: "application/json, text/javascript, */*; q=0.01",
       },
       body: formData,
     });
@@ -171,23 +218,26 @@ async function executeWooCommerceAddToCart(
     if (res.ok) {
       const win = window as any;
       if (win.jQuery) {
-        win.jQuery(document.body).trigger('added_to_cart');
-        win.jQuery(document.body).trigger('wc_fragment_refresh');
+        win.jQuery(document.body).trigger("added_to_cart");
+        win.jQuery(document.body).trigger("wc_fragment_refresh");
       }
       return {
         success: true,
-        platform: 'woocommerce',
-        message: 'Item added to WooCommerce cart!',
+        platform: "woocommerce",
+        message: "Item added to WooCommerce cart!",
       };
     }
   } catch (err: any) {
-    console.warn('[Labto AI Cart] WooCommerce AJAX failed, trying fallback:', err);
+    console.warn(
+      "[Labto AI Cart] WooCommerce AJAX failed, trying fallback:",
+      err,
+    );
   }
 
   return {
     success: false,
-    platform: 'woocommerce',
-    message: 'WooCommerce AJAX fallback needed',
+    platform: "woocommerce",
+    message: "WooCommerce AJAX fallback needed",
   };
 }
 
@@ -195,9 +245,9 @@ async function executeWooCommerceAddToCart(
  * Tier 3: Smart DOM Simulation (For Custom React, Next.js, Vue, PHP, Webflow, HTML, Wix, Squarespace)
  */
 async function executeDomSimulationAddToCart(
-  selectedOptions?: Record<string, string>
+  selectedOptions?: Record<string, string>,
 ): Promise<boolean> {
-  if (typeof document === 'undefined') return false;
+  if (typeof document === "undefined") return false;
 
   try {
     // 1. If options like Size/Storage/Weight/Color were selected, find and click matching options / swatches / buttons
@@ -209,17 +259,32 @@ async function executeDomSimulationAddToCart(
         const lowerVal = String(optVal).toLowerCase().trim();
 
         // A. Search native <select> dropdowns
-        const selects = Array.from(document.querySelectorAll('select'));
+        const selects = Array.from(document.querySelectorAll("select"));
         for (const sel of selects) {
-          const selName = (sel.name || sel.id || sel.getAttribute('data-name') || '').toLowerCase();
-          if (selName.includes(lowerName) || lowerName.includes('size') || lowerName.includes('color') || lowerName.includes('storage') || lowerName.includes('weight')) {
+          const selName = (
+            sel.name ||
+            sel.id ||
+            sel.getAttribute("data-name") ||
+            ""
+          ).toLowerCase();
+          if (
+            selName.includes(lowerName) ||
+            lowerName.includes("size") ||
+            lowerName.includes("color") ||
+            lowerName.includes("storage") ||
+            lowerName.includes("weight")
+          ) {
             for (let i = 0; i < sel.options.length; i++) {
               const optText = sel.options[i].text.toLowerCase().trim();
               const optV = sel.options[i].value.toLowerCase().trim();
-              if (optText === lowerVal || optV === lowerVal || optText.includes(lowerVal)) {
+              if (
+                optText === lowerVal ||
+                optV === lowerVal ||
+                optText.includes(lowerVal)
+              ) {
                 sel.selectedIndex = i;
-                sel.dispatchEvent(new Event('change', { bubbles: true }));
-                sel.dispatchEvent(new Event('input', { bubbles: true }));
+                sel.dispatchEvent(new Event("change", { bubbles: true }));
+                sel.dispatchEvent(new Event("input", { bubbles: true }));
                 optionClicked = true;
                 break;
               }
@@ -229,13 +294,26 @@ async function executeDomSimulationAddToCart(
 
         // B. Search interactive buttons, swatches, radio buttons, and pill chips
         const clickableOptions = Array.from(
-          document.querySelectorAll('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, [data-size], [data-value], [data-color], [data-storage], [data-weight]')
+          document.querySelectorAll(
+            'button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, [data-size], [data-value], [data-color], [data-storage], [data-weight]',
+          ),
         );
         for (const el of clickableOptions) {
-          const text = (el.textContent || (el as HTMLInputElement).value || el.getAttribute('data-value') || el.getAttribute('data-size') || el.getAttribute('data-color') || '').trim().toLowerCase();
+          const text = (
+            el.textContent ||
+            (el as HTMLInputElement).value ||
+            el.getAttribute("data-value") ||
+            el.getAttribute("data-size") ||
+            el.getAttribute("data-color") ||
+            ""
+          )
+            .trim()
+            .toLowerCase();
           if (text === lowerVal) {
             (el as HTMLElement).focus();
-            (el as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            (el as HTMLElement).dispatchEvent(
+              new MouseEvent("click", { bubbles: true, cancelable: true }),
+            );
             (el as HTMLElement).click();
             optionClicked = true;
             break;
@@ -245,7 +323,9 @@ async function executeDomSimulationAddToCart(
 
       // If an option was selected, wait 150ms for React/Vue/Svelte/Next.js state hydration
       if (optionClicked) {
-        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 180)));
+        await new Promise((r) =>
+          requestAnimationFrame(() => setTimeout(r, 180)),
+        );
       }
     }
 
@@ -259,35 +339,48 @@ async function executeDomSimulationAddToCart(
       'button[class*="single_add_to_cart" i]',
       '[data-action="add-to-cart" i]',
       '[data-testid*="add-to-cart" i]',
-      '.add-to-cart-btn',
-      '.single_add_to_cart_button',
-      '.product-form__submit',
-      '#AddToCart',
+      ".add-to-cart-btn",
+      ".single_add_to_cart_button",
+      ".product-form__submit",
+      "#AddToCart",
     ];
 
     for (const sel of buttonSelectors) {
       const btn = document.querySelector(sel) as HTMLElement;
-      if (btn && btn.offsetParent !== null && typeof btn.click === 'function') {
+      if (btn && btn.offsetParent !== null && typeof btn.click === "function") {
         btn.focus();
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        btn.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true }),
+        );
         btn.click();
         return true;
       }
     }
 
     // 3. Fallback: Search all buttons / submit inputs for Add to Cart text
-    const allButtons = Array.from(document.querySelectorAll('button, input[type="submit"], a[role="button"]'));
+    const allButtons = Array.from(
+      document.querySelectorAll(
+        'button, input[type="submit"], a[role="button"]',
+      ),
+    );
     for (const b of allButtons) {
-      const text = (b.textContent || (b as HTMLInputElement).value || '').trim().toLowerCase();
-      if (/add\s*to\s*cart|add\s*to\s*bag|buy\s*now/i.test(text) && (b as HTMLElement).offsetParent !== null) {
+      const text = (b.textContent || (b as HTMLInputElement).value || "")
+        .trim()
+        .toLowerCase();
+      if (
+        /add\s*to\s*cart|add\s*to\s*bag|buy\s*now/i.test(text) &&
+        (b as HTMLElement).offsetParent !== null
+      ) {
         (b as HTMLElement).focus();
-        (b as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        (b as HTMLElement).dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true }),
+        );
         (b as HTMLElement).click();
         return true;
       }
     }
   } catch (err) {
-    console.warn('[Labto AI Cart] DOM Simulation failed:', err);
+    console.warn("[Labto AI Cart] DOM Simulation failed:", err);
   }
 
   return false;
@@ -299,14 +392,14 @@ let isAutoAdding = false;
  * Auto-Add Watcher for Cross-Page Navigations (e.g. user clicked Add to Cart from /cart or /collection)
  */
 export function initAutoAddWatcher(): void {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  if (typeof window === "undefined" || typeof document === "undefined") return;
 
   try {
-    const raw = sessionStorage.getItem('labto_auto_add');
+    const raw = sessionStorage.getItem("labto_auto_add");
     if (!raw) return;
 
     // Immediately remove from sessionStorage to prevent concurrent readers
-    sessionStorage.removeItem('labto_auto_add');
+    sessionStorage.removeItem("labto_auto_add");
 
     if (isAutoAdding) return;
 
@@ -330,8 +423,17 @@ export function initAutoAddWatcher(): void {
       if (clicked) {
         clearInterval(interval);
         isAutoAdding = false;
-        executeEventAndLocalStorageAddToCart(data.productId, data.quantity, data.variantId, data.options);
-        window.dispatchEvent(new CustomEvent('labto:toast', { detail: { message: 'Added to cart successfully!' } }));
+        executeEventAndLocalStorageAddToCart(
+          data.productId,
+          data.quantity,
+          data.variantId,
+          data.options,
+        );
+        window.dispatchEvent(
+          new CustomEvent("labto:toast", {
+            detail: { message: "Added to cart successfully!" },
+          }),
+        );
       }
     }, 300);
   } catch {
@@ -346,9 +448,9 @@ function executeEventAndLocalStorageAddToCart(
   productId: string,
   quantity: number = 1,
   variantId?: string,
-  selectedOptions?: Record<string, string>
+  selectedOptions?: Record<string, string>,
 ): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   const eventPayload = {
     productId,
@@ -359,14 +461,28 @@ function executeEventAndLocalStorageAddToCart(
   };
 
   // Dispatch standard events for headless React/Vue/Next.js stores
-  window.dispatchEvent(new CustomEvent('ai-widget:add-to-cart', { detail: eventPayload, bubbles: true }));
-  window.dispatchEvent(new CustomEvent('labto:add_to_cart', { detail: eventPayload, bubbles: true }));
-  window.dispatchEvent(new CustomEvent('labto:cart:add', { detail: eventPayload, bubbles: true }));
-  document.dispatchEvent(new CustomEvent('labto:cart:add', { detail: eventPayload, bubbles: true }));
+  window.dispatchEvent(
+    new CustomEvent("ai-widget:add-to-cart", {
+      detail: eventPayload,
+      bubbles: true,
+    }),
+  );
+  window.dispatchEvent(
+    new CustomEvent("labto:add_to_cart", {
+      detail: eventPayload,
+      bubbles: true,
+    }),
+  );
+  window.dispatchEvent(
+    new CustomEvent("labto:cart:add", { detail: eventPayload, bubbles: true }),
+  );
+  document.dispatchEvent(
+    new CustomEvent("labto:cart:add", { detail: eventPayload, bubbles: true }),
+  );
 
   // Safe fallback to common localStorage cart keys
   try {
-    const keysToCheck = ['cart_items', 'cart', 'shopping_cart', 'labto_cart'];
+    const keysToCheck = ["cart_items", "cart", "shopping_cart", "labto_cart"];
     for (const key of keysToCheck) {
       const raw = localStorage.getItem(key);
       if (raw) {
@@ -399,28 +515,51 @@ export async function requestAddToCart(
   quantity: number = 1,
   variantId?: string,
   selectedOptions?: Record<string, string>,
-  productUrl?: string
+  productUrl?: string,
 ): Promise<AddToCartResult> {
-  if (typeof window === 'undefined') {
-    return { success: false, platform: 'custom_event', message: 'Window is not defined' };
+  if (typeof window === "undefined") {
+    return {
+      success: false,
+      platform: "custom_event",
+      message: "Window is not defined",
+    };
   }
 
   const effectiveVariantId = variantId || productId;
 
   // 1. Check & Execute Shopify
   if (isShopifyStore()) {
-    const shopifyResult = await executeShopifyAddToCart(effectiveVariantId, quantity, selectedOptions);
+    const shopifyResult = await executeShopifyAddToCart(
+      effectiveVariantId,
+      quantity,
+      selectedOptions,
+    );
     if (shopifyResult.success) {
-      executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
+      executeEventAndLocalStorageAddToCart(
+        productId,
+        quantity,
+        variantId,
+        selectedOptions,
+      );
       return shopifyResult;
     }
   }
 
   // 2. Check & Execute WooCommerce
   if (isWooCommerceStore()) {
-    const wooResult = await executeWooCommerceAddToCart(productId, quantity, variantId, selectedOptions);
+    const wooResult = await executeWooCommerceAddToCart(
+      productId,
+      quantity,
+      variantId,
+      selectedOptions,
+    );
     if (wooResult.success) {
-      executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
+      executeEventAndLocalStorageAddToCart(
+        productId,
+        quantity,
+        variantId,
+        selectedOptions,
+      );
       return wooResult;
     }
   }
@@ -428,47 +567,57 @@ export async function requestAddToCart(
   // 3. Check & Execute Smart DOM Simulation on Current Page
   const domSuccess = await executeDomSimulationAddToCart(selectedOptions);
   if (domSuccess) {
-    executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
+    executeEventAndLocalStorageAddToCart(
+      productId,
+      quantity,
+      variantId,
+      selectedOptions,
+    );
     return {
       success: true,
-      platform: 'dom_simulation',
-      message: 'Item added to cart!',
+      platform: "dom_simulation",
+      message: "Item added to cart!",
     };
   }
 
   // 4. Cross-Page Navigation for Custom Stores (if user is on homepage, /cart, /collection, or different product page)
-  if (productUrl && productUrl !== '#' && typeof window !== 'undefined') {
+  if (productUrl && productUrl !== "#" && typeof window !== "undefined") {
     try {
       const targetUrl = new URL(productUrl, window.location.origin);
       if (targetUrl.pathname !== window.location.pathname) {
         sessionStorage.setItem(
-          'labto_auto_add',
+          "labto_auto_add",
           JSON.stringify({
             productId,
             variantId,
             options: selectedOptions,
             quantity: quantity || 1,
             timestamp: Date.now(),
-          })
+          }),
         );
         window.location.href = targetUrl.href;
         return {
           success: true,
-          platform: 'dom_simulation',
-          message: 'Opening product page to add item...',
+          platform: "dom_simulation",
+          message: "Opening product page to add item...",
         };
       }
     } catch (err) {
-      console.warn('[Labto AI Cart] Cross page navigation error:', err);
+      console.warn("[Labto AI Cart] Cross page navigation error:", err);
     }
   }
 
   // 5. Fallback: Global Event Dispatch & LocalStorage update
-  executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
+  executeEventAndLocalStorageAddToCart(
+    productId,
+    quantity,
+    variantId,
+    selectedOptions,
+  );
 
   return {
     success: true,
-    platform: 'custom_event',
-    message: 'Added to cart!',
+    platform: "custom_event",
+    message: "Added to cart!",
   };
 }

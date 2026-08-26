@@ -169,9 +169,18 @@ function ChatWidget({ api }) {
     const [selectedOptionsState, setSelectedOptionsState] = (0, hooks_1.useState)({});
     const [modalQuantity, setModalQuantity] = (0, hooks_1.useState)(1);
     const [toastMsg, setToastMsg] = (0, hooks_1.useState)(null);
+    const toastTimerRef = (0, hooks_1.useRef)(null);
     const showToast = (msg) => {
+        if (!msg)
+            return;
+        if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current);
+        }
         setToastMsg(msg);
-        setTimeout(() => setToastMsg(null), 3000);
+        toastTimerRef.current = setTimeout(() => {
+            setToastMsg(null);
+            toastTimerRef.current = null;
+        }, 2800);
     };
     const messagesContainerRef = (0, hooks_1.useRef)(null);
     const messagesEndRef = (0, hooks_1.useRef)(null);
@@ -408,16 +417,20 @@ function ChatWidget({ api }) {
                     options: res.cartAction.options,
                     variants: res.cartAction.variants,
                 };
-                const allOptions = res.cartAction.options || targetProd.options || [];
+                const allOptions = (res.cartAction.options || targetProd.options || []);
                 const hasOptions = Array.isArray(allOptions) && allOptions.length > 0;
-                const hasSelectedOpts = res.cartAction.selectedOptions &&
-                    typeof res.cartAction.selectedOptions === 'object' &&
-                    Object.keys(res.cartAction.selectedOptions).length > 0;
-                // If the product has options BUT neither user nor AI has selected one yet -> Open Modal ONLY
-                if (hasOptions && !hasSelectedOpts && !res.cartAction.variantId) {
-                    const defaultOpts = {};
+                const selectedOpts = (res.cartAction.selectedOptions && typeof res.cartAction.selectedOptions === 'object')
+                    ? res.cartAction.selectedOptions
+                    : {};
+                // Dynamic Schema-Driven Verification: Check if ALL required options (Size, Color, Storage, etc.) are resolved
+                const isFullyResolved = hasOptions
+                    ? allOptions.every((opt) => selectedOpts[opt.name] && String(selectedOpts[opt.name]).trim().length > 0)
+                    : true;
+                // If product has options and ANY option is still missing -> Open Modal with known options pre-selected
+                if (hasOptions && !isFullyResolved && !res.cartAction.variantId) {
+                    const defaultOpts = { ...selectedOpts };
                     allOptions.forEach((opt) => {
-                        if (opt.values && opt.values.length > 0) {
+                        if (!defaultOpts[opt.name] && opt.values && opt.values.length > 0) {
                             defaultOpts[opt.name] = opt.values[0];
                         }
                     });
@@ -426,8 +439,8 @@ function ChatWidget({ api }) {
                     setModalProduct({ ...targetProd, options: allOptions });
                 }
                 else {
-                    // Selected options are present (e.g. Size: S) or product has NO options -> Call Add to Cart!
-                    (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, targetProd.productUrl).then((result) => {
+                    // Either product has NO options, or ALL options are completely resolved -> Execute Add to Cart!
+                    (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, targetProd.productUrl, config.eventBridgeEnabled).then((result) => {
                         if (result.message && !result.platform?.includes('cross_page')) {
                             showToast(result.message);
                         }
@@ -825,8 +838,10 @@ function ChatWidget({ api }) {
                                                 return false;
                                             return Object.entries(selectedOptionsState).every(([k, val]) => String(v.options?.[k]).toLowerCase() === String(val).toLowerCase());
                                         });
-                                        (0, cartBridge_1.requestAddToCart)(modalProduct.externalId || modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState, modalProduct.productUrl).then((res) => {
-                                            showToast(res.message || `Added '${modalProduct.title}' to cart!`);
+                                        (0, cartBridge_1.requestAddToCart)(modalProduct.externalId || modalProduct.id, modalQuantity, selectedVariant?.id, selectedOptionsState, modalProduct.productUrl, config.eventBridgeEnabled).then((res) => {
+                                            if (res.message && !res.platform?.includes('cross_page')) {
+                                                showToast(res.message);
+                                            }
                                         });
                                         setModalProduct(null);
                                     }, style: {

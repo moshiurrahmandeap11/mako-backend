@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isShopifyStore = isShopifyStore;
 exports.isWooCommerceStore = isWooCommerceStore;
+exports.isHeadlessBridgeActive = isHeadlessBridgeActive;
 exports.initAutoAddWatcher = initAutoAddWatcher;
 exports.requestAddToCart = requestAddToCart;
 /**
@@ -170,6 +171,18 @@ async function executeWooCommerceAddToCart(productId, quantity = 1, variantId, s
     };
 }
 /**
+ * Checks if the current host page has registered a custom Headless / Event Bridge listener
+ */
+function isHeadlessBridgeActive() {
+    if (typeof window === 'undefined')
+        return false;
+    const win = window;
+    return Boolean(win.__LABTO_EVENT_BRIDGE__ ||
+        win.__LABTO_CART_LISTENER__ ||
+        win.aiWidgetEventBridge ||
+        win.hasLabtoCartBridge);
+}
+/**
  * Tier 3: Smart DOM Simulation (For Custom React, Next.js, Vue, PHP, Webflow, HTML, Wix, Squarespace)
  */
 async function executeDomSimulationAddToCart(selectedOptions) {
@@ -179,14 +192,19 @@ async function executeDomSimulationAddToCart(selectedOptions) {
         // 1. If options like Size/Storage/Weight/Color were selected, find and click matching options / swatches / buttons
         if (selectedOptions && Object.keys(selectedOptions).length > 0) {
             let optionClicked = false;
-            Object.entries(selectedOptions).forEach(([optName, optVal]) => {
+            for (const [optName, optVal] of Object.entries(selectedOptions)) {
                 const lowerName = String(optName).toLowerCase().trim();
                 const lowerVal = String(optVal).toLowerCase().trim();
                 // A. Search native <select> dropdowns
                 const selects = Array.from(document.querySelectorAll('select'));
                 for (const sel of selects) {
                     const selName = (sel.name || sel.id || sel.getAttribute('data-name') || '').toLowerCase();
-                    if (selName.includes(lowerName) || lowerName.includes('size') || lowerName.includes('color') || lowerName.includes('storage') || lowerName.includes('weight')) {
+                    if (selName.includes(lowerName) ||
+                        lowerName.includes('size') ||
+                        lowerName.includes('color') ||
+                        lowerName.includes('storage') ||
+                        lowerName.includes('weight') ||
+                        lowerName.includes('ram')) {
                         for (let i = 0; i < sel.options.length; i++) {
                             const optText = sel.options[i].text.toLowerCase().trim();
                             const optV = sel.options[i].value.toLowerCase().trim();
@@ -201,24 +219,36 @@ async function executeDomSimulationAddToCart(selectedOptions) {
                     }
                 }
                 // B. Search interactive buttons, swatches, radio buttons, and pill chips
-                const clickableOptions = Array.from(document.querySelectorAll('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, [data-size], [data-value], [data-color], [data-storage], [data-weight]'));
+                const clickableOptions = Array.from(document.querySelectorAll('button, input[type="radio"], [role="radio"], [role="button"], .swatch, .option-btn, [data-size], [data-value], [data-color], [data-storage], [data-weight], [data-ram]'));
                 for (const el of clickableOptions) {
-                    const text = (el.textContent || el.value || el.getAttribute('data-value') || el.getAttribute('data-size') || el.getAttribute('data-color') || '').trim().toLowerCase();
+                    const text = (el.textContent ||
+                        el.value ||
+                        el.getAttribute('data-value') ||
+                        el.getAttribute('data-size') ||
+                        el.getAttribute('data-color') ||
+                        el.getAttribute('data-storage') ||
+                        '')
+                        .trim()
+                        .toLowerCase();
                     if (text === lowerVal) {
-                        el.focus();
-                        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                        el.click();
+                        const htmlEl = el;
+                        // Prevent default submission if button is inside a form without type="button"
+                        if (htmlEl.tagName.toLowerCase() === 'button' && !htmlEl.getAttribute('type')) {
+                            htmlEl.setAttribute('type', 'button');
+                        }
+                        htmlEl.focus();
+                        htmlEl.click(); // Single clean click trigger
                         optionClicked = true;
                         break;
                     }
                 }
-            });
-            // If an option was selected, wait 150ms for React/Vue/Svelte/Next.js state hydration
+            }
+            // If an option was selected, wait briefly for React/Vue/Next.js state hydration
             if (optionClicked) {
-                await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 180)));
+                await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 160)));
             }
         }
-        // 2. Find and trigger the native Add to Cart Button
+        // 2. Find and trigger the native Add to Cart Button (Single clean click trigger)
         const buttonSelectors = [
             'form[action*="cart"] button[type="submit"]',
             'form[action*="cart"] input[type="submit"]',
@@ -237,8 +267,7 @@ async function executeDomSimulationAddToCart(selectedOptions) {
             const btn = document.querySelector(sel);
             if (btn && btn.offsetParent !== null && typeof btn.click === 'function') {
                 btn.focus();
-                btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                btn.click();
+                btn.click(); // Single clean click trigger (no duplicate dispatchEvent)
                 return true;
             }
         }
@@ -247,15 +276,15 @@ async function executeDomSimulationAddToCart(selectedOptions) {
         for (const b of allButtons) {
             const text = (b.textContent || b.value || '').trim().toLowerCase();
             if (/add\s*to\s*cart|add\s*to\s*bag|buy\s*now/i.test(text) && b.offsetParent !== null) {
-                b.focus();
-                b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                b.click();
+                const btnEl = b;
+                btnEl.focus();
+                btnEl.click(); // Single clean click trigger
                 return true;
             }
         }
     }
     catch (err) {
-        console.warn('[Labto AI Cart] DOM Simulation failed:', err);
+        console.warn('[Labto AI Cart] DOM Simulation notice:', err);
     }
     return false;
 }
@@ -270,20 +299,20 @@ function initAutoAddWatcher() {
         const raw = sessionStorage.getItem('labto_auto_add');
         if (!raw)
             return;
-        // Immediately remove from sessionStorage to prevent concurrent readers
+        // Immediately remove from sessionStorage to prevent concurrent execution
         sessionStorage.removeItem('labto_auto_add');
         if (isAutoAdding)
             return;
+        isAutoAdding = true;
         const data = JSON.parse(raw);
-        // Only process if within last 60 seconds
         if (Date.now() - (data.timestamp || 0) > 60000) {
+            isAutoAdding = false;
             return;
         }
-        isAutoAdding = true;
         let attempts = 0;
         const interval = setInterval(async () => {
             attempts++;
-            if (attempts > 20) {
+            if (attempts > 25) {
                 clearInterval(interval);
                 isAutoAdding = false;
                 return;
@@ -292,10 +321,11 @@ function initAutoAddWatcher() {
             if (clicked) {
                 clearInterval(interval);
                 isAutoAdding = false;
+                // Dispatch custom event for headless sync
                 executeEventAndLocalStorageAddToCart(data.productId, data.quantity, data.variantId, data.options);
                 window.dispatchEvent(new CustomEvent('labto:toast', { detail: { message: 'Added to cart successfully!' } }));
             }
-        }, 300);
+        }, 250);
     }
     catch {
         isAutoAdding = false;
@@ -317,8 +347,6 @@ function executeEventAndLocalStorageAddToCart(productId, quantity = 1, variantId
     // Dispatch standard events for headless React/Vue/Next.js stores
     window.dispatchEvent(new CustomEvent('ai-widget:add-to-cart', { detail: eventPayload, bubbles: true }));
     window.dispatchEvent(new CustomEvent('labto:add_to_cart', { detail: eventPayload, bubbles: true }));
-    window.dispatchEvent(new CustomEvent('labto:cart:add', { detail: eventPayload, bubbles: true }));
-    document.dispatchEvent(new CustomEvent('labto:cart:add', { detail: eventPayload, bubbles: true }));
     // Safe fallback to common localStorage cart keys
     try {
         const keysToCheck = ['cart_items', 'cart', 'shopping_cart', 'labto_cart'];
@@ -348,40 +376,46 @@ function executeEventAndLocalStorageAddToCart(productId, quantity = 1, variantId
 }
 /**
  * Universal Add-to-Cart Orchestrator
- * Automatically detects the store architecture and executes the optimal addition pipeline.
+ * Uses a strict Execution State Machine to eliminate duplicate clicks and event collision.
  */
-async function requestAddToCart(productId, quantity = 1, variantId, selectedOptions, productUrl) {
+async function requestAddToCart(productId, quantity = 1, variantId, selectedOptions, productUrl, forceEventOnly = false) {
     if (typeof window === 'undefined') {
         return { success: false, platform: 'custom_event', message: 'Window is not defined' };
     }
     const effectiveVariantId = variantId || productId;
-    // 1. Check & Execute Shopify
+    // 1. Check & Execute Headless / Event Bridge Mode (Bypasses DOM clicks entirely)
+    if (forceEventOnly || isHeadlessBridgeActive()) {
+        executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
+        return {
+            success: true,
+            platform: 'custom_event',
+            message: 'Item added to cart!',
+        };
+    }
+    // 2. Check & Execute Shopify Native
     if (isShopifyStore()) {
         const shopifyResult = await executeShopifyAddToCart(effectiveVariantId, quantity, selectedOptions);
         if (shopifyResult.success) {
-            executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
             return shopifyResult;
         }
     }
-    // 2. Check & Execute WooCommerce
+    // 3. Check & Execute WooCommerce Native
     if (isWooCommerceStore()) {
         const wooResult = await executeWooCommerceAddToCart(productId, quantity, variantId, selectedOptions);
         if (wooResult.success) {
-            executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
             return wooResult;
         }
     }
-    // 3. Check & Execute Smart DOM Simulation on Current Page
+    // 4. Check & Execute Smart DOM Simulation on Current Page
     const domSuccess = await executeDomSimulationAddToCart(selectedOptions);
     if (domSuccess) {
-        executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
         return {
             success: true,
             platform: 'dom_simulation',
             message: 'Item added to cart!',
         };
     }
-    // 4. Cross-Page Navigation for Custom Stores (if user is on homepage, /cart, /collection, or different product page)
+    // 5. Cross-Page Navigation for Custom Stores (if visitor is on /collection, /cart, or another page)
     if (productUrl && productUrl !== '#' && typeof window !== 'undefined') {
         try {
             const targetUrl = new URL(productUrl, window.location.origin);
@@ -402,10 +436,10 @@ async function requestAddToCart(productId, quantity = 1, variantId, selectedOpti
             }
         }
         catch (err) {
-            console.warn('[Labto AI Cart] Cross page navigation error:', err);
+            console.warn('[Labto AI Cart] Cross page navigation notice:', err);
         }
     }
-    // 5. Fallback: Global Event Dispatch & LocalStorage update
+    // 6. Final Fallback: Dispatch custom event & update LocalStorage
     executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
     return {
         success: true,
