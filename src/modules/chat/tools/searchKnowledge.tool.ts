@@ -1,16 +1,18 @@
-import { prisma } from '../../../config/db';
-import { generateEmbedding } from '../../../utils/embeddings';
-import { logger } from '../../../utils/logger';
+import { prisma } from "../../../config/db";
+import { generateEmbedding } from "../../../utils/embeddings";
+import { logger } from "../../../utils/logger";
 
 export async function searchKnowledgeTool(
   merchantId: string,
   query: string,
   maxResults: number = 8,
-  targetDomain?: string
+  targetDomain?: string,
 ) {
   try {
     let chunks: any[] = [];
-    const domainFilter = targetDomain ? `%${targetDomain.replace(/^https?:\/\//, '').split('/')[0]}%` : '';
+    const domainFilter = targetDomain
+      ? `%${targetDomain.replace(/^https?:\/\//, "").split("/")[0]}%`
+      : "";
 
     // 1. Diverse Vector Similarity Search (Grouped & Partitioned by URL via local pgvector)
     try {
@@ -18,7 +20,7 @@ export async function searchKnowledgeTool(
       const isRealVector = queryVector && queryVector.some((v) => v !== 0);
 
       if (isRealVector) {
-        const vectorStr = `[${queryVector.join(',')}]`;
+        const vectorStr = `[${queryVector.join(",")}]`;
         const rawResults: any[] = await prisma.$queryRawUnsafe(
           `WITH RankedChunks AS (
              SELECT id, url, content, 
@@ -26,7 +28,7 @@ export async function searchKnowledgeTool(
                     ROW_NUMBER() OVER (PARTITION BY url ORDER BY (embedding <=> $1::vector) ASC) as rank_per_url
              FROM "KnowledgeChunk"
              WHERE "merchantId" = $2 
-               AND ($4 = '' OR url ILIKE $4)
+               AND ($4 = '' OR url ILIKE $4 OR url ILIKE '%global%' OR url LIKE 'global://%' OR url LIKE 'doc:%' OR url LIKE 'custom-note%')
                AND embedding IS NOT NULL
            )
            SELECT id, url, content, distance
@@ -36,7 +38,7 @@ export async function searchKnowledgeTool(
           vectorStr,
           merchantId,
           maxResults,
-          domainFilter
+          domainFilter,
         );
 
         if (rawResults && rawResults.length > 0) {
@@ -44,7 +46,7 @@ export async function searchKnowledgeTool(
         }
       }
     } catch (e) {
-      logger.error('Vector search error in searchKnowledgeTool:', e);
+      logger.error("Vector search error in searchKnowledgeTool:", e);
     }
 
     // 2. Keyword Search with Multi-URL Diversity Fallback
@@ -52,32 +54,44 @@ export async function searchKnowledgeTool(
       try {
         const words = query
           .toLowerCase()
-          .replace(/[^a-z0-9\s]/g, '')
+          .replace(/[^a-z0-9\s]/g, "")
           .split(/\s+/)
           .filter((w) => w.length >= 3);
 
         const whereConditions: any = { merchantId };
         if (domainFilter) {
-          whereConditions.url = { contains: domainFilter.replace(/%/g, ''), mode: 'insensitive' };
+          const cleanDomain = domainFilter.replace(/%/g, "");
+          whereConditions.OR = [
+            { url: { contains: cleanDomain, mode: "insensitive" } },
+            { url: { contains: "global", mode: "insensitive" } },
+            { url: { startsWith: "global://" } },
+            { url: { startsWith: "doc:" } },
+            { url: { startsWith: "custom-note" } },
+          ];
         }
 
         if (words.length > 0) {
-          whereConditions.OR = words.map((w) => ({
-            content: { contains: w, mode: 'insensitive' as const },
+          const wordConditions = words.map((w) => ({
+            content: { contains: w, mode: "insensitive" as const },
           }));
+          if (whereConditions.OR) {
+            whereConditions.AND = [{ OR: wordConditions }];
+          } else {
+            whereConditions.OR = wordConditions;
+          }
         }
 
         const textResults = await prisma.knowledgeChunk.findMany({
           where: whereConditions,
           take: maxResults * 2,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         });
 
         if (textResults && textResults.length > 0) {
           // Partition by URL to ensure multi-page diversity
           const seenUrls = new Set<string>();
           const diverseResults: any[] = [];
-          
+
           for (const item of textResults) {
             if (!seenUrls.has(item.url)) {
               seenUrls.add(item.url);
@@ -97,7 +111,7 @@ export async function searchKnowledgeTool(
           chunks = diverseResults;
         }
       } catch (err) {
-        logger.error('Keyword search error in searchKnowledgeTool:', err);
+        logger.error("Keyword search error in searchKnowledgeTool:", err);
       }
     }
 
@@ -106,13 +120,20 @@ export async function searchKnowledgeTool(
       try {
         const whereConditions: any = { merchantId };
         if (domainFilter) {
-          whereConditions.url = { contains: domainFilter.replace(/%/g, ''), mode: 'insensitive' };
+          const cleanDomain = domainFilter.replace(/%/g, "");
+          whereConditions.OR = [
+            { url: { contains: cleanDomain, mode: "insensitive" } },
+            { url: { contains: "global", mode: "insensitive" } },
+            { url: { startsWith: "global://" } },
+            { url: { startsWith: "doc:" } },
+            { url: { startsWith: "custom-note" } },
+          ];
         }
 
         const fallbackChunks = await prisma.knowledgeChunk.findMany({
           where: whereConditions,
           take: maxResults * 2,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         });
 
         if (fallbackChunks && fallbackChunks.length > 0) {
@@ -125,10 +146,13 @@ export async function searchKnowledgeTool(
               if (diverseFallback.length >= maxResults) break;
             }
           }
-          chunks = diverseFallback.length > 0 ? diverseFallback : fallbackChunks.slice(0, maxResults);
+          chunks =
+            diverseFallback.length > 0
+              ? diverseFallback
+              : fallbackChunks.slice(0, maxResults);
         }
       } catch (err) {
-        logger.error('Failed fallback knowledgeChunk query:', err);
+        logger.error("Failed fallback knowledgeChunk query:", err);
       }
     }
 
@@ -137,7 +161,7 @@ export async function searchKnowledgeTool(
       content: c.content,
     }));
   } catch (error) {
-    logger.error('Error in searchKnowledgeTool:', error);
+    logger.error("Error in searchKnowledgeTool:", error);
     return [];
   }
 }

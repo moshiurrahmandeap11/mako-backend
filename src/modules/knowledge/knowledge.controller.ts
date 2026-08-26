@@ -18,17 +18,35 @@ export async function listKnowledge(req: DashboardAuthRequest, res: Response) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const chunks = await prisma.knowledgeChunk.findMany({
-      where: { merchantId },
-      orderBy: { createdAt: "desc" },
-      take: 150,
-      select: {
-        id: true,
-        url: true,
-        content: true,
-        createdAt: true,
-      },
-    });
+    const [chunks, merchantUser] = await Promise.all([
+      prisma.knowledgeChunk.findMany({
+        where: { merchantId },
+        orderBy: { createdAt: "desc" },
+        take: 300,
+        select: {
+          id: true,
+          url: true,
+          content: true,
+          createdAt: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: merchantId },
+        select: { allowedDomains: true },
+      }),
+    ]);
+
+    const allowedDomains = (merchantUser?.allowedDomains || [])
+      .map(
+        (d: string) =>
+          d
+            .trim()
+            .toLowerCase()
+            .replace(/^https?:\/\//, "")
+            .split("/")[0]
+            .split(":")[0],
+      )
+      .filter(Boolean);
 
     // Extract unique source URLs and page stats
     const sourceMap = new Map<string, number>();
@@ -45,6 +63,7 @@ export async function listKnowledge(req: DashboardAuthRequest, res: Response) {
     return res.json({
       totalChunks: chunks.length,
       totalPages: sources.length,
+      allowedDomains: Array.from(new Set(allowedDomains)),
       sources,
       chunks,
     });
@@ -101,16 +120,34 @@ export async function addCustomKnowledge(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { title, content, sourceUrl } = req.body;
+    const { title, content, sourceUrl, targetDomain } = req.body;
     if (!title || !content) {
       return res.status(400).json({ error: "Title and content are required" });
+    }
+
+    let finalSourceUrl = sourceUrl;
+    if (!finalSourceUrl) {
+      const slug =
+        title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "") || String(Date.now());
+      if (targetDomain && targetDomain !== "all" && targetDomain !== "global") {
+        const cleanDomain = targetDomain
+          .replace(/^https?:\/\//, "")
+          .split("/")[0]
+          .split(":")[0];
+        finalSourceUrl = `https://${cleanDomain}/notes/${slug}`;
+      } else {
+        finalSourceUrl = `global://notes/${slug}`;
+      }
     }
 
     const chunk = await addManualKnowledgeChunk(
       merchantId,
       title,
       content,
-      sourceUrl,
+      finalSourceUrl,
     );
 
     return res.json({
@@ -160,7 +197,7 @@ export async function deleteKnowledge(
 }
 
 /**
- * Delete ALL knowledge chunks for merchant
+ * Delete ALL or Domain-scoped knowledge chunks for merchant
  */
 export async function deleteAllKnowledge(
   req: DashboardAuthRequest,
@@ -170,6 +207,40 @@ export async function deleteAllKnowledge(
     const merchantId = req.merchant?.id;
     if (!merchantId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const domain = (req.query.domain || req.body?.domain) as string;
+    if (domain && domain !== "all") {
+      if (domain === "global") {
+        await prisma.knowledgeChunk.deleteMany({
+          where: {
+            merchantId,
+            OR: [
+              { url: { startsWith: "global://" } },
+              { url: { contains: "global", mode: "insensitive" } },
+              { url: { startsWith: "doc:" } },
+              { url: { startsWith: "custom-note" } },
+            ],
+          },
+        });
+        return res.json({
+          message: "Global notes and documents deleted successfully",
+        });
+      } else {
+        const cleanDomain = domain
+          .replace(/^https?:\/\//, "")
+          .split("/")[0]
+          .split(":")[0];
+        await prisma.knowledgeChunk.deleteMany({
+          where: {
+            merchantId,
+            url: { contains: cleanDomain, mode: "insensitive" },
+          },
+        });
+        return res.json({
+          message: `Knowledge chunks for ${domain} deleted successfully`,
+        });
+      }
     }
 
     await prisma.knowledgeChunk.deleteMany({
@@ -213,14 +284,12 @@ export async function rescrapeAll(req: DashboardAuthRequest, res: Response) {
       );
     });
 
-    const domainsToCrawl = req.body.domain ? [req.body.domain] : publicDomains;
+    const domainsToCrawl = req.body?.domain ? [req.body.domain] : publicDomains;
 
     if (domainsToCrawl.length === 0) {
-      return res
-        .status(400)
-        .json({
-          error: "No valid public domains configured for this merchant",
-        });
+      return res.status(400).json({
+        error: "No valid public domains configured for this merchant",
+      });
     }
 
     logger.info(
@@ -278,7 +347,8 @@ export async function uploadDoc(req: DashboardAuthRequest, res: Response) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { filename, fileData, fileType, textContent } = req.body;
+    const { filename, fileData, fileType, textContent, targetDomain } =
+      req.body;
     if (!filename) {
       return res.status(400).json({ error: "Filename is required" });
     }
@@ -334,7 +404,6 @@ export async function uploadDoc(req: DashboardAuthRequest, res: Response) {
       chunks.push(currentChunk.trim());
     }
 
-    const sourceUrl = `doc:${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { generateEmbedding } = await import("../../utils/embeddings");
 
     let createdCount = 0;
