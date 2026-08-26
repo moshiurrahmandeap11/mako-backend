@@ -513,30 +513,21 @@ async function indexPageContent(
         for (const item of items) {
           if (
             item["@type"] === "Product" ||
-            item["@type"] === "http://schema.org/Product"
+            item["@type"] === "http://schema.org/Product" ||
+            item["@type"] === "Service" ||
+            item["@type"] === "http://schema.org/Service"
           ) {
-            const title = item.name || pageTitle;
-            const description = item.description || metaDescription || title;
+            const baseTitle = String(item.name || pageTitle).trim();
+            const description = String(
+              item.description || metaDescription || baseTitle,
+            ).trim();
             const rawOffers = item.offers || {};
             const offers = Array.isArray(rawOffers)
               ? rawOffers
               : Array.isArray(rawOffers.offers)
                 ? rawOffers.offers
                 : [rawOffers];
-            const primaryOffer = offers[0] || {};
-            let price =
-              parseFloat(primaryOffer.price || primaryOffer.lowPrice || "0") ||
-              0;
 
-            // If price is 0 and there are multiple offers with paid options, pick first non-zero price
-            if (price === 0 && offers.length > 1) {
-              const paidOffer = offers.find(
-                (o: any) => parseFloat(o.price || "0") > 0,
-              );
-              if (paidOffer) price = parseFloat(paidOffer.price);
-            }
-
-            const currency = primaryOffer.priceCurrency || "USD";
             const imageUrl = Array.isArray(item.image)
               ? item.image[0]
               : item.image || ogImage || "";
@@ -544,37 +535,71 @@ async function indexPageContent(
               ? new URL(item.url, origin).href
               : currentUrlStr;
             const category = item.category || "General";
-            const sku = generateDeterministicExternalId(
-              productUrl,
-              title,
-              item.sku || item.mpn,
-            );
 
-            let parsedVariants: any[] | undefined = undefined;
-            if (offers.length > 1) {
-              parsedVariants = offers.map((off: any, idx: number) => ({
-                id: String(off.sku || off.identifier || `VAR-${idx + 1}`),
-                title: off.name || `Option ${idx + 1}`,
-                price: parseFloat(off.price || "0") || price,
-                available: off.availability
-                  ? !off.availability.includes("OutOfStock")
-                  : true,
-                sku: off.sku,
-              }));
+            // If there are multiple distinct named offers/plans (e.g. Free Plan, Starter Plan, Pro Plan)
+            const hasMultipleNamedOffers =
+              offers.length > 1 &&
+              offers.some((o: any) =>
+                Boolean(o.name && o.name.trim().length > 0),
+              );
+
+            if (hasMultipleNamedOffers) {
+              for (let i = 0; i < offers.length; i++) {
+                const off = offers[i];
+                const offName = String(off.name || `Option ${i + 1}`).trim();
+                const fullItemTitle = baseTitle
+                  .toLowerCase()
+                  .includes(offName.toLowerCase())
+                  ? baseTitle
+                  : `${baseTitle} - ${offName}`;
+                const offPrice =
+                  parseFloat(off.price || off.lowPrice || "0") || 0;
+                const offCurrency = off.priceCurrency || "USD";
+                const offSku = generateDeterministicExternalId(
+                  productUrl,
+                  fullItemTitle,
+                  off.sku || off.identifier,
+                );
+
+                productsFound.push({
+                  externalId: offSku,
+                  title: fullItemTitle,
+                  description: `${fullItemTitle} - ${description}`,
+                  price: offPrice,
+                  currency: offCurrency,
+                  imageUrl: String(imageUrl),
+                  productUrl: String(productUrl),
+                  category: String(category),
+                  inStock: off.availability
+                    ? !off.availability.includes("OutOfStock")
+                    : true,
+                });
+              }
+            } else {
+              const primaryOffer = offers[0] || {};
+              const price =
+                parseFloat(
+                  primaryOffer.price || primaryOffer.lowPrice || "0",
+                ) || 0;
+              const currency = primaryOffer.priceCurrency || "USD";
+              const sku = generateDeterministicExternalId(
+                productUrl,
+                baseTitle,
+                item.sku || item.mpn,
+              );
+
+              productsFound.push({
+                externalId: String(sku),
+                title: baseTitle,
+                description,
+                price,
+                currency,
+                imageUrl: String(imageUrl),
+                productUrl: String(productUrl),
+                category: String(category),
+                inStock: true,
+              });
             }
-
-            productsFound.push({
-              externalId: String(sku),
-              title: String(title).trim(),
-              description: String(description).trim(),
-              price,
-              currency,
-              imageUrl: String(imageUrl),
-              productUrl: String(productUrl),
-              category: String(category),
-              inStock: true,
-              variants: parsedVariants,
-            });
           }
         }
       } catch {}
