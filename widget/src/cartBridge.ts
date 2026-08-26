@@ -564,7 +564,7 @@ export async function requestAddToCart(
     }
   }
 
-  // 3. Check & Execute Smart DOM Simulation on Current Page (if user is on the product page)
+  // 3. Check & Execute Smart DOM Simulation on Current Page (if user is already on the product page)
   const domSuccess = await executeDomSimulationAddToCart(selectedOptions);
   if (domSuccess) {
     executeEventAndLocalStorageAddToCart(
@@ -580,29 +580,35 @@ export async function requestAddToCart(
     };
   }
 
-  // 4. Background Invisible Worker Simulation (For Headless / Next.js stores when user is on Homepage/Collection)
+  // 4. Dynamic Cross-Page Navigation (Works universally for any headless/custom store dynamic product URL)
   if (productUrl && productUrl !== "#" && typeof window !== "undefined") {
-    const iframeSuccess = await executeBackgroundIframeAddToCart(
-      productUrl,
-      selectedOptions,
-      quantity,
-    );
-    if (iframeSuccess) {
-      executeEventAndLocalStorageAddToCart(
-        productId,
-        quantity,
-        variantId,
-        selectedOptions,
-      );
-      return {
-        success: true,
-        platform: "dom_simulation",
-        message: "Item added to cart!",
-      };
+    try {
+      const targetUrl = new URL(productUrl, window.location.origin);
+      if (targetUrl.pathname !== window.location.pathname) {
+        sessionStorage.setItem(
+          "labto_auto_add",
+          JSON.stringify({
+            productId,
+            variantId,
+            options: selectedOptions,
+            quantity: quantity || 1,
+            timestamp: Date.now(),
+          }),
+        );
+        sessionStorage.setItem("labto_widget_open", "true");
+        window.location.href = targetUrl.href;
+        return {
+          success: true,
+          platform: "dom_simulation",
+          message: "Opening product page to add item...",
+        };
+      }
+    } catch (err) {
+      console.warn("[Labto AI Cart] Cross page navigation error:", err);
     }
   }
 
-  // 5. Background Custom / Headless / React Store Event & LocalStorage Addition
+  // 5. Background Custom / Headless / React Store Event & LocalStorage Addition Fallback
   executeEventAndLocalStorageAddToCart(
     productId,
     quantity,

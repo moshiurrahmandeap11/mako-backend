@@ -158,7 +158,17 @@ function TypewriterMessageText({ text, isBot, shouldAnimate = false, onType, }) 
     return (0, jsx_runtime_1.jsx)("span", { children: renderMarkdownText(displayedText) });
 }
 function ChatWidget({ api }) {
-    const [isOpen, setIsOpen] = (0, hooks_1.useState)(false);
+    const [isOpen, setIsOpen] = (0, hooks_1.useState)(() => {
+        if (typeof window === "undefined")
+            return false;
+        try {
+            return (sessionStorage.getItem("labto_widget_open") === "true" ||
+                Boolean(sessionStorage.getItem("labto_auto_add")));
+        }
+        catch {
+            return false;
+        }
+    });
     const [isClosing, setIsClosing] = (0, hooks_1.useState)(false);
     const [isOpeningSkeleton, setIsOpeningSkeleton] = (0, hooks_1.useState)(false);
     const [isMobile, setIsMobile] = (0, hooks_1.useState)(typeof window !== "undefined" ? window.innerWidth <= 640 : false);
@@ -215,6 +225,10 @@ function ChatWidget({ api }) {
         return () => window.removeEventListener("resize", handleResize);
     }, []);
     const handleOpen = () => {
+        try {
+            sessionStorage.setItem("labto_widget_open", "true");
+        }
+        catch { }
         setIsClosing(false);
         setIsOpen(true);
         setIsOpeningSkeleton(true);
@@ -224,6 +238,10 @@ function ChatWidget({ api }) {
         }, 150);
     };
     const handleClose = () => {
+        try {
+            sessionStorage.removeItem("labto_widget_open");
+        }
+        catch { }
         setIsClosing(true);
         setTimeout(() => {
             setIsOpen(false);

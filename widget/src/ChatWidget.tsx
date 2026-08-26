@@ -403,7 +403,17 @@ function TypewriterMessageText({
 }
 
 export function ChatWidget({ api }: ChatWidgetProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return (
+        sessionStorage.getItem("labto_widget_open") === "true" ||
+        Boolean(sessionStorage.getItem("labto_auto_add"))
+      );
+    } catch {
+      return false;
+    }
+  });
   const [isClosing, setIsClosing] = useState(false);
   const [isOpeningSkeleton, setIsOpeningSkeleton] = useState(false);
   const [isMobile, setIsMobile] = useState<boolean>(
@@ -479,6 +489,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   }, []);
 
   const handleOpen = () => {
+    try {
+      sessionStorage.setItem("labto_widget_open", "true");
+    } catch {}
     setIsClosing(false);
     setIsOpen(true);
     setIsOpeningSkeleton(true);
@@ -489,6 +502,9 @@ export function ChatWidget({ api }: ChatWidgetProps) {
   };
 
   const handleClose = () => {
+    try {
+      sessionStorage.removeItem("labto_widget_open");
+    } catch {}
     setIsClosing(true);
     setTimeout(() => {
       setIsOpen(false);
