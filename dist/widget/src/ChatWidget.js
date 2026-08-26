@@ -119,8 +119,8 @@ function renderMarkdownText(text) {
         }
         lastIndex = regex.lastIndex;
     }
-    if (lastIndex < text.length) {
-        parts.push(text.substring(lastIndex));
+    if (lastIndex < clean.length) {
+        parts.push(clean.substring(lastIndex));
     }
     return parts;
 }

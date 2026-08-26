@@ -899,8 +899,13 @@ async function fetchRenderedHtmlWithPuppeteer(url) {
                 req.continue();
             }
         });
-        await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 }).catch(() => {
-            return page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+        await page
+            .goto(url, { waitUntil: "networkidle2", timeout: 20000 })
+            .catch(() => {
+            return page.goto(url, {
+                waitUntil: "domcontentloaded",
+                timeout: 15000,
+            });
         });
         // Sleep for React/Next.js client state hydration
         await new Promise((resolve) => setTimeout(resolve, 2500));

@@ -54,6 +54,9 @@ app.use('/widget.js', (req, res, next) => {
     const widgetFilePath = path_1.default.join(publicDir, 'widget.js');
     if (fs_1.default.existsSync(widgetFilePath)) {
         res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.sendFile(widgetFilePath);
     }
     else {
