@@ -91,7 +91,6 @@ export async function executeLlmCascade(
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(`⚡ Synthesized response via Google Gemini Flash (~0.3s).`);
     } catch (error) {
       logger.error(
         "Gemini provider pool failed, falling back to Groq pool:",
@@ -118,7 +117,6 @@ export async function executeLlmCascade(
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(`⚡ Synthesized response via Groq LLaMA 3.3 70B (~0.4s).`);
     } catch (error) {
       logger.error(
         "Groq provider pool failed, falling back to OpenRouter pool:",
@@ -142,9 +140,6 @@ export async function executeLlmCascade(
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(
-        `⚡ Synthesized response via OpenRouter LLaMA 3.3 70B (~0.5s).`,
-      );
     } catch (error) {
       logger.error(
         "OpenRouter provider pool failed, falling back to Anthropic:",
@@ -175,9 +170,6 @@ export async function executeLlmCascade(
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(
-        `⚡ Synthesized response via Anthropic Claude 3.5 Sonnet (~0.7s).`,
-      );
     } catch (error) {
       logger.error("Anthropic provider pool failed:", error);
       selectedProvider = "fallback";
@@ -263,7 +255,6 @@ export async function executeLlmCascadeStream(
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(`⚡ Streamed response live via Google Gemini Flash (~0.15s TTFB).`);
     } catch (error) {
       logger.error(
         "Gemini stream pool failed, falling back to Groq stream:",
@@ -291,7 +282,6 @@ export async function executeLlmCascadeStream(
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(`⚡ Streamed response live via Groq LLaMA 3.3 70B (~0.2s TTFB).`);
     } catch (error) {
       logger.error(
         "Groq stream pool failed, falling back to OpenRouter stream:",
@@ -316,9 +306,6 @@ export async function executeLlmCascadeStream(
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(
-        `⚡ Streamed response live via OpenRouter LLaMA 3.3 70B (~0.3s TTFB).`,
-      );
     } catch (error) {
       logger.error(
         "OpenRouter stream pool failed, falling back to Anthropic stream:",
@@ -350,9 +337,6 @@ export async function executeLlmCascadeStream(
       finalReply = result.content;
       estimatedTokens = result.tokensUsed;
       executionSuccess = true;
-      thoughts.push(
-        `⚡ Streamed response live via Anthropic Claude 3.5 Sonnet (~0.4s TTFB).`,
-      );
     } catch (error) {
       logger.error("Anthropic stream pool failed:", error);
       selectedProvider = "fallback";

@@ -143,7 +143,7 @@ export async function processChatMessage(
       sessionId,
       reply: hijackReply,
       thoughts: [
-        `🛡️ Security Guard: Prevented role hijacking / prompt injection attempt.`,
+        `Verified assistant persona & safety policies`,
       ],
       cartAction: undefined,
       recommendedProducts: [],
@@ -174,7 +174,7 @@ export async function processChatMessage(
       sessionId,
       reply: declineReply,
       thoughts: [
-        `🛡️ Policy Guard: Declining out-of-scope coding/homework request.`,
+        `Verified website scope & store policies`,
       ],
       cartAction: undefined,
       recommendedProducts: [],
@@ -216,7 +216,7 @@ export async function processChatMessage(
       products: cached.products || [],
       cartAction: null,
       thoughts: [
-        "⚡ Instant High-Speed Cached Response (~2ms).",
+        "Retrieved verified instant response",
         ...cached.thoughts,
       ],
     };
@@ -543,7 +543,7 @@ export async function processChatMessageStream(
       hijackReply = `I am the official AI assistant dedicated exclusively to ${merchantName}. I cannot change my role or act as a personal assistant. How can I help you with our services today?`;
     }
 
-    onThought(`🛡️ Security Guard: Prevented role hijacking attempt.`);
+    onThought(`Verified assistant persona & safety policies`);
     onToken(hijackReply);
 
     await prisma.message.create({
@@ -557,7 +557,7 @@ export async function processChatMessageStream(
     return {
       sessionId,
       reply: hijackReply,
-      thoughts: [`🛡️ Security Guard: Prevented role hijacking attempt.`],
+      thoughts: [`Verified assistant persona & safety policies`],
       cartAction: undefined,
       products: [],
     };
@@ -574,7 +574,7 @@ export async function processChatMessageStream(
       declineReply = `I am the AI assistant dedicated to ${merchantName}. I can only assist you with our services, portfolio projects, and company information.`;
     }
 
-    onThought(`🛡️ Policy Guard: Declining out-of-scope request.`);
+    onThought(`Verified website scope & store policies`);
     onToken(declineReply);
 
     await prisma.message.create({
@@ -588,7 +588,7 @@ export async function processChatMessageStream(
     return {
       sessionId,
       reply: declineReply,
-      thoughts: [`🛡️ Policy Guard: Declining out-of-scope request.`],
+      thoughts: [`Verified website scope & store policies`],
       cartAction: undefined,
       products: [],
     };
@@ -609,7 +609,7 @@ export async function processChatMessageStream(
   // Fast-path 4: Cached Response
   const cached = !imageUrl ? getCachedResponse(merchantId, userMessage) : null;
   if (cached) {
-    onThought("⚡ Instant High-Speed Cached Response (~2ms).");
+    onThought("Retrieved verified instant response");
     onToken(cached.reply);
 
     await prisma.message.create({
@@ -631,7 +631,7 @@ export async function processChatMessageStream(
       products: cached.products || [],
       cartAction: null,
       thoughts: [
-        "⚡ Instant High-Speed Cached Response (~2ms).",
+        "Retrieved verified instant response",
         ...cached.thoughts,
       ],
     };
