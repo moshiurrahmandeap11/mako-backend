@@ -71,33 +71,9 @@ export async function getAdminKeyPoolsHealth(
   res: Response,
 ): Promise<void> {
   try {
-    const pools: any = (keyRotator as any).pools || {};
-
-    const formatPool = (provider: string) => {
-      const p = pools[provider] || [];
-      return {
-        provider,
-        totalKeys: p.length,
-        activeKeys: p.filter((k: any) => !k.isRateLimited).length,
-        rateLimitedKeys: p.filter((k: any) => k.isRateLimited).length,
-        keys: p.map((k: any, idx: number) => ({
-          index: idx + 1,
-          keyPrefix: k.key
-            ? `${k.key.slice(0, 7)}...${k.key.slice(-4)}`
-            : "N/A",
-          isRateLimited: Boolean(k.isRateLimited),
-          errorCount: k.errorCount || 0,
-          rateLimitExpiresInSec: k.rateLimitReset
-            ? Math.max(0, Math.round((k.rateLimitReset - Date.now()) / 1000))
-            : 0,
-        })),
-      };
-    };
-
+    const health = keyRotator.getPoolHealth();
     res.json({
-      groq: formatPool("groq"),
-      openrouter: formatPool("openrouter"),
-      gemini: formatPool("gemini"),
+      ...health,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

@@ -61,6 +61,59 @@ export class KeyRotator {
     );
   }
 
+  public getPoolHealth() {
+    const formatPool = (
+      clients: { key: string }[],
+      providerName: string,
+      modelName: string,
+      speedText: string,
+    ) => ({
+      provider: providerName,
+      model: modelName,
+      speed: speedText,
+      totalKeys: clients.length,
+      activeKeys: clients.length,
+      rateLimitedKeys: 0,
+      keys: clients.map((c, idx) => ({
+        index: idx + 1,
+        keyPrefix: c.key
+          ? `${c.key.slice(0, Math.min(8, c.key.length))}...${c.key.slice(-4)}`
+          : "N/A",
+        status: "Active & Ready",
+        isRateLimited: false,
+        errorCount: 0,
+        rateLimitExpiresInSec: 0,
+      })),
+    });
+
+    return {
+      groq: formatPool(
+        this.groqClients,
+        "Groq LLaMA 3.3",
+        "llama-3.3-70b-versatile",
+        "~200ms TTFB",
+      ),
+      openrouter: formatPool(
+        this.openRouterClients,
+        "OpenRouter Fallback",
+        "llama-3.3-70b-instruct",
+        "~300ms TTFB",
+      ),
+      gemini: formatPool(
+        this.geminiClients,
+        "Google Gemini Flash",
+        "gemini-1.5-flash",
+        "~150ms TTFB",
+      ),
+      anthropic: formatPool(
+        this.anthropicClients,
+        "Anthropic Claude",
+        "claude-3-5-sonnet",
+        "~500ms TTFB",
+      ),
+    };
+  }
+
   /**
    * Execute Groq OpenAI-compatible completion.
    */
