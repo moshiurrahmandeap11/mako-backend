@@ -30,11 +30,18 @@ async function sendEmailViaResendOrSmtp({
   to,
   subject,
   html,
+  from,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
+  from?: string;
+  replyTo?: string;
 }) {
+  const senderFrom = from || process.env.SMTP_FROM || "Labto AI <no-reply@labtoai.com>";
+  const senderReplyTo = replyTo || "support@labtoai.com";
+
   if (resendApiKey) {
     try {
       const textFallback = html
@@ -49,9 +56,9 @@ async function sendEmailViaResendOrSmtp({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: process.env.SMTP_FROM || "Labto AI <support@labtoai.com>",
+          from: senderFrom,
           to: [to],
-          reply_to: "support@labtoai.com",
+          reply_to: senderReplyTo,
           subject,
           html,
           text: textFallback,
@@ -75,8 +82,9 @@ async function sendEmailViaResendOrSmtp({
   // Fallback to Nodemailer transporter
   try {
     const info = await transporter.sendMail({
-      from: env.SMTP_FROM || "Labto AI Assistant <moshiurbhau@gmail.com>",
+      from: senderFrom,
       to,
+      replyTo: senderReplyTo,
       subject,
       html,
     });
@@ -89,6 +97,23 @@ async function sendEmailViaResendOrSmtp({
     throw smtpErr;
   }
 }
+
+// Brand Logo Component for HTML Emails
+const emailBrandHeader = `
+  <div style="text-align: center; margin-bottom: 24px;">
+    <a href="https://labtoai.com" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="34" height="34" style="vertical-align: middle;">
+        <g stroke="#1DBF73" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <path d="M 120,90 H 380 A 50,50 0 0 1 430,140 V 310 A 50,50 0 0 1 380,360 H 350 L 380,415 L 310,360 H 120 A 50,50 0 0 1 70,310 V 140 A 50,50 0 0 1 120,90 Z" />
+          <path d="M 155,160 V 290 H 235" />
+          <path d="M 315,165 Q 315,225 375,225 Q 315,225 315,285 Q 315,225 255,225 Q 315,225 315,165 Z" />
+        </g>
+      </svg>
+      <span class="brand-text" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 700; color: #222325; letter-spacing: -0.5px; vertical-align: middle; margin-left: 6px;">Labto <span style="color: #1DBF73;">AI</span></span>
+    </a>
+  </div>
+`;
+
 export async function sendOtpEmail({
   to,
   otp,
@@ -100,50 +125,67 @@ export async function sendOtpEmail({
 }) {
   const isVerification = type === "email-verification";
   const subject = isVerification
-    ? "Verify Your Email Address - Labto AI Assistant"
-    : "Reset Your Password - Labto AI Assistant";
+    ? "Verify Your Email Address - Labto AI"
+    : "Reset Your Password - Labto AI";
 
   const title = isVerification ? "Verify Your Email" : "Reset Your Password";
   const messageText = isVerification
-    ? "Thank you for registering with Labto AI Assistant. Use the 6-digit OTP code below to verify your email address and activate your account:"
+    ? "Thank you for registering with Labto AI. Use the 6-digit OTP code below to verify your email address and activate your account:"
     : "We received a request to reset the password for your Labto AI account. Use the 6-digit OTP code below to proceed with resetting your password:";
 
   const html = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="color-scheme" content="light dark">
+      <meta name="supported-color-schemes" content="light dark">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #020617; color: #f8fafc; margin: 0; padding: 40px 20px; }
-        .container { max-width: 520px; margin: 0 auto; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 36px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
-        .logo { font-size: 20px; font-weight: 800; color: #f59e0b; text-transform: uppercase; tracking: 0.1em; margin-bottom: 24px; text-align: center; }
-        .title { font-size: 24px; font-weight: 700; color: #ffffff; margin-bottom: 12px; text-align: center; }
-        .subtitle { font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 28px; text-align: center; }
-        .otp-box { background-color: #020617; border: 1px solid #f59e0b40; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 28px; }
-        .otp-code { font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #f59e0b; font-family: monospace; }
-        .footer { font-size: 12px; color: #64748b; text-align: center; line-height: 1.5; margin-top: 32px; border-top: 1px solid #1e293b; padding-top: 20px; }
+        :root { color-scheme: light dark; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8F9FA; color: #222325; margin: 0; padding: 24px 16px; }
+        .container { max-width: 520px; margin: 0 auto; background: #FFFFFF; border: 1px solid #E4E5E7; border-radius: 10px; padding: 36px 28px; }
+        .title { font-size: 22px; font-weight: 700; color: #222325; margin-bottom: 12px; text-align: center; }
+        .subtitle { font-size: 14px; color: #62646A; line-height: 1.6; margin-bottom: 24px; text-align: center; }
+        .otp-box { background-color: #F7F7F7; border: 1px solid #E4E5E7; border-radius: 8px; padding: 18px; text-align: center; margin-bottom: 24px; }
+        .otp-code { font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #1DBF73; font-family: monospace; }
+        .footer { font-size: 12px; color: #95979D; text-align: center; line-height: 1.5; margin-top: 28px; border-top: 1px solid #E4E5E7; padding-top: 20px; }
+        @media (prefers-color-scheme: dark) {
+          body { background-color: #121212 !important; color: #F3F4F6 !important; }
+          .container { background-color: #1E1E1E !important; border-color: #333333 !important; }
+          .brand-text, .title { color: #FFFFFF !important; }
+          .subtitle { color: #D1D5DB !important; }
+          .otp-box { background-color: #262626 !important; border-color: #404040 !important; }
+          .footer { color: #888888 !important; border-color: #333333 !important; }
+        }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="logo">⚡ LABTO AI</div>
+        ${emailBrandHeader}
         <div class="title">${title}</div>
         <div class="subtitle">${messageText}</div>
         <div class="otp-box">
           <div class="otp-code">${otp}</div>
         </div>
         <div class="subtitle" style="font-size: 12px; margin-bottom: 0;">
-          This OTP code is valid for 5 minutes. If you did not request this, please ignore this email.
+          This code is valid for 10 minutes. If you did not request this, please ignore this email.
         </div>
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Labto AI Shopping Assistant. All rights reserved.
+          &copy; ${new Date().getFullYear()} Labto AI. All rights reserved.
         </div>
       </div>
     </body>
     </html>
   `;
 
-  return sendEmailViaResendOrSmtp({ to, subject, html });
+  return sendEmailViaResendOrSmtp({
+    to,
+    subject,
+    html,
+    from: "Labto AI <no-reply@labtoai.com>",
+    replyTo: "support@labtoai.com",
+  });
 }
 
 export async function sendQuotaWarningEmail({
@@ -159,63 +201,75 @@ export async function sendQuotaWarningEmail({
   limit: number;
   tier: string;
 }) {
-  const subject = `⚠️ Action Required: You've used 90% of your Labto AI monthly credits`;
   const percentage = Math.round((used / limit) * 100);
+  const subject = `⚠️ Labto AI Usage Alert: ${percentage}% of Monthly Credits Used`;
 
   const html = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="color-scheme" content="light dark">
+      <meta name="supported-color-schemes" content="light dark">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #020617; color: #f8fafc; margin: 0; padding: 40px 20px; }
-        .container { max-width: 540px; margin: 0 auto; background-color: #0f172a; border: 1px solid #334155; border-radius: 16px; padding: 36px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
-        .logo { font-size: 20px; font-weight: 800; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 24px; text-align: center; }
-        .badge { display: inline-block; background-color: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 16px; }
-        .title { font-size: 22px; font-weight: 700; color: #ffffff; margin-bottom: 12px; }
-        .subtitle { font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 24px; }
-        .progress-box { background-color: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 28px; }
-        .progress-bar-bg { width: 100%; height: 10px; background-color: #1e293b; border-radius: 5px; overflow: hidden; margin-top: 10px; }
-        .progress-bar-fill { width: ${percentage}%; height: 100%; background: linear-gradient(90deg, #f59e0b, #ef4444); border-radius: 5px; }
-        .cta-btn { display: block; width: 100%; background-color: #f59e0b; color: #020617; text-align: center; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; box-sizing: border-box; }
-        .cta-btn:hover { background-color: #d97706; }
-        .footer { font-size: 12px; color: #64748b; text-align: center; line-height: 1.5; margin-top: 32px; border-top: 1px solid #1e293b; padding-top: 20px; }
+        :root { color-scheme: light dark; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8F9FA; color: #222325; margin: 0; padding: 24px 16px; }
+        .container { max-width: 540px; margin: 0 auto; background: #FFFFFF; border: 1px solid #E4E5E7; border-radius: 10px; padding: 36px 28px; }
+        .badge { display: inline-block; background-color: #FEF3C7; border: 1px solid #FDE68A; color: #B45309; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }
+        .title { font-size: 20px; font-weight: 700; color: #222325; margin-bottom: 12px; }
+        .subtitle { font-size: 14px; color: #62646A; line-height: 1.6; margin-bottom: 20px; }
+        .progress-box { background-color: #F7F7F7; border: 1px solid #E4E5E7; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+        .progress-bar-bg { background-color: #E5E7EB; border-radius: 6px; height: 10px; overflow: hidden; margin-top: 10px; }
+        .progress-bar-fill { background-color: #F59E0B; height: 100%; border-radius: 6px; }
+        .cta-btn { display: block; width: 100%; background-color: #1DBF73; color: #FFFFFF !important; text-align: center; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 20px; border-radius: 6px; margin-bottom: 16px; box-sizing: border-box; }
+        .footer { font-size: 12px; color: #95979D; text-align: center; line-height: 1.5; margin-top: 28px; border-top: 1px solid #E4E5E7; padding-top: 20px; }
+        @media (prefers-color-scheme: dark) {
+          body { background-color: #121212 !important; color: #F3F4F6 !important; }
+          .container { background-color: #1E1E1E !important; border-color: #333333 !important; }
+          .brand-text, .title { color: #FFFFFF !important; }
+          .subtitle { color: #D1D5DB !important; }
+          .progress-box { background-color: #262626 !important; border-color: #404040 !important; }
+          .progress-bar-bg { background-color: #404040 !important; }
+          .footer { color: #888888 !important; border-color: #333333 !important; }
+        }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="logo">⚡ LABTO AI</div>
+        ${emailBrandHeader}
         <div style="text-align: center;">
-          <span class="badge">90% Quota Used</span>
+          <span class="badge">Quota Alert &bull; ${percentage}% Used</span>
         </div>
-        <div class="title">Your Monthly AI Credits are Ending Soon</div>
+        <div class="title">Approaching Monthly AI Credits Limit</div>
         <div class="subtitle">
-          Hi ${name || "Merchant"}, your website chatbot has consumed <strong>${used.toLocaleString()} of ${limit.toLocaleString()} AI Smart Credits</strong> (${percentage}%) for your <strong>${tier}</strong> plan this month.
+          Hello ${name || "Merchant"}, your AI assistant has consumed <strong>${used.toLocaleString()}</strong> out of your <strong>${limit.toLocaleString()} monthly AI credits</strong> (${percentage}%) on the <strong>${tier}</strong> plan.
         </div>
         <div class="progress-box">
-          <table style="width: 100%; color: #e2e8f0; font-size: 14px;">
-            <tr>
-              <td><strong>Current Usage</strong></td>
-              <td style="text-align: right; color: #f59e0b; font-weight: 700;">${used.toLocaleString()} / ${limit.toLocaleString()} Credits</td>
-            </tr>
-          </table>
+          <div style="display: flex; justify-content: space-between; font-size: 13px;">
+            <span>Current Consumption</span>
+            <span><strong>${used.toLocaleString()} / ${limit.toLocaleString()}</strong></span>
+          </div>
           <div class="progress-bar-bg">
-            <div class="progress-bar-fill"></div>
+            <div class="progress-bar-fill" style="width: ${Math.min(percentage, 100)}%;"></div>
           </div>
         </div>
-        <div class="subtitle">
-          To prevent your chatbot from pausing when it reaches 100%, upgrade to our Starter plan ($2/mo) or Pro plan ($5/mo) today with <strong>100% Unused Credit Rollover</strong>.
-        </div>
-        <a href="https://labtoai.com/pricing" class="cta-btn">Upgrade Plan & Keep Widget Active &rarr;</a>
+        <a href="https://labtoai.com/pricing" class="cta-btn">Upgrade Plan to Avoid Pauses &rarr;</a>
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Labto AI Assistant. All rights reserved.
+          &copy; ${new Date().getFullYear()} Labto AI. All rights reserved.
         </div>
       </div>
     </body>
     </html>
   `;
 
-  return sendEmailViaResendOrSmtp({ to, subject, html });
+  return sendEmailViaResendOrSmtp({
+    to,
+    subject,
+    html,
+    from: "Labto AI <support@labtoai.com>",
+    replyTo: "support@labtoai.com",
+  });
 }
 
 export async function sendQuotaExceededEmail({
@@ -235,57 +289,64 @@ export async function sendQuotaExceededEmail({
 
   const html = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="color-scheme" content="light dark">
+      <meta name="supported-color-schemes" content="light dark">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #020617; color: #f8fafc; margin: 0; padding: 40px 20px; }
-        .container { max-width: 540px; margin: 0 auto; background-color: #0f172a; border: 1px solid #ef444450; border-radius: 16px; padding: 36px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
-        .logo { font-size: 20px; font-weight: 800; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 24px; text-align: center; }
-        .badge { display: inline-block; background-color: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #f87171; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 16px; }
-        .title { font-size: 22px; font-weight: 700; color: #ffffff; margin-bottom: 12px; }
-        .subtitle { font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 24px; }
-        .alert-box { background-color: #020617; border: 1px solid #ef444440; border-radius: 12px; padding: 20px; margin-bottom: 28px; }
-        .cta-btn { display: block; width: 100%; background-color: #ef4444; color: #ffffff; text-align: center; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; box-sizing: border-box; }
-        .cta-btn:hover { background-color: #dc2626; }
-        .footer { font-size: 12px; color: #64748b; text-align: center; line-height: 1.5; margin-top: 32px; border-top: 1px solid #1e293b; padding-top: 20px; }
+        :root { color-scheme: light dark; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8F9FA; color: #222325; margin: 0; padding: 24px 16px; }
+        .container { max-width: 540px; margin: 0 auto; background: #FFFFFF; border: 1px solid #E4E5E7; border-radius: 10px; padding: 36px 28px; }
+        .badge { display: inline-block; background-color: #FEE2E2; border: 1px solid #FECACA; color: #DC2626; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }
+        .title { font-size: 20px; font-weight: 700; color: #222325; margin-bottom: 12px; }
+        .subtitle { font-size: 14px; color: #62646A; line-height: 1.6; margin-bottom: 20px; }
+        .alert-box { background-color: #F7F7F7; border: 1px solid #E4E5E7; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+        .cta-btn { display: block; width: 100%; background-color: #DC2626; color: #FFFFFF !important; text-align: center; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 20px; border-radius: 6px; margin-bottom: 16px; box-sizing: border-box; }
+        .footer { font-size: 12px; color: #95979D; text-align: center; line-height: 1.5; margin-top: 28px; border-top: 1px solid #E4E5E7; padding-top: 20px; }
+        @media (prefers-color-scheme: dark) {
+          body { background-color: #121212 !important; color: #F3F4F6 !important; }
+          .container { background-color: #1E1E1E !important; border-color: #333333 !important; }
+          .brand-text, .title { color: #FFFFFF !important; }
+          .subtitle { color: #D1D5DB !important; }
+          .alert-box { background-color: #262626 !important; border-color: #404040 !important; }
+          .footer { color: #888888 !important; border-color: #333333 !important; }
+        }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="logo">⚡ LABTO AI</div>
+        ${emailBrandHeader}
         <div style="text-align: center;">
-          <span class="badge">100% Credits Reached &bull; Widget Paused</span>
+          <span class="badge">100% Credits Reached &bull; Paused</span>
         </div>
         <div class="title">Monthly AI Smart Credits Reached</div>
         <div class="subtitle">
-          Hi ${name || "Merchant"}, your chatbot has reached its monthly limit of <strong>${limit.toLocaleString()} AI Smart Credits</strong> on the <strong>${tier}</strong> plan.
+          Hello ${name || "Merchant"}, your AI assistant has reached its monthly limit of <strong>${limit.toLocaleString()} credits</strong> on the <strong>${tier}</strong> plan.
         </div>
         <div class="alert-box">
-          <table style="width: 100%; color: #f8fafc; font-size: 14px;">
-            <tr>
-              <td><strong>Status:</strong></td>
-              <td style="text-align: right; color: #ef4444; font-weight: 700;">Widget Temporarily Paused</td>
-            </tr>
-            <tr>
-              <td><strong>Used Quota:</strong></td>
-              <td style="text-align: right; color: #f87171; font-weight: 600;">${used.toLocaleString()} / ${limit.toLocaleString()} Credits</td>
-            </tr>
-          </table>
+          <div style="display: flex; justify-content: space-between; font-size: 13px;">
+            <span>Status</span>
+            <span style="color: #DC2626; font-weight: 600;">Widget Responses Paused</span>
+          </div>
         </div>
-        <div class="subtitle">
-          Your website visitors will no longer receive AI responses until your quota resets on the 1st of next month or when you upgrade.
-        </div>
-        <a href="https://labtoai.com/pricing" class="cta-btn">Reactivate Widget Instantly &rarr;</a>
+        <a href="https://labtoai.com/pricing" class="cta-btn">Reactivate Assistant Instantly &rarr;</a>
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Labto AI Assistant. All rights reserved.
+          &copy; ${new Date().getFullYear()} Labto AI. All rights reserved.
         </div>
       </div>
     </body>
     </html>
   `;
 
-  return sendEmailViaResendOrSmtp({ to, subject, html });
+  return sendEmailViaResendOrSmtp({
+    to,
+    subject,
+    html,
+    from: "Labto AI <support@labtoai.com>",
+    replyTo: "support@labtoai.com",
+  });
 }
 
 export async function sendMaintenanceBroadcastEmail({
@@ -304,24 +365,36 @@ export async function sendMaintenanceBroadcastEmail({
 
   const html = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="color-scheme" content="light dark">
+      <meta name="supported-color-schemes" content="light dark">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F7F7F7; color: #222325; margin: 0; padding: 40px 20px; }
-        .container { max-width: 560px; margin: 0 auto; background-color: #FFFFFF; border: 1px solid #E4E5E7; border-radius: 8px; padding: 36px; }
-        .logo { font-size: 20px; font-weight: 800; color: #1DBF73; letter-spacing: -0.02em; margin-bottom: 20px; text-align: center; }
-        .badge { display: inline-block; background-color: #ECFDF5; border: 1px solid #A7F3D0; color: #059669; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }
+        :root { color-scheme: light dark; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8F9FA; color: #222325; margin: 0; padding: 24px 16px; }
+        .container { max-width: 560px; margin: 0 auto; background: #FFFFFF; border: 1px solid #E4E5E7; border-radius: 10px; padding: 36px 28px; }
+        .badge { display: inline-block; background-color: #ECFDF5; border: 1px solid #A7F3D0; color: #059669; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }
         .title { font-size: 20px; font-weight: 700; color: #222325; margin-bottom: 12px; }
         .subtitle { font-size: 14px; color: #62646A; line-height: 1.6; margin-bottom: 20px; }
-        .notice-box { background-color: #F9FAFB; border: 1px solid #E4E5E7; border-radius: 6px; padding: 18px; margin-bottom: 24px; font-size: 13px; color: #374151; line-height: 1.6; }
+        .notice-box { background-color: #F7F7F7; border: 1px solid #E4E5E7; border-radius: 8px; padding: 18px; margin-bottom: 20px; font-size: 13px; color: #374151; line-height: 1.6; }
         .bullet { margin-bottom: 8px; font-size: 13px; color: #4B5563; }
-        .footer { font-size: 12px; color: #74767E; text-align: center; line-height: 1.5; margin-top: 32px; border-top: 1px solid #E4E5E7; padding-top: 20px; }
+        .footer { font-size: 12px; color: #95979D; text-align: center; line-height: 1.5; margin-top: 28px; border-top: 1px solid #E4E5E7; padding-top: 20px; }
+        @media (prefers-color-scheme: dark) {
+          body { background-color: #121212 !important; color: #F3F4F6 !important; }
+          .container { background-color: #1E1E1E !important; border-color: #333333 !important; }
+          .brand-text, .title { color: #FFFFFF !important; }
+          .subtitle { color: #D1D5DB !important; }
+          .notice-box { background-color: #262626 !important; border-color: #404040 !important; color: #E5E7EB !important; }
+          .bullet { color: #D1D5DB !important; }
+          .footer { color: #888888 !important; border-color: #333333 !important; }
+        }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="logo">⚡ LABTO AI</div>
+        ${emailBrandHeader}
         <div style="text-align: center;">
           <span class="badge">Scheduled System Maintenance</span>
         </div>
@@ -337,15 +410,21 @@ export async function sendMaintenanceBroadcastEmail({
           <div class="bullet">&bull; <strong>Widget Status:</strong> AI assistant responses are temporarily paused and will automatically resume as soon as maintenance is completed.</div>
         </div>
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Labto AI Inc. All rights reserved.<br>
-          Need urgent assistance? Contact us at support@labtoai.com
+          &copy; ${new Date().getFullYear()} Labto AI. All rights reserved.<br>
+          Need assistance? Contact us at <a href="mailto:support@labtoai.com" style="color: #1DBF73; text-decoration: none;">support@labtoai.com</a>
         </div>
       </div>
     </body>
     </html>
   `;
 
-  return sendEmailViaResendOrSmtp({ to, subject, html });
+  return sendEmailViaResendOrSmtp({
+    to,
+    subject,
+    html,
+    from: "Labto AI <no-reply@labtoai.com>",
+    replyTo: "support@labtoai.com",
+  });
 }
 
 export async function sendNewsletterWelcomeEmail({
@@ -355,53 +434,41 @@ export async function sendNewsletterWelcomeEmail({
   to: string;
   name?: string;
 }) {
-  const subject = "Welcome to Labto AI — You're Subscribed! 🎉";
+  const subject = "Welcome to Labto AI 🎉";
   const html = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="color-scheme" content="light dark">
+      <meta name="supported-color-schemes" content="light dark">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8F9FA; margin: 0; padding: 20px; color: #222325; }
-        .container { max-width: 560px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; border: 1px solid #E4E5E7; padding: 40px 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-        .logo { font-size: 20px; font-weight: 800; color: #1DBF73; letter-spacing: -0.5px; text-align: center; margin-bottom: 24px; }
-        .badge { display: inline-block; padding: 6px 14px; background: #E8F8F0; color: #1DBF73; font-size: 12px; font-weight: 600; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
-        .title { font-size: 24px; font-weight: 700; color: #222325; text-align: center; margin-bottom: 12px; line-height: 1.3; }
-        .subtitle { font-size: 15px; color: #62646A; line-height: 1.6; margin-bottom: 24px; text-align: left; }
-        .highlight-card { background: #F7F7F7; border: 1px solid #E4E5E7; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
-        .feature-item { display: flex; align-items: flex-start; margin-bottom: 12px; font-size: 14px; color: #404145; line-height: 1.5; }
-        .feature-item:last-child { margin-bottom: 0; }
-        .btn-container { text-align: center; margin: 32px 0 20px; }
-        .btn { display: inline-block; background: #1DBF73; color: #FFFFFF !important; text-decoration: none; padding: 13px 28px; border-radius: 6px; font-weight: 600; font-size: 14px; }
-        .footer { font-size: 12px; color: #95979D; text-align: center; border-top: 1px solid #E4E5E7; padding-top: 24px; margin-top: 32px; line-height: 1.6; }
+        :root { color-scheme: light dark; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8F9FA; margin: 0; padding: 24px 16px; color: #222325; }
+        .container { max-width: 560px; margin: 0 auto; background: #FFFFFF; border-radius: 10px; border: 1px solid #E4E5E7; padding: 40px 32px; }
+        .title { font-size: 24px; font-weight: 700; color: #222325; text-align: center; margin-bottom: 16px; line-height: 1.3; }
+        .subtitle { font-size: 15px; color: #62646A; line-height: 1.65; margin-bottom: 0; text-align: left; }
+        .footer { font-size: 12px; color: #95979D; text-align: center; border-top: 1px solid #E4E5E7; padding-top: 24px; margin-top: 36px; line-height: 1.6; }
+        @media (prefers-color-scheme: dark) {
+          body { background-color: #121212 !important; color: #F3F4F6 !important; }
+          .container { background-color: #1E1E1E !important; border-color: #333333 !important; }
+          .brand-text, .title { color: #FFFFFF !important; }
+          .subtitle { color: #D1D5DB !important; }
+          .footer { color: #888888 !important; border-color: #333333 !important; }
+        }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="logo">⚡ LABTO AI</div>
-        <div style="text-align: center;">
-          <span class="badge">Subscription Confirmed</span>
-        </div>
-        <div class="title">Welcome to the Future of E-Commerce AI</div>
+        ${emailBrandHeader}
+        <div class="title">Welcome to Labto AI</div>
         <div class="subtitle">
           Hello ${name ? name : "there"},<br><br>
-          Thank you for subscribing to <strong>Labto AI</strong> updates! You're now on the list to receive our latest product release notes, e-commerce conversion strategies, and autonomous sales assistant innovations.
+          Thank you for subscribing to <strong>Labto AI</strong> updates! You're now on the list to receive our latest product release notes, intelligent AI assistant features, and platform updates for your websites and businesses.
         </div>
-        
-        <div class="highlight-card">
-          <div style="font-weight: 600; font-size: 14px; color: #222325; margin-bottom: 12px;">What to expect from us:</div>
-          <div class="feature-item">🚀 <strong>Autonomous Sales & Concierge:</strong> Discover how AI shopping agents boost conversions across Shopify, WooCommerce & Custom storefronts.</div>
-          <div class="feature-item">💡 <strong>Sub-Second Hybrid Search:</strong> Insights on vector search & zero-hallucination store retrieval.</div>
-          <div class="feature-item">🛍️ <strong>Automated Cart Mutations:</strong> Seamless multi-platform cart flows and customer experience tips.</div>
-        </div>
-
-        <div class="btn-container">
-          <a href="https://labtoai.com" class="btn" target="_blank">Explore Labto AI Platform</a>
-        </div>
-
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Labto AI Inc. All rights reserved.<br>
+          &copy; ${new Date().getFullYear()} Labto AI. All rights reserved.<br>
           You received this email because you subscribed to updates at <a href="https://labtoai.com" style="color: #1DBF73; text-decoration: none;">labtoai.com</a>.
         </div>
       </div>
@@ -409,5 +476,11 @@ export async function sendNewsletterWelcomeEmail({
     </html>
   `;
 
-  return sendEmailViaResendOrSmtp({ to, subject, html });
+  return sendEmailViaResendOrSmtp({
+    to,
+    subject,
+    html,
+    from: "Labto AI <no-reply@labtoai.com>",
+    replyTo: "support@labtoai.com",
+  });
 }
