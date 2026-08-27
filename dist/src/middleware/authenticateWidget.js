@@ -69,9 +69,7 @@ async function authenticateWidget(req, res, next) {
             !isDomainAllowed &&
             reqDomain) {
             logger_1.logger.warn(`Widget API domain rejected. Request Domain: ${reqDomain}, Allowed: ${allowedDomains.join(",")}`);
-            res
-                .status(403)
-                .json({
+            res.status(403).json({
                 error: `Domain '${reqDomain}' is not whitelisted for this API key.`,
             });
             return;

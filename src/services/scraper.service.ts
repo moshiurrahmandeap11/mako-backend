@@ -318,6 +318,8 @@ async function indexPageContent(
   pageTitle: string;
   pageMarkdown: string;
 }> {
+  currentUrlStr = currentUrlStr.split("#")[0];
+
   // Pre-process Cloudflare Email Protection tokens into plaintext emails
   let cleanHtml = html.replace(
     /\/cdn-cgi\/l\/email-protection#([a-fA-F0-9]+)/g,
@@ -1113,7 +1115,11 @@ async function indexPageContent(
   // 5. Upsert discovered products
   for (const prod of productsFound) {
     try {
-      const contentToEmbed = `Product/Project: ${prod.title}. Category: ${prod.category}. Price: $${prod.price} ${prod.currency}. Link: ${prod.productUrl}. Description: ${prod.description}`;
+      const cleanProductUrl = String(prod.productUrl || "")
+        .split("#")[0]
+        .replace(/\/respond\/?$/i, "/");
+
+      const contentToEmbed = `Product/Project: ${prod.title}. Category: ${prod.category}. Price: $${prod.price} ${prod.currency}. Link: ${cleanProductUrl}. Description: ${prod.description}`;
       const embedding = await generateEmbedding(contentToEmbed);
 
       const savedProduct = await prisma.product.upsert({
@@ -1128,7 +1134,7 @@ async function indexPageContent(
           price: prod.price,
           currency: prod.currency,
           imageUrl: prod.imageUrl,
-          productUrl: prod.productUrl,
+          productUrl: cleanProductUrl,
           category: prod.category,
           inStock: prod.inStock,
           options: prod.options ? (prod.options as any) : undefined,
@@ -1140,7 +1146,7 @@ async function indexPageContent(
           price: prod.price,
           currency: prod.currency,
           imageUrl: prod.imageUrl,
-          productUrl: prod.productUrl,
+          productUrl: cleanProductUrl,
           category: prod.category,
           inStock: prod.inStock,
           ...(prod.options ? { options: prod.options as any } : {}),

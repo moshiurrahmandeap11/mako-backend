@@ -16,12 +16,12 @@ export function sanitizeReplyText(rawReply: string): string {
     .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
     .trim();
 
-  // Remove raw markdown hashtags (#, ##, ###), convert raw * bullets to •, and clean trailing fragments
+  // Remove line-initial markdown headers (#, ##, ###), convert raw * bullets to •, and clean trailing fragments
   reply = reply
-    .replace(/#+\s*/g, "")
+    .replace(/^\s*#+\s*/gm, "")
     .replace(/^[\t ]*\*[\t ]+/gm, "• ")
     .replace(/\n[\t ]*\*[\t ]+/g, "\n• ")
-    .replace(/(\n|---|\s)*(#+\s*[^\n]*)$/gi, "")
+    .replace(/(\n|---|\s)*(^\s*#+\s*[^\n]*)$/gim, "")
     .trim();
 
   // Strip trailing incomplete bullet item (e.g. "\n5. " or "\n5. E-Commerce" without terminal punctuation)

@@ -286,6 +286,7 @@ function decodeCloudflareEmail(encodedHex) {
  * Indexes a single page's markdown and structured items into KnowledgeChunk and Product
  */
 async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainDomain = false) {
+    currentUrlStr = currentUrlStr.split("#")[0];
     // Pre-process Cloudflare Email Protection tokens into plaintext emails
     let cleanHtml = html.replace(/\/cdn-cgi\/l\/email-protection#([a-fA-F0-9]+)/g, (match, hex) => {
         const decoded = decodeCloudflareEmail(hex);
@@ -874,7 +875,10 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
     // 5. Upsert discovered products
     for (const prod of productsFound) {
         try {
-            const contentToEmbed = `Product/Project: ${prod.title}. Category: ${prod.category}. Price: $${prod.price} ${prod.currency}. Link: ${prod.productUrl}. Description: ${prod.description}`;
+            const cleanProductUrl = String(prod.productUrl || "")
+                .split("#")[0]
+                .replace(/\/respond\/?$/i, "/");
+            const contentToEmbed = `Product/Project: ${prod.title}. Category: ${prod.category}. Price: $${prod.price} ${prod.currency}. Link: ${cleanProductUrl}. Description: ${prod.description}`;
             const embedding = await (0, embeddings_1.generateEmbedding)(contentToEmbed);
             const savedProduct = await db_1.prisma.product.upsert({
                 where: {
@@ -888,7 +892,7 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
                     price: prod.price,
                     currency: prod.currency,
                     imageUrl: prod.imageUrl,
-                    productUrl: prod.productUrl,
+                    productUrl: cleanProductUrl,
                     category: prod.category,
                     inStock: prod.inStock,
                     options: prod.options ? prod.options : undefined,
@@ -900,7 +904,7 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
                     price: prod.price,
                     currency: prod.currency,
                     imageUrl: prod.imageUrl,
-                    productUrl: prod.productUrl,
+                    productUrl: cleanProductUrl,
                     category: prod.category,
                     inStock: prod.inStock,
                     ...(prod.options ? { options: prod.options } : {}),
