@@ -206,7 +206,7 @@ export async function sendQuotaWarningEmail({
         <div class="subtitle">
           To prevent your chatbot from pausing when it reaches 100%, upgrade to our Starter plan ($2/mo) or Pro plan ($5/mo) today with <strong>100% Unused Credit Rollover</strong>.
         </div>
-        <a href="https://mako-frontend.vercel.app/pricing" class="cta-btn">Upgrade Plan & Keep Widget Active &rarr;</a>
+        <a href="https://labtoai.com/pricing" class="cta-btn">Upgrade Plan & Keep Widget Active &rarr;</a>
         <div class="footer">
           &copy; ${new Date().getFullYear()} Labto AI Assistant. All rights reserved.
         </div>
@@ -276,7 +276,7 @@ export async function sendQuotaExceededEmail({
         <div class="subtitle">
           Your website visitors will no longer receive AI responses until your quota resets on the 1st of next month or when you upgrade.
         </div>
-        <a href="https://mako-frontend.vercel.app/pricing" class="cta-btn">Reactivate Widget Instantly &rarr;</a>
+        <a href="https://labtoai.com/pricing" class="cta-btn">Reactivate Widget Instantly &rarr;</a>
         <div class="footer">
           &copy; ${new Date().getFullYear()} Labto AI Assistant. All rights reserved.
         </div>
