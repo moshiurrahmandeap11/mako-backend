@@ -7,6 +7,7 @@ exports.sendOtpEmail = sendOtpEmail;
 exports.sendQuotaWarningEmail = sendQuotaWarningEmail;
 exports.sendQuotaExceededEmail = sendQuotaExceededEmail;
 exports.sendMaintenanceBroadcastEmail = sendMaintenanceBroadcastEmail;
+exports.sendNewsletterWelcomeEmail = sendNewsletterWelcomeEmail;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const env_1 = require("../config/env");
 const logger_1 = require("./logger");
@@ -172,7 +173,7 @@ async function sendQuotaWarningEmail({ to, name, used, limit, tier, }) {
         <div class="subtitle">
           To prevent your chatbot from pausing when it reaches 100%, upgrade to our Starter plan ($2/mo) or Pro plan ($5/mo) today with <strong>100% Unused Credit Rollover</strong>.
         </div>
-        <a href="https://mako-frontend.vercel.app/pricing" class="cta-btn">Upgrade Plan & Keep Widget Active &rarr;</a>
+        <a href="https://labtoai.com/pricing" class="cta-btn">Upgrade Plan & Keep Widget Active &rarr;</a>
         <div class="footer">
           &copy; ${new Date().getFullYear()} Labto AI Assistant. All rights reserved.
         </div>
@@ -227,7 +228,7 @@ async function sendQuotaExceededEmail({ to, name, used, limit, tier, }) {
         <div class="subtitle">
           Your website visitors will no longer receive AI responses until your quota resets on the 1st of next month or when you upgrade.
         </div>
-        <a href="https://mako-frontend.vercel.app/pricing" class="cta-btn">Reactivate Widget Instantly &rarr;</a>
+        <a href="https://labtoai.com/pricing" class="cta-btn">Reactivate Widget Instantly &rarr;</a>
         <div class="footer">
           &copy; ${new Date().getFullYear()} Labto AI Assistant. All rights reserved.
         </div>
@@ -278,6 +279,62 @@ async function sendMaintenanceBroadcastEmail({ to, name, message, }) {
         <div class="footer">
           &copy; ${new Date().getFullYear()} Labto AI Inc. All rights reserved.<br>
           Need urgent assistance? Contact us at support@ahsanul.dev
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+    return sendEmailViaResendOrSmtp({ to, subject, html });
+}
+async function sendNewsletterWelcomeEmail({ to, name, }) {
+    const subject = "Welcome to Labto AI — You're Subscribed! 🎉";
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8F9FA; margin: 0; padding: 20px; color: #222325; }
+        .container { max-width: 560px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; border: 1px solid #E4E5E7; padding: 40px 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        .logo { font-size: 20px; font-weight: 800; color: #1DBF73; letter-spacing: -0.5px; text-align: center; margin-bottom: 24px; }
+        .badge { display: inline-block; padding: 6px 14px; background: #E8F8F0; color: #1DBF73; font-size: 12px; font-weight: 600; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+        .title { font-size: 24px; font-weight: 700; color: #222325; text-align: center; margin-bottom: 12px; line-height: 1.3; }
+        .subtitle { font-size: 15px; color: #62646A; line-height: 1.6; margin-bottom: 24px; text-align: left; }
+        .highlight-card { background: #F7F7F7; border: 1px solid #E4E5E7; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+        .feature-item { display: flex; align-items: flex-start; margin-bottom: 12px; font-size: 14px; color: #404145; line-height: 1.5; }
+        .feature-item:last-child { margin-bottom: 0; }
+        .btn-container { text-align: center; margin: 32px 0 20px; }
+        .btn { display: inline-block; background: #1DBF73; color: #FFFFFF !important; text-decoration: none; padding: 13px 28px; border-radius: 6px; font-weight: 600; font-size: 14px; }
+        .footer { font-size: 12px; color: #95979D; text-align: center; border-top: 1px solid #E4E5E7; padding-top: 24px; margin-top: 32px; line-height: 1.6; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="logo">⚡ LABTO AI</div>
+        <div style="text-align: center;">
+          <span class="badge">Subscription Confirmed</span>
+        </div>
+        <div class="title">Welcome to the Future of E-Commerce AI</div>
+        <div class="subtitle">
+          Hello ${name ? name : "there"},<br><br>
+          Thank you for subscribing to <strong>Labto AI</strong> updates! You're now on the list to receive our latest product release notes, e-commerce conversion strategies, and autonomous sales assistant innovations.
+        </div>
+        
+        <div class="highlight-card">
+          <div style="font-weight: 600; font-size: 14px; color: #222325; margin-bottom: 12px;">What to expect from us:</div>
+          <div class="feature-item">🚀 <strong>Autonomous Sales & Concierge:</strong> Discover how AI shopping agents boost conversions across Shopify, WooCommerce & Custom storefronts.</div>
+          <div class="feature-item">💡 <strong>Sub-Second Hybrid Search:</strong> Insights on vector search & zero-hallucination store retrieval.</div>
+          <div class="feature-item">🛍️ <strong>Automated Cart Mutations:</strong> Seamless multi-platform cart flows and customer experience tips.</div>
+        </div>
+
+        <div class="btn-container">
+          <a href="https://labtoai.com" class="btn" target="_blank">Explore Labto AI Platform</a>
+        </div>
+
+        <div class="footer">
+          &copy; ${new Date().getFullYear()} Labto AI Inc. All rights reserved.<br>
+          You received this email because you subscribed to updates at <a href="https://labtoai.com" style="color: #1DBF73; text-decoration: none;">labtoai.com</a>.
         </div>
       </div>
     </body>

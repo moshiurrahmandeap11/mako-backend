@@ -737,7 +737,7 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
             // Extract WooCommerce numeric Post ID if present on page
             const wcButtonId = $('form.cart button[name="add-to-cart"]').val() ||
                 $('form.cart input[name="add-to-cart"]').val() ||
-                $('button.single_add_to_cart_button[value]').val() ||
+                $("button.single_add_to_cart_button[value]").val() ||
                 $('form.cart input[name="product_id"]').val() ||
                 $("[data-product_id]").first().attr("data-product_id");
             const extractedId = wcButtonId
