@@ -32,6 +32,28 @@ export async function subscribeNewsletter(
       return;
     }
 
+    // Check if subscriber already exists
+    const existing = await (prisma as any).newsletterSubscriber.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (existing && existing.status === "SUBSCRIBED") {
+      logger.info(
+        `[Newsletter] Existing subscriber attempted resubscribe: ${cleanEmail}`,
+      );
+      res.status(200).json({
+        success: true,
+        alreadySubscribed: true,
+        message: "You are already subscribed to Labto AI updates!",
+        subscriber: {
+          email: existing.email,
+          status: existing.status,
+          createdAt: existing.createdAt,
+        },
+      });
+      return;
+    }
+
     // Upsert subscriber in database
     const subscriber = await (prisma as any).newsletterSubscriber.upsert({
       where: { email: cleanEmail },
@@ -63,6 +85,7 @@ export async function subscribeNewsletter(
 
     res.status(200).json({
       success: true,
+      alreadySubscribed: false,
       message:
         "Thank you for subscribing to Labto AI updates! A welcome confirmation email has been sent.",
       subscriber: {
