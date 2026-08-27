@@ -142,9 +142,7 @@ export async function processChatMessage(
     return {
       sessionId,
       reply: hijackReply,
-      thoughts: [
-        `Verified assistant persona & safety policies`,
-      ],
+      thoughts: [`Verified assistant persona & safety policies`],
       cartAction: undefined,
       recommendedProducts: [],
       tokensUsed: 15,
@@ -173,9 +171,7 @@ export async function processChatMessage(
     return {
       sessionId,
       reply: declineReply,
-      thoughts: [
-        `Verified website scope & store policies`,
-      ],
+      thoughts: [`Verified website scope & store policies`],
       cartAction: undefined,
       recommendedProducts: [],
       tokensUsed: 12,
@@ -215,10 +211,7 @@ export async function processChatMessage(
       reply: cached.reply,
       products: cached.products || [],
       cartAction: null,
-      thoughts: [
-        "Retrieved verified instant response",
-        ...cached.thoughts,
-      ],
+      thoughts: ["Retrieved verified instant response", ...cached.thoughts],
     };
   }
 
@@ -630,10 +623,7 @@ export async function processChatMessageStream(
       reply: cached.reply,
       products: cached.products || [],
       cartAction: null,
-      thoughts: [
-        "Retrieved verified instant response",
-        ...cached.thoughts,
-      ],
+      thoughts: ["Retrieved verified instant response", ...cached.thoughts],
     };
   }
 
