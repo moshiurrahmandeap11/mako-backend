@@ -286,13 +286,8 @@ function renderMarkdownText(text: string) {
       const linkUrl = match[2];
       const isEmail = linkUrl.startsWith("mailto:") || linkTitle.includes("@");
 
-      if (
-        !isEmail &&
-        (/^[a-f0-9]{24}$/i.test(linkTitle) ||
-          (!linkTitle.includes(" ") &&
-            (linkTitle.endsWith("-frontend") ||
-              linkTitle.includes("vercel.app"))))
-      ) {
+      // Only clean raw 24-character hexadecimal MongoDB/Prisma object IDs
+      if (!isEmail && /^[a-f0-9]{24}$/i.test(linkTitle)) {
         try {
           const u = new URL(linkUrl);
           if (
@@ -353,14 +348,13 @@ function renderMarkdownText(text: string) {
         try {
           const u = new URL(rawUrl);
           if (u.pathname && u.pathname.length > 1) {
-            const lastSegment = u.pathname.split("/").filter(Boolean).pop() || "";
+            const lastSegment =
+              u.pathname.split("/").filter(Boolean).pop() || "";
             displayLabel = lastSegment
               .replace(/[-_]/g, " ")
               .replace(/\b\w/g, (c) => c.toUpperCase());
           } else {
-            displayLabel = u.hostname
-              .replace(".vercel.app", "")
-              .replace(".com", "");
+            displayLabel = u.hostname.replace(/^www\./, "");
           }
         } catch {}
       }
