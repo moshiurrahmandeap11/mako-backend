@@ -191,7 +191,9 @@ async function executeWooCommerceAddToCart(
   const cleanProductId = productId.replace(/[^0-9]/g, "") || productId;
 
   // Helper to refresh WooCommerce UI fragments across the page
-  const refreshWooCommerceFragments = async (fragments?: Record<string, string>) => {
+  const refreshWooCommerceFragments = async (
+    fragments?: Record<string, string>,
+  ) => {
     try {
       if (fragments && typeof fragments === "object") {
         Object.entries(fragments).forEach(([selector, html]) => {
@@ -267,7 +269,10 @@ async function executeWooCommerceAddToCart(
       };
     }
   } catch (err: any) {
-    console.warn("[Labto AI Cart] WooCommerce AJAX failed, trying Store API:", err);
+    console.warn(
+      "[Labto AI Cart] WooCommerce AJAX failed, trying Store API:",
+      err,
+    );
   }
 
   // 2. Try WooCommerce Store REST API (/wp-json/wc/store/v1/cart/add-item)
@@ -296,7 +301,10 @@ async function executeWooCommerceAddToCart(
       }
     }
   } catch (err: any) {
-    console.warn("[Labto AI Cart] WooCommerce Store API failed, trying direct form POST:", err);
+    console.warn(
+      "[Labto AI Cart] WooCommerce Store API failed, trying direct form POST:",
+      err,
+    );
   }
 
   // 3. Try Direct Product Page Form POST
