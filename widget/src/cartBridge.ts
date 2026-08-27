@@ -53,7 +53,7 @@ export function isWooCommerceStore(): boolean {
   }
   if (
     document.querySelector(
-      '.woocommerce, [class*="woocommerce"], form.variations_form',
+      '.woocommerce, [class*="woocommerce"], form.variations_form, form.cart, .single_add_to_cart_button, link[href*="wp-content"], script[src*="wp-content"], script[src*="woocommerce"], a[href*="/cart"], a[href*="/checkout"], a[href*="/shop"], .cart-contents, .wp-block-woocommerce-cart',
     )
   ) {
     return true;
@@ -179,17 +179,59 @@ async function executeShopifyAddToCart(
 }
 
 /**
- * Tier 2: WooCommerce Native Ajax Cart Addition
+ * Tier 2: WooCommerce Native Ajax, Store API & Form Cart Addition
  */
 async function executeWooCommerceAddToCart(
   productId: string,
   quantity: number = 1,
   variantId?: string,
   selectedOptions?: Record<string, string>,
+  productUrl?: string,
 ): Promise<AddToCartResult> {
+  const cleanProductId = productId.replace(/[^0-9]/g, "") || productId;
+
+  // Helper to refresh WooCommerce UI fragments across the page
+  const refreshWooCommerceFragments = async (fragments?: Record<string, string>) => {
+    try {
+      if (fragments && typeof fragments === "object") {
+        Object.entries(fragments).forEach(([selector, html]) => {
+          document.querySelectorAll(selector).forEach((el) => {
+            (el as HTMLElement).outerHTML = String(html);
+          });
+        });
+      }
+
+      // Fetch latest fragments from WooCommerce endpoint
+      const fragRes = await fetch("/?wc-ajax=get_refreshed_fragments", {
+        method: "POST",
+      }).catch(() => null);
+
+      if (fragRes && fragRes.ok) {
+        const fragData = await fragRes.json().catch(() => ({}));
+        if (fragData.fragments) {
+          Object.entries(fragData.fragments).forEach(([selector, html]) => {
+            document.querySelectorAll(selector).forEach((el) => {
+              (el as HTMLElement).outerHTML = String(html);
+            });
+          });
+        }
+      }
+
+      const win = window as any;
+      if (win.jQuery) {
+        win.jQuery(document.body).trigger("added_to_cart", [fragments, ""]);
+        win.jQuery(document.body).trigger("wc_fragment_refresh");
+        win.jQuery(document.body).trigger("wc_fragments_refreshed");
+      }
+      window.dispatchEvent(new CustomEvent("woocommerce:cart:updated"));
+      document.dispatchEvent(new CustomEvent("woocommerce:cart:updated"));
+      window.dispatchEvent(new CustomEvent("cart:updated"));
+    } catch {}
+  };
+
+  // 1. Try standard WooCommerce AJAX endpoint (/?wc-ajax=add_to_cart)
   try {
     const formData = new URLSearchParams();
-    const cleanProductId = productId.replace(/[^0-9]/g, "") || productId;
     formData.append("product_id", cleanProductId);
     formData.append("quantity", String(quantity || 1));
 
@@ -202,10 +244,10 @@ async function executeWooCommerceAddToCart(
       Object.entries(selectedOptions).forEach(([k, v]) => {
         const key = k.toLowerCase().replace(/\s+/g, "_");
         formData.append(`attribute_${key}`, v);
+        formData.append(`attribute_pa_${key}`, v);
       });
     }
 
-    // Try standard WooCommerce AJAX endpoint
     const res = await fetch("/?wc-ajax=add_to_cart", {
       method: "POST",
       headers: {
@@ -216,11 +258,8 @@ async function executeWooCommerceAddToCart(
     });
 
     if (res.ok) {
-      const win = window as any;
-      if (win.jQuery) {
-        win.jQuery(document.body).trigger("added_to_cart");
-        win.jQuery(document.body).trigger("wc_fragment_refresh");
-      }
+      const data = await res.json().catch(() => ({}));
+      await refreshWooCommerceFragments(data.fragments);
       return {
         success: true,
         platform: "woocommerce",
@@ -228,10 +267,69 @@ async function executeWooCommerceAddToCart(
       };
     }
   } catch (err: any) {
-    console.warn(
-      "[Labto AI Cart] WooCommerce AJAX failed, trying fallback:",
-      err,
-    );
+    console.warn("[Labto AI Cart] WooCommerce AJAX failed, trying Store API:", err);
+  }
+
+  // 2. Try WooCommerce Store REST API (/wp-json/wc/store/v1/cart/add-item)
+  try {
+    const numId = Number(cleanProductId);
+    if (!isNaN(numId) && numId > 0) {
+      const res = await fetch("/wp-json/wc/store/v1/cart/add-item", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          id: numId,
+          quantity: quantity || 1,
+        }),
+      });
+
+      if (res.ok) {
+        await refreshWooCommerceFragments();
+        return {
+          success: true,
+          platform: "woocommerce",
+          message: "Item added to WooCommerce cart!",
+        };
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Labto AI Cart] WooCommerce Store API failed, trying direct form POST:", err);
+  }
+
+  // 3. Try Direct Product Page Form POST
+  if (productUrl && productUrl !== "#") {
+    try {
+      const targetUrl = new URL(productUrl, window.location.origin);
+      const postData = new URLSearchParams();
+      postData.append("add-to-cart", cleanProductId);
+      postData.append("quantity", String(quantity || 1));
+      if (selectedOptions) {
+        Object.entries(selectedOptions).forEach(([k, v]) => {
+          const key = k.toLowerCase().replace(/\s+/g, "_");
+          postData.append(`attribute_${key}`, v);
+        });
+      }
+
+      const res = await fetch(targetUrl.href, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: postData,
+      });
+
+      if (res.ok) {
+        await refreshWooCommerceFragments();
+        return {
+          success: true,
+          platform: "woocommerce",
+          message: "Item added to WooCommerce cart!",
+        };
+      }
+    } catch {}
   }
 
   return {
@@ -577,6 +675,7 @@ export async function requestAddToCart(
       quantity,
       variantId,
       selectedOptions,
+      productUrl,
     );
     if (wooResult.success) {
       executeEventAndLocalStorageAddToCart(

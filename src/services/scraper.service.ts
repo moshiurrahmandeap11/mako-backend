@@ -837,6 +837,16 @@ async function indexPageContent(
       // 2. Generic <select> option extraction (Dropdowns: Storage, Weight, Flavor, Material, Color, Size, etc.)
       $("select").each((_, sel) => {
         const selectEl = $(sel);
+
+        // Skip review ratings, comment forms, cart ordering, and search/nav dropdowns
+        if (
+          selectEl.closest(
+            '#reviews, #review_form, #commentform, .comment-form, .woocommerce-ordering, form[class*="comment" i], nav, footer, header',
+          ).length > 0
+        ) {
+          return;
+        }
+
         let optName =
           selectEl.attr("name") ||
           selectEl.attr("id") ||
@@ -851,12 +861,23 @@ async function indexPageContent(
           .replace(/choose/i, "")
           .trim();
 
+        // Hard skip non-product select fields
+        if (
+          /^(rating|review|orderby|sort|country|state|billing|shipping|lang|language|currency)$/i.test(
+            optName,
+          )
+        ) {
+          return;
+        }
+
         const vals: string[] = [];
         selectEl.find("option").each((_, opt) => {
           const t = $(opt).text().trim();
           if (
             t &&
-            !/choose|select|pick/i.test(t) &&
+            !/choose|select|pick|rate…|perfect|good|average|very poor/i.test(
+              t,
+            ) &&
             t.length > 0 &&
             t.length < 40
           ) {
@@ -926,10 +947,17 @@ async function indexPageContent(
         }
       }
 
-      const extractedId = generateDeterministicExternalId(
-        currentUrlStr,
-        singleTitle,
-      );
+      // Extract WooCommerce numeric Post ID if present on page
+      const wcButtonId =
+        $('form.cart button[name="add-to-cart"]').val() ||
+        $('form.cart input[name="add-to-cart"]').val() ||
+        $('button.single_add_to_cart_button[value]').val() ||
+        $('form.cart input[name="product_id"]').val() ||
+        $("[data-product_id]").first().attr("data-product_id");
+
+      const extractedId = wcButtonId
+        ? String(wcButtonId).trim()
+        : generateDeterministicExternalId(currentUrlStr, singleTitle);
 
       if (singleTitle && singleTitle.length > 2) {
         productsFound.push({
