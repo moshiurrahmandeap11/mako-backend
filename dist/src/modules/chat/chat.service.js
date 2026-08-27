@@ -243,7 +243,10 @@ Currently, no specific catalog items or knowledge base articles matched this que
     catch (err) {
         logger_1.logger.error("RAG Search Error:", err);
     }
-    const hasStoreProducts = retrievedProducts.length > 0;
+    const merchantTotalProducts = await db_1.prisma.product.count({
+        where: { merchantId },
+    });
+    const hasStoreProducts = retrievedProducts.length > 0 || merchantTotalProducts > 0;
     const systemPrompt = (0, systemPromptBuilder_1.buildSystemPrompt)(merchantName, effectiveDomain, botMode, customPrompt, template, hasStoreProducts);
     // Execute Cascading LLM Provider Runner
     const llmResult = await (0, llmRunner_1.executeLlmCascade)(merchantId, userMessage, systemPrompt + ragContext, conversation.messages, imageUrl, provider, botMode, template);
@@ -569,7 +572,10 @@ Currently, no specific catalog items or knowledge base articles matched this que
     catch (err) {
         logger_1.logger.error("RAG Search Error:", err);
     }
-    const hasStoreProducts = retrievedProducts.length > 0;
+    const merchantTotalProducts = await db_1.prisma.product.count({
+        where: { merchantId },
+    });
+    const hasStoreProducts = retrievedProducts.length > 0 || merchantTotalProducts > 0;
     const systemPrompt = (0, systemPromptBuilder_1.buildSystemPrompt)(merchantName, effectiveDomain, botMode, customPrompt, template, hasStoreProducts);
     // Execute Streaming LLM Cascade
     const llmResult = await (0, llmRunner_1.executeLlmCascadeStream)(merchantId, userMessage, systemPrompt + ragContext, conversation.messages, onToken, imageUrl, provider, botMode, template);

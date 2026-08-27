@@ -314,7 +314,11 @@ Currently, no specific catalog items or knowledge base articles matched this que
     logger.error("RAG Search Error:", err);
   }
 
-  const hasStoreProducts = retrievedProducts.length > 0;
+  const merchantTotalProducts = await prisma.product.count({
+    where: { merchantId },
+  });
+  const hasStoreProducts =
+    retrievedProducts.length > 0 || merchantTotalProducts > 0;
   const systemPrompt = buildSystemPrompt(
     merchantName,
     effectiveDomain,
@@ -751,7 +755,11 @@ Currently, no specific catalog items or knowledge base articles matched this que
     logger.error("RAG Search Error:", err);
   }
 
-  const hasStoreProducts = retrievedProducts.length > 0;
+  const merchantTotalProducts = await prisma.product.count({
+    where: { merchantId },
+  });
+  const hasStoreProducts =
+    retrievedProducts.length > 0 || merchantTotalProducts > 0;
   const systemPrompt = buildSystemPrompt(
     merchantName,
     effectiveDomain,
