@@ -128,9 +128,7 @@ async function login(req, res) {
             return;
         }
         if (!merchant.passwordHash) {
-            res
-                .status(401)
-                .json({
+            res.status(401).json({
                 error: "This account is set up with social authentication. Please log in with Google or GitHub.",
             });
             return;
@@ -185,11 +183,7 @@ async function me(req, res) {
             res.status(404).json({ error: "Merchant not found." });
             return;
         }
-        const adminEmail = (env_1.env.ADMIN_EMAIL || "admin@ahsanul.dev")
-            .trim()
-            .toLowerCase();
-        const isAdmin = merchant.role === "ADMIN" ||
-            merchant.email.trim().toLowerCase() === adminEmail;
+        const isAdmin = merchant.role === "ADMIN";
         const domainStatuses = await Promise.all((merchant.allowedDomains || []).map(async (domain) => {
             const chunkCount = await db_1.prisma.knowledgeChunk.count({
                 where: {

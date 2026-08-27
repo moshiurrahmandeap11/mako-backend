@@ -14,7 +14,7 @@ export async function getAdminMerchants(
     const search = req.query.search ? String(req.query.search).trim() : "";
     const tier = req.query.tier ? String(req.query.tier).toUpperCase() : "ALL";
     const page = parseInt(String(req.query.page || "1"), 10);
-    const limit = parseInt(String(req.query.limit || "50"), 10);
+    const limit = parseInt(String(req.query.limit || "10"), 10);
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -168,11 +168,9 @@ export async function updateMerchantPlan(
 
     const validTiers = ["FREE", "STARTER", "PRO", "ENTERPRISE"];
     if (!validTiers.includes(planTier)) {
-      res
-        .status(400)
-        .json({
-          error: `Invalid plan tier. Must be one of ${validTiers.join(", ")}`,
-        });
+      res.status(400).json({
+        error: `Invalid plan tier. Must be one of ${validTiers.join(", ")}`,
+      });
       return;
     }
 

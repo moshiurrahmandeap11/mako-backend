@@ -36,6 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.generateDeterministicExternalId = generateDeterministicExternalId;
 exports.isSafeUrl = isSafeUrl;
 exports.decodeCloudflareEmail = decodeCloudflareEmail;
 exports.fetchRenderedHtmlWithPuppeteer = fetchRenderedHtmlWithPuppeteer;
@@ -45,10 +46,30 @@ exports.addManualKnowledgeChunk = addManualKnowledgeChunk;
 exports.getScrapeStatus = getScrapeStatus;
 exports.triggerBackgroundCrawl = triggerBackgroundCrawl;
 const cheerio = __importStar(require("cheerio"));
+const crypto_1 = __importDefault(require("crypto"));
 const puppeteer_1 = __importDefault(require("puppeteer"));
 const db_1 = require("../config/db");
 const embeddings_1 = require("../utils/embeddings");
 const logger_1 = require("../utils/logger");
+function generateDeterministicExternalId(productUrl, title, sku) {
+    if (sku && String(sku).trim().length > 0 && !/^scrape-/i.test(String(sku))) {
+        return String(sku).trim();
+    }
+    const urlMatch = productUrl.match(/\/product[s]?\/([^\/\?#]+)/i) ||
+        productUrl.match(/\/item\/([^\/\?#]+)/i) ||
+        productUrl.match(/\/p\/([^\/\?#]+)/i);
+    if (urlMatch && urlMatch[1] && urlMatch[1].length > 1) {
+        return urlMatch[1].trim();
+    }
+    const cleanUrl = productUrl.split("?")[0].split("#")[0].toLowerCase().trim();
+    const cleanTitle = (title || "").toLowerCase().trim();
+    const hash = crypto_1.default
+        .createHash("md5")
+        .update(`${cleanUrl}#${cleanTitle}`)
+        .digest("hex")
+        .slice(0, 12);
+    return `PROD-${hash}`;
+}
 function isSafeUrl(url) {
     if (url.protocol !== "http:" && url.protocol !== "https:") {
         return false;
@@ -425,16 +446,17 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
                 const items = Array.isArray(data) ? data : [data];
                 for (const item of items) {
                     if (item["@type"] === "Product" ||
-                        item["@type"] === "http://schema.org/Product") {
-                        const title = item.name || pageTitle;
-                        const description = item.description || metaDescription || title;
-                        const offers = Array.isArray(item.offers)
-                            ? item.offers
-                            : [item.offers || {}];
-                        const primaryOffer = offers[0] || {};
-                        const price = parseFloat(primaryOffer.price || primaryOffer.lowPrice || "0") ||
-                            0;
-                        const currency = primaryOffer.priceCurrency || "USD";
+                        item["@type"] === "http://schema.org/Product" ||
+                        item["@type"] === "Service" ||
+                        item["@type"] === "http://schema.org/Service") {
+                        const baseTitle = String(item.name || pageTitle).trim();
+                        const description = String(item.description || metaDescription || baseTitle).trim();
+                        const rawOffers = item.offers || {};
+                        const offers = Array.isArray(rawOffers)
+                            ? rawOffers
+                            : Array.isArray(rawOffers.offers)
+                                ? rawOffers.offers
+                                : [rawOffers];
                         const imageUrl = Array.isArray(item.image)
                             ? item.image[0]
                             : item.image || ogImage || "";
@@ -442,33 +464,53 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
                             ? new URL(item.url, origin).href
                             : currentUrlStr;
                         const category = item.category || "General";
-                        const sku = item.sku ||
-                            item.mpn ||
-                            `SCRAPE-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-                        let parsedVariants = undefined;
-                        if (offers.length > 1) {
-                            parsedVariants = offers.map((off, idx) => ({
-                                id: String(off.sku || off.identifier || `VAR-${idx + 1}`),
-                                title: off.name || `Option ${idx + 1}`,
-                                price: parseFloat(off.price || "0") || price,
-                                available: off.availability
-                                    ? !off.availability.includes("OutOfStock")
-                                    : true,
-                                sku: off.sku,
-                            }));
+                        // If there are multiple distinct named offers/plans (e.g. Free Plan, Starter Plan, Pro Plan)
+                        const hasMultipleNamedOffers = offers.length > 1 &&
+                            offers.some((o) => Boolean(o.name && o.name.trim().length > 0));
+                        if (hasMultipleNamedOffers) {
+                            for (let i = 0; i < offers.length; i++) {
+                                const off = offers[i];
+                                const offName = String(off.name || `Option ${i + 1}`).trim();
+                                const fullItemTitle = baseTitle
+                                    .toLowerCase()
+                                    .includes(offName.toLowerCase())
+                                    ? baseTitle
+                                    : `${baseTitle} - ${offName}`;
+                                const offPrice = parseFloat(off.price || off.lowPrice || "0") || 0;
+                                const offCurrency = off.priceCurrency || "USD";
+                                const offSku = generateDeterministicExternalId(productUrl, fullItemTitle, off.sku || off.identifier);
+                                productsFound.push({
+                                    externalId: offSku,
+                                    title: fullItemTitle,
+                                    description: `${fullItemTitle} - ${description}`,
+                                    price: offPrice,
+                                    currency: offCurrency,
+                                    imageUrl: String(imageUrl),
+                                    productUrl: String(productUrl),
+                                    category: String(category),
+                                    inStock: off.availability
+                                        ? !off.availability.includes("OutOfStock")
+                                        : true,
+                                });
+                            }
                         }
-                        productsFound.push({
-                            externalId: String(sku),
-                            title: String(title).trim(),
-                            description: String(description).trim(),
-                            price,
-                            currency,
-                            imageUrl: String(imageUrl),
-                            productUrl: String(productUrl),
-                            category: String(category),
-                            inStock: true,
-                            variants: parsedVariants,
-                        });
+                        else {
+                            const primaryOffer = offers[0] || {};
+                            const price = parseFloat(primaryOffer.price || primaryOffer.lowPrice || "0") || 0;
+                            const currency = primaryOffer.priceCurrency || "USD";
+                            const sku = generateDeterministicExternalId(productUrl, baseTitle, item.sku || item.mpn);
+                            productsFound.push({
+                                externalId: String(sku),
+                                title: baseTitle,
+                                description,
+                                price,
+                                currency,
+                                imageUrl: String(imageUrl),
+                                productUrl: String(productUrl),
+                                category: String(category),
+                                inStock: true,
+                            });
+                        }
                     }
                 }
             }
@@ -496,8 +538,9 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
             if (title && title.length > 2 && (link || img)) {
                 const fullUrl = link ? new URL(link, origin).href : currentUrlStr;
                 const fullImg = img ? new URL(img, origin).href : ogImage;
+                const extId = generateDeterministicExternalId(fullUrl, title);
                 productsFound.push({
-                    externalId: `DOM-${idx + 1}-${Buffer.from(title).toString("hex").slice(0, 10)}`,
+                    externalId: extId,
                     title,
                     description: `${title} - Details available at ${fullUrl}`,
                     price: numericPrice,
@@ -667,10 +710,7 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
                     addExtractedOption("Color", colorVals);
                 }
             }
-            const urlMatch = currentUrlStr.match(/\/product[s]?\/([^\/\?#]+)/i);
-            const extractedId = urlMatch
-                ? urlMatch[1]
-                : `PROD-${Buffer.from(singleTitle).toString("hex").slice(0, 10)}`;
+            const extractedId = generateDeterministicExternalId(currentUrlStr, singleTitle);
             if (singleTitle && singleTitle.length > 2) {
                 productsFound.push({
                     externalId: extractedId,
@@ -702,8 +742,7 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
             const img = link.find("img").attr("src") || link.find("img").attr("data-src");
             const priceText = link.text().match(/\$\s*(\d+(?:\.\d{1,2})?)/);
             const price = priceText ? parseFloat(priceText[1]) : 0;
-            const urlMatch = href.match(/\/product[s]?\/([^\/\?#]+)/i);
-            const extId = urlMatch ? urlMatch[1] : `PROD-${idx + 1}`;
+            const extId = generateDeterministicExternalId(fullUrl, title);
             if (title &&
                 title.length > 2 &&
                 !productsFound.some((p) => p.productUrl === fullUrl)) {

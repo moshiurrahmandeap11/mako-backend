@@ -15,6 +15,47 @@ const BriefcaseSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "13", height
 const ToolsSvg = () => ((0, jsx_runtime_1.jsx)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: (0, jsx_runtime_1.jsx)("path", { d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" }) }));
 const MailSvg = () => ((0, jsx_runtime_1.jsxs)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: [(0, jsx_runtime_1.jsx)("path", { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }), (0, jsx_runtime_1.jsx)("polyline", { points: "22,6 12,13 2,6" })] }));
 const MessageSquareSvg = () => ((0, jsx_runtime_1.jsx)("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.85 }, children: (0, jsx_runtime_1.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }) }));
+function parseSafeOptions(rawOptions) {
+    if (!rawOptions)
+        return [];
+    let parsed = rawOptions;
+    if (typeof rawOptions === "string") {
+        try {
+            parsed = JSON.parse(rawOptions);
+        }
+        catch {
+            return [];
+        }
+    }
+    if (!Array.isArray(parsed)) {
+        if (typeof parsed === "object" && parsed !== null) {
+            return Object.entries(parsed).map(([key, val]) => ({
+                name: String(key),
+                values: Array.isArray(val) ? val.map(String) : [String(val)],
+            }));
+        }
+        return [];
+    }
+    return parsed
+        .filter((opt) => Boolean(opt && typeof opt === "object"))
+        .map((opt) => {
+        let vals = [];
+        if (Array.isArray(opt.values)) {
+            vals = opt.values.map(String);
+        }
+        else if (opt.value) {
+            vals = [String(opt.value)];
+        }
+        else if (typeof opt === "string") {
+            return { name: "Option", values: [opt] };
+        }
+        return {
+            name: String(opt.name || "Option"),
+            values: vals.filter(Boolean),
+        };
+    })
+        .filter((opt) => opt.values.length > 0);
+}
 function renderMarkdownText(text) {
     if (!text)
         return null;
@@ -538,32 +579,44 @@ function ChatWidget({ api }) {
                     p.externalId === actionProdId ||
                     p.productUrl?.includes(actionProdId)) || {
                     id: actionProdId,
-                    title: "Product",
-                    price: 0,
-                    currency: "USD",
-                    productUrl: "#",
+                    externalId: res.cartAction.productId,
+                    title: res.cartAction.title || "Product",
+                    price: res.cartAction.price || 0,
+                    currency: res.cartAction.currency || "USD",
+                    productUrl: res.cartAction.productUrl || "#",
+                    imageUrl: res.cartAction.imageUrl,
                     inStock: true,
                     options: res.cartAction.options,
                     variants: res.cartAction.variants,
                 };
-                const allOptions = res.cartAction.options || targetProd.options || [];
-                const hasOptions = Array.isArray(allOptions) && allOptions.length > 0;
-                const hasSelectedOpts = res.cartAction.selectedOptions &&
-                    typeof res.cartAction.selectedOptions === "object" &&
-                    Object.keys(res.cartAction.selectedOptions).length > 0;
-                if (hasOptions && !hasSelectedOpts && !res.cartAction.variantId) {
-                    const defaultOpts = {};
-                    allOptions.forEach((opt) => {
-                        if (opt.values && opt.values.length > 0) {
+                const rawOptions = res.cartAction.options || targetProd.options || [];
+                const safeOptions = parseSafeOptions(rawOptions);
+                const hasOptions = safeOptions.length > 0;
+                const selectedOptsKeys = res.cartAction.selectedOptions &&
+                    typeof res.cartAction.selectedOptions === "object"
+                    ? Object.keys(res.cartAction.selectedOptions)
+                    : [];
+                const hasAllSelectedOpts = hasOptions && selectedOptsKeys.length >= safeOptions.length;
+                if (res.cartAction.requiresSelection ||
+                    (hasOptions && !hasAllSelectedOpts && !res.cartAction.variantId)) {
+                    const defaultOpts = {
+                        ...(res.cartAction.selectedOptions || {}),
+                    };
+                    safeOptions.forEach((opt) => {
+                        if (!defaultOpts[opt.name] && opt.values.length > 0) {
                             defaultOpts[opt.name] = opt.values[0];
                         }
                     });
                     setSelectedOptionsState(defaultOpts);
                     setModalQuantity(res.cartAction.quantity || 1);
-                    setModalProduct({ ...targetProd, options: allOptions });
+                    setModalProduct({
+                        ...targetProd,
+                        options: safeOptions,
+                        productUrl: res.cartAction.productUrl || targetProd.productUrl,
+                    });
                 }
                 else {
-                    (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, targetProd.productUrl).then((result) => {
+                    (0, cartBridge_1.requestAddToCart)(res.cartAction.productId, res.cartAction.quantity || 1, res.cartAction.variantId, res.cartAction.selectedOptions, res.cartAction.productUrl || targetProd.productUrl).then((result) => {
                         if (result.message && result.platform !== "dom_simulation") {
                             showToast(result.message);
                         }
@@ -1172,14 +1225,14 @@ function ChatWidget({ api }) {
                                                 fontWeight: "700",
                                                 color: primaryColor,
                                                 marginTop: "2px",
-                                            }, children: ["$", modalProduct.price, " ", modalProduct.currency || "USD"] }))] }), (modalProduct.options || []).map((opt) => ((0, jsx_runtime_1.jsxs)("div", { style: { marginBottom: "12px" }, children: [(0, jsx_runtime_1.jsxs)("label", { style: {
+                                            }, children: ["$", modalProduct.price, " ", modalProduct.currency || "USD"] }))] }), parseSafeOptions(modalProduct.options).map((opt) => ((0, jsx_runtime_1.jsxs)("div", { style: { marginBottom: "12px" }, children: [(0, jsx_runtime_1.jsxs)("label", { style: {
                                                 display: "block",
                                                 fontSize: "11px",
                                                 fontWeight: "600",
                                                 color: "#64748b",
                                                 textTransform: "uppercase",
                                                 marginBottom: "6px",
-                                            }, children: [opt.name, ":", " ", (0, jsx_runtime_1.jsx)("span", { style: { color: "#0f172a", textTransform: "none" }, children: selectedOptionsState[opt.name] })] }), (0, jsx_runtime_1.jsx)("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: opt.values.map((val) => {
+                                            }, children: [opt.name, ":", " ", (0, jsx_runtime_1.jsx)("span", { style: { color: "#0f172a", textTransform: "none" }, children: selectedOptionsState[opt.name] || opt.values[0] })] }), (0, jsx_runtime_1.jsx)("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: opt.values.map((val) => {
                                                 const isSelected = selectedOptionsState[opt.name] === val;
                                                 return ((0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setSelectedOptionsState((prev) => ({
                                                         ...prev,
@@ -1234,7 +1287,10 @@ function ChatWidget({ api }) {
                                                         cursor: "pointer",
                                                         fontWeight: "bold",
                                                     }, children: "+" })] })] }), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => {
-                                        const selectedVariant = modalProduct.variants?.find((v) => {
+                                        const variantsList = Array.isArray(modalProduct.variants)
+                                            ? modalProduct.variants
+                                            : [];
+                                        const selectedVariant = variantsList.find((v) => {
                                             if (!v.options)
                                                 return false;
                                             return Object.entries(selectedOptionsState).every(([k, val]) => String(v.options?.[k]).toLowerCase() ===

@@ -6,13 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendOtpEmail = sendOtpEmail;
 exports.sendQuotaWarningEmail = sendQuotaWarningEmail;
 exports.sendQuotaExceededEmail = sendQuotaExceededEmail;
+exports.sendMaintenanceBroadcastEmail = sendMaintenanceBroadcastEmail;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const env_1 = require("../config/env");
 const logger_1 = require("./logger");
-const isGmail = env_1.env.SMTP_HOST.includes('gmail');
+const isGmail = env_1.env.SMTP_HOST.includes("gmail");
 const transporter = nodemailer_1.default.createTransport(isGmail
     ? {
-        service: 'gmail',
+        service: "gmail",
         auth: {
             user: env_1.env.SMTP_USER,
             pass: env_1.env.SMTP_PASS,
@@ -27,21 +28,24 @@ const transporter = nodemailer_1.default.createTransport(isGmail
             pass: env_1.env.SMTP_PASS,
         },
     });
-const resendApiKey = process.env.RESEND_API_KEY || '';
+const resendApiKey = process.env.RESEND_API_KEY || "";
 async function sendEmailViaResendOrSmtp({ to, subject, html, }) {
     if (resendApiKey) {
         try {
-            const textFallback = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-            const res = await fetch('https://api.resend.com/emails', {
-                method: 'POST',
+            const textFallback = html
+                .replace(/<[^>]+>/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+            const res = await fetch("https://api.resend.com/emails", {
+                method: "POST",
                 headers: {
-                    'Authorization': `Bearer ${resendApiKey}`,
-                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${resendApiKey}`,
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    from: process.env.SMTP_FROM || 'Labto AI <support@ahsanul.dev>',
+                    from: process.env.SMTP_FROM || "Labto AI <support@ahsanul.dev>",
                     to: [to],
-                    reply_to: 'support@ahsanul.dev',
+                    reply_to: "support@ahsanul.dev",
                     subject,
                     html,
                     text: textFallback,
@@ -63,7 +67,7 @@ async function sendEmailViaResendOrSmtp({ to, subject, html, }) {
     // Fallback to Nodemailer transporter
     try {
         const info = await transporter.sendMail({
-            from: env_1.env.SMTP_FROM || 'Labto AI Assistant <moshiurbhau@gmail.com>',
+            from: env_1.env.SMTP_FROM || "Labto AI Assistant <moshiurbhau@gmail.com>",
             to,
             subject,
             html,
@@ -77,14 +81,14 @@ async function sendEmailViaResendOrSmtp({ to, subject, html, }) {
     }
 }
 async function sendOtpEmail({ to, otp, type, }) {
-    const isVerification = type === 'email-verification';
+    const isVerification = type === "email-verification";
     const subject = isVerification
-        ? 'Verify Your Email Address - Labto AI Assistant'
-        : 'Reset Your Password - Labto AI Assistant';
-    const title = isVerification ? 'Verify Your Email' : 'Reset Your Password';
+        ? "Verify Your Email Address - Labto AI Assistant"
+        : "Reset Your Password - Labto AI Assistant";
+    const title = isVerification ? "Verify Your Email" : "Reset Your Password";
     const messageText = isVerification
-        ? 'Thank you for registering with Labto AI Assistant. Use the 6-digit OTP code below to verify your email address and activate your account:'
-        : 'We received a request to reset the password for your Labto AI account. Use the 6-digit OTP code below to proceed with resetting your password:';
+        ? "Thank you for registering with Labto AI Assistant. Use the 6-digit OTP code below to verify your email address and activate your account:"
+        : "We received a request to reset the password for your Labto AI account. Use the 6-digit OTP code below to proceed with resetting your password:";
     const html = `
     <!DOCTYPE html>
     <html>
@@ -152,7 +156,7 @@ async function sendQuotaWarningEmail({ to, name, used, limit, tier, }) {
         </div>
         <div class="title">Your Monthly AI Credits are Ending Soon</div>
         <div class="subtitle">
-          Hi ${name || 'Merchant'}, your website chatbot has consumed <strong>${used.toLocaleString()} of ${limit.toLocaleString()} AI Smart Credits</strong> (${percentage}%) for your <strong>${tier}</strong> plan this month.
+          Hi ${name || "Merchant"}, your website chatbot has consumed <strong>${used.toLocaleString()} of ${limit.toLocaleString()} AI Smart Credits</strong> (${percentage}%) for your <strong>${tier}</strong> plan this month.
         </div>
         <div class="progress-box">
           <table style="width: 100%; color: #e2e8f0; font-size: 14px;">
@@ -206,7 +210,7 @@ async function sendQuotaExceededEmail({ to, name, used, limit, tier, }) {
         </div>
         <div class="title">Monthly AI Smart Credits Reached</div>
         <div class="subtitle">
-          Hi ${name || 'Merchant'}, your chatbot has reached its monthly limit of <strong>${limit.toLocaleString()} AI Smart Credits</strong> on the <strong>${tier}</strong> plan.
+          Hi ${name || "Merchant"}, your chatbot has reached its monthly limit of <strong>${limit.toLocaleString()} AI Smart Credits</strong> on the <strong>${tier}</strong> plan.
         </div>
         <div class="alert-box">
           <table style="width: 100%; color: #f8fafc; font-size: 14px;">
@@ -226,6 +230,54 @@ async function sendQuotaExceededEmail({ to, name, used, limit, tier, }) {
         <a href="https://mako-frontend.vercel.app/pricing" class="cta-btn">Reactivate Widget Instantly &rarr;</a>
         <div class="footer">
           &copy; ${new Date().getFullYear()} Labto AI Assistant. All rights reserved.
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+    return sendEmailViaResendOrSmtp({ to, subject, html });
+}
+async function sendMaintenanceBroadcastEmail({ to, name, message, }) {
+    const subject = "🚨 Scheduled Maintenance Notice - Labto AI";
+    const customMsg = message ||
+        "Labto AI is currently undergoing scheduled platform maintenance and system upgrades. We will be back online shortly.";
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F7F7F7; color: #222325; margin: 0; padding: 40px 20px; }
+        .container { max-width: 560px; margin: 0 auto; background-color: #FFFFFF; border: 1px solid #E4E5E7; border-radius: 8px; padding: 36px; }
+        .logo { font-size: 20px; font-weight: 800; color: #1DBF73; letter-spacing: -0.02em; margin-bottom: 20px; text-align: center; }
+        .badge { display: inline-block; background-color: #ECFDF5; border: 1px solid #A7F3D0; color: #059669; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }
+        .title { font-size: 20px; font-weight: 700; color: #222325; margin-bottom: 12px; }
+        .subtitle { font-size: 14px; color: #62646A; line-height: 1.6; margin-bottom: 20px; }
+        .notice-box { background-color: #F9FAFB; border: 1px solid #E4E5E7; border-radius: 6px; padding: 18px; margin-bottom: 24px; font-size: 13px; color: #374151; line-height: 1.6; }
+        .bullet { margin-bottom: 8px; font-size: 13px; color: #4B5563; }
+        .footer { font-size: 12px; color: #74767E; text-align: center; line-height: 1.5; margin-top: 32px; border-top: 1px solid #E4E5E7; padding-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="logo">⚡ LABTO AI</div>
+        <div style="text-align: center;">
+          <span class="badge">Scheduled System Maintenance</span>
+        </div>
+        <div class="title">Platform Maintenance Notice</div>
+        <div class="subtitle">
+          Hello ${name || "Merchant"},
+        </div>
+        <div class="notice-box">
+          <strong>Notice:</strong> ${customMsg}
+        </div>
+        <div class="subtitle">
+          <div class="bullet">&bull; <strong>Data Safety:</strong> All your store product catalogs, knowledge bases, and conversation history are 100% safe and preserved.</div>
+          <div class="bullet">&bull; <strong>Widget Status:</strong> AI assistant responses are temporarily paused and will automatically resume as soon as maintenance is completed.</div>
+        </div>
+        <div class="footer">
+          &copy; ${new Date().getFullYear()} Labto AI Inc. All rights reserved.<br>
+          Need urgent assistance? Contact us at support@ahsanul.dev
         </div>
       </div>
     </body>

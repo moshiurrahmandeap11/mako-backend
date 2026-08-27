@@ -23,12 +23,12 @@ async function authenticateDashboard(req, res, next) {
             headers: (0, node_1.fromNodeHeaders)(req.headers),
         });
         if (!session) {
-            res.status(401).json({ error: 'Unauthorized. No active session found.' });
+            res.status(401).json({ error: "Unauthorized. No active session found." });
             return;
         }
         const userId = session.user.id;
-        let planTier = 'FREE';
-        let role = 'MERCHANT';
+        let planTier = "FREE";
+        let role = "MERCHANT";
         const now = Date.now();
         const cached = userMetaCache.get(userId);
         if (cached && cached.expires > now) {
@@ -40,12 +40,16 @@ async function authenticateDashboard(req, res, next) {
                 where: { id: userId },
                 select: { planTier: true, role: true, email: true },
             });
-            planTier = dbUser?.planTier || 'FREE';
-            role = dbUser?.role || (dbUser?.email === 'admin@ahsanul.dev' ? 'ADMIN' : 'MERCHANT');
+            planTier = dbUser?.planTier || "FREE";
+            role = dbUser?.role || "MERCHANT";
             // Cleanup to prevent memory leaks over time
             if (userMetaCache.size > 1000)
                 userMetaCache.clear();
-            userMetaCache.set(userId, { tier: planTier, role, expires: now + CACHE_TTL_MS });
+            userMetaCache.set(userId, {
+                tier: planTier,
+                role,
+                expires: now + CACHE_TTL_MS,
+            });
         }
         req.merchant = {
             id: session.user.id,
@@ -57,17 +61,16 @@ async function authenticateDashboard(req, res, next) {
         next();
     }
     catch (error) {
-        logger_1.logger.warn('Dashboard Auth Failed:', error);
-        res.status(401).json({ error: 'Unauthorized. Invalid or expired session.' });
+        logger_1.logger.warn("Dashboard Auth Failed:", error);
+        res
+            .status(401)
+            .json({ error: "Unauthorized. Invalid or expired session." });
     }
 }
-const env_1 = require("../config/env");
 function requireAdmin(req, res, next) {
-    const adminEmail = (env_1.env.ADMIN_EMAIL || 'admin@ahsanul.dev').trim().toLowerCase();
-    const userEmail = req.merchant?.email?.trim().toLowerCase();
-    const isMerchantAdmin = Boolean(req.merchant && (req.merchant.role === 'ADMIN' || (userEmail && userEmail === adminEmail)));
+    const isMerchantAdmin = Boolean(req.merchant && req.merchant.role === "ADMIN");
     if (!isMerchantAdmin) {
-        res.status(403).json({ error: 'Forbidden. Admin access required.' });
+        res.status(403).json({ error: "Forbidden. Admin access required." });
         return;
     }
     next();

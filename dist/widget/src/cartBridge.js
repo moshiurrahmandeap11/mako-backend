@@ -300,7 +300,6 @@ async function executeDomSimulationAddToCart(selectedOptions, quantity = 1) {
             const btn = document.querySelector(sel);
             if (btn && btn.offsetParent !== null && typeof btn.click === "function") {
                 btn.focus();
-                btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
                 btn.click();
                 return true;
             }
@@ -314,7 +313,6 @@ async function executeDomSimulationAddToCart(selectedOptions, quantity = 1) {
             if (/add\s*to\s*cart|add\s*to\s*bag|buy\s*now/i.test(text) &&
                 b.offsetParent !== null) {
                 b.focus();
-                b.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
                 b.click();
                 return true;
             }
@@ -358,7 +356,6 @@ function initAutoAddWatcher() {
             if (clicked) {
                 clearInterval(interval);
                 isAutoAdding = false;
-                executeEventAndLocalStorageAddToCart(data.productId, data.quantity || 1, data.variantId, data.options);
             }
         }, 300);
     }
@@ -449,7 +446,6 @@ async function requestAddToCart(productId, quantity = 1, variantId, selectedOpti
     // 3. Check & Execute Smart DOM Simulation on Current Page (if user is already on the product page)
     const domSuccess = await executeDomSimulationAddToCart(selectedOptions, quantity);
     if (domSuccess) {
-        executeEventAndLocalStorageAddToCart(productId, quantity, variantId, selectedOptions);
         return {
             success: true,
             platform: "dom_simulation",
