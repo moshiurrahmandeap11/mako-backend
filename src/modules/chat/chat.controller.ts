@@ -168,6 +168,7 @@ export async function chat(
           req.apiKeyRecord?.systemPrompt,
           req.apiKeyRecord?.template,
           imageUrl,
+          req.detectedDomain,
         );
 
         sendEvent("done", response);
@@ -216,6 +217,7 @@ export async function chat(
       req.apiKeyRecord?.systemPrompt,
       req.apiKeyRecord?.template,
       imageUrl,
+      req.detectedDomain,
     );
 
     res.json(response);

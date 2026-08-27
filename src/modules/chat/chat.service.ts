@@ -38,6 +38,7 @@ export async function processChatMessage(
   customPrompt?: string,
   template?: string,
   imageUrl?: string,
+  requestDomain?: string,
 ) {
   // Enforce strict 250 character limit on all prompts
   userMessage = (userMessage || "").trim().slice(0, 250);
@@ -50,10 +51,10 @@ export async function processChatMessage(
 
   // Dynamically resolve clean business identity
   let merchantName = "our company";
-  const primaryDomain = merchant?.allowedDomains?.[0] || "";
+  const effectiveDomain = requestDomain || merchant?.allowedDomains?.[0] || "";
 
-  if (primaryDomain) {
-    const rawDomain = primaryDomain
+  if (effectiveDomain) {
+    const rawDomain = effectiveDomain
       .replace(/^https?:\/\//, "")
       .split("/")[0]
       .split(":")[0]
@@ -246,12 +247,18 @@ export async function processChatMessage(
 
     let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
       Promise.all([
-        searchProductsTool(merchantId, userMessage || "general", undefined, 6),
+        searchProductsTool(
+          merchantId,
+          userMessage || "general",
+          undefined,
+          6,
+          effectiveDomain,
+        ),
         searchKnowledgeTool(
           merchantId,
           userMessage || "general",
           8,
-          primaryDomain,
+          effectiveDomain,
         ),
       ]),
       ragTimeout,
@@ -300,7 +307,7 @@ export async function processChatMessage(
 
     if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
       ragContext = `\n\n### Website Context:
-Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ""}.
+Company/Website Name: ${merchantName}${effectiveDomain ? ` (${effectiveDomain})` : ""}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
     }
   } catch (err) {
@@ -310,7 +317,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
   const hasStoreProducts = retrievedProducts.length > 0;
   const systemPrompt = buildSystemPrompt(
     merchantName,
-    primaryDomain,
+    effectiveDomain,
     botMode,
     customPrompt,
     template,
@@ -442,6 +449,7 @@ export async function processChatMessageStream(
   customPrompt?: string,
   template?: string,
   imageUrl?: string,
+  requestDomain?: string,
 ): Promise<ChatResponse> {
   userMessage = (userMessage || "").trim().slice(0, 250);
 
@@ -451,10 +459,10 @@ export async function processChatMessageStream(
   });
 
   let merchantName = "our company";
-  const primaryDomain = merchant?.allowedDomains?.[0] || "";
+  const effectiveDomain = requestDomain || merchant?.allowedDomains?.[0] || "";
 
-  if (primaryDomain) {
-    const rawDomain = primaryDomain
+  if (effectiveDomain) {
+    const rawDomain = effectiveDomain
       .replace(/^https?:\/\//, "")
       .split("/")[0]
       .split(":")[0]
@@ -655,13 +663,14 @@ export async function processChatMessageStream(
 
     let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
       Promise.all([
-        searchProductsTool(merchantId, userMessage || "general", undefined, 6),
-        searchKnowledgeTool(
+        searchProductsTool(
           merchantId,
           userMessage || "general",
-          8,
-          primaryDomain,
+          undefined,
+          6,
+          effectiveDomain,
         ),
+        searchKnowledgeTool(merchantId, userMessage || "general", 8),
       ]),
       ragTimeout,
     ]);
@@ -735,7 +744,7 @@ export async function processChatMessageStream(
       !ragContext.includes("Live Web Search Results")
     ) {
       ragContext = `\n\n### Website Context:
-Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ""}.
+Company/Website Name: ${merchantName}${effectiveDomain ? ` (${effectiveDomain})` : ""}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
     }
   } catch (err) {
@@ -745,7 +754,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
   const hasStoreProducts = retrievedProducts.length > 0;
   const systemPrompt = buildSystemPrompt(
     merchantName,
-    primaryDomain,
+    effectiveDomain,
     botMode,
     customPrompt,
     template,

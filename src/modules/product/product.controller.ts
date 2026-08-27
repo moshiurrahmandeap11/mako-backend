@@ -1,21 +1,38 @@
-import { Response } from 'express';
-import { prisma, executeRawNeonQuery } from '../../config/db';
-import { generateEmbedding } from '../../utils/embeddings';
-import { logger } from '../../utils/logger';
-import { DashboardAuthRequest } from '../../middleware/authenticateDashboard';
+import { Response } from "express";
+import { executeRawNeonQuery, prisma } from "../../config/db";
+import { DashboardAuthRequest } from "../../middleware/authenticateDashboard";
+import { generateEmbedding } from "../../utils/embeddings";
+import { logger } from "../../utils/logger";
 
-export async function createProduct(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function createProduct(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
-    const { externalId, title, description, price, currency, imageUrl, productUrl, category, inStock } = req.body;
+    const {
+      externalId,
+      title,
+      description,
+      price,
+      currency,
+      imageUrl,
+      productUrl,
+      category,
+      inStock,
+    } = req.body;
 
     if (!externalId || !title || price === undefined || !productUrl) {
-      res.status(400).json({ error: 'externalId, title, price, and productUrl are required.' });
+      res
+        .status(400)
+        .json({
+          error: "externalId, title, price, and productUrl are required.",
+        });
       return;
     }
 
     // Generate vector embedding
-    const textToEmbed = `${title} ${description || ''} ${category || ''}`;
+    const textToEmbed = `${title} ${description || ""} ${category || ""}`;
     const vector = await generateEmbedding(textToEmbed);
 
     const product = await prisma.product.create({
@@ -25,7 +42,7 @@ export async function createProduct(req: DashboardAuthRequest, res: Response): P
         title,
         description,
         price,
-        currency: currency || 'USD',
+        currency: currency || "USD",
         imageUrl,
         productUrl,
         category,
@@ -36,46 +53,78 @@ export async function createProduct(req: DashboardAuthRequest, res: Response): P
     // Update embedding in pgvector column via raw SQL
     await executeRawNeonQuery(
       `UPDATE "Product" SET embedding = $1 WHERE id = $2`,
-      [vector, product.id]
+      [vector, product.id],
     );
 
-    res.status(201).json({ message: 'Product created successfully', product });
+    res.status(201).json({ message: "Product created successfully", product });
   } catch (error) {
-    logger.error('Create Product Error:', error);
-    res.status(500).json({ error: 'Failed to create product.' });
+    logger.error("Create Product Error:", error);
+    res.status(500).json({ error: "Failed to create product." });
   }
 }
 
-export async function listProducts(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function listProducts(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
-    const page = parseInt(req.query.page as string || '1', 10);
-    const limit = parseInt(req.query.limit as string || '20', 10);
-    const search = (req.query.search as string || '').trim();
+    const page = parseInt((req.query.page as string) || "1", 10);
+    const limit = parseInt((req.query.limit as string) || "20", 10);
+    const search = ((req.query.search as string) || "").trim();
+    const domain = ((req.query.domain as string) || "").trim();
 
     const skip = (page - 1) * limit;
 
     const where: any = { merchantId };
     if (search) {
       where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { category: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { category: { contains: search, mode: "insensitive" } },
       ];
     }
+    if (domain && domain !== "all") {
+      where.productUrl = { contains: domain, mode: "insensitive" };
+    }
 
-    const [products, total] = await Promise.all([
+    const [products, total, allProductUrls, merchantUser] = await Promise.all([
       prisma.product.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
       }),
       prisma.product.count({ where }),
+      prisma.product.findMany({
+        where: { merchantId },
+        select: { productUrl: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: merchantId },
+        select: { allowedDomains: true },
+      }),
     ]);
+
+    const rawProductDomains = allProductUrls
+      .map((p) => {
+        try {
+          return new URL(p.productUrl).hostname;
+        } catch {
+          return "";
+        }
+      })
+      .filter(Boolean);
+
+    const availableDomains = Array.from(
+      new Set([...(merchantUser?.allowedDomains || []), ...rawProductDomains]),
+    ).filter(
+      (d) => Boolean(d) && d !== "*" && d !== "localhost" && d !== "127.0.0.1",
+    );
 
     res.json({
       products,
+      domains: availableDomains,
       pagination: {
         total,
         page,
@@ -84,23 +133,35 @@ export async function listProducts(req: DashboardAuthRequest, res: Response): Pr
       },
     });
   } catch (error) {
-    logger.error('List Products Error:', error);
-    res.status(500).json({ error: 'Failed to fetch products.' });
+    logger.error("List Products Error:", error);
+    res.status(500).json({ error: "Failed to fetch products." });
   }
 }
 
-export async function updateProduct(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function updateProduct(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
     const productId = req.params.id as string;
-    const { title, description, price, currency, imageUrl, productUrl, category, inStock } = req.body;
+    const {
+      title,
+      description,
+      price,
+      currency,
+      imageUrl,
+      productUrl,
+      category,
+      inStock,
+    } = req.body;
 
     const existingProduct = await prisma.product.findFirst({
       where: { id: productId, merchantId },
     });
 
     if (!existingProduct) {
-      res.status(404).json({ error: 'Product not found.' });
+      res.status(404).json({ error: "Product not found." });
       return;
     }
 
@@ -119,23 +180,33 @@ export async function updateProduct(req: DashboardAuthRequest, res: Response): P
     });
 
     // Re-generate vector embedding if content changed
-    if (title !== undefined || description !== undefined || category !== undefined) {
-      const textToEmbed = `${updatedProduct.title} ${updatedProduct.description || ''} ${updatedProduct.category || ''}`;
+    if (
+      title !== undefined ||
+      description !== undefined ||
+      category !== undefined
+    ) {
+      const textToEmbed = `${updatedProduct.title} ${updatedProduct.description || ""} ${updatedProduct.category || ""}`;
       const vector = await generateEmbedding(textToEmbed);
       await executeRawNeonQuery(
         `UPDATE "Product" SET embedding = $1 WHERE id = $2`,
-        [vector, updatedProduct.id]
+        [vector, updatedProduct.id],
       );
     }
 
-    res.json({ message: 'Product updated successfully', product: updatedProduct });
+    res.json({
+      message: "Product updated successfully",
+      product: updatedProduct,
+    });
   } catch (error) {
-    logger.error('Update Product Error:', error);
-    res.status(500).json({ error: 'Failed to update product.' });
+    logger.error("Update Product Error:", error);
+    res.status(500).json({ error: "Failed to update product." });
   }
 }
 
-export async function deleteProduct(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function deleteProduct(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
     const productId = req.params.id as string;
@@ -145,26 +216,31 @@ export async function deleteProduct(req: DashboardAuthRequest, res: Response): P
     });
 
     if (!existingProduct) {
-      res.status(404).json({ error: 'Product not found.' });
+      res.status(404).json({ error: "Product not found." });
       return;
     }
 
     await prisma.product.delete({ where: { id: productId } });
 
-    res.json({ message: 'Product deleted successfully.' });
+    res.json({ message: "Product deleted successfully." });
   } catch (error) {
-    logger.error('Delete Product Error:', error);
-    res.status(500).json({ error: 'Failed to delete product.' });
+    logger.error("Delete Product Error:", error);
+    res.status(500).json({ error: "Failed to delete product." });
   }
 }
 
-export async function importProducts(req: DashboardAuthRequest, res: Response): Promise<void> {
+export async function importProducts(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
   try {
     const merchantId = req.merchant?.id!;
     const { products } = req.body;
 
     if (!Array.isArray(products) || products.length === 0) {
-      res.status(400).json({ error: 'Body must contain a non-empty products array.' });
+      res
+        .status(400)
+        .json({ error: "Body must contain a non-empty products array." });
       return;
     }
 
@@ -176,9 +252,13 @@ export async function importProducts(req: DashboardAuthRequest, res: Response): 
         continue;
       }
 
-      const externalId = String(item.externalId || item.sku || `item_${Date.now()}_${idx}`);
-      const productUrl = String(item.productUrl || item.url || `/products#${externalId}`);
-      const textToEmbed = `${item.title} ${item.description || ''} ${item.category || ''}`;
+      const externalId = String(
+        item.externalId || item.sku || `item_${Date.now()}_${idx}`,
+      );
+      const productUrl = String(
+        item.productUrl || item.url || `/products#${externalId}`,
+      );
+      const textToEmbed = `${item.title} ${item.description || ""} ${item.category || ""}`;
       const vector = await generateEmbedding(textToEmbed);
 
       const existing = await prisma.product.findUnique({
@@ -192,7 +272,7 @@ export async function importProducts(req: DashboardAuthRequest, res: Response): 
             title: item.title,
             description: item.description,
             price: item.price,
-            currency: item.currency || 'USD',
+            currency: item.currency || "USD",
             imageUrl: item.imageUrl,
             productUrl: item.productUrl,
             category: item.category,
@@ -202,7 +282,7 @@ export async function importProducts(req: DashboardAuthRequest, res: Response): 
 
         await executeRawNeonQuery(
           `UPDATE "Product" SET embedding = $1 WHERE id = $2`,
-          [vector, updated.id]
+          [vector, updated.id],
         );
         updatedCount++;
       } else {
@@ -213,7 +293,7 @@ export async function importProducts(req: DashboardAuthRequest, res: Response): 
             title: item.title,
             description: item.description,
             price: item.price,
-            currency: item.currency || 'USD',
+            currency: item.currency || "USD",
             imageUrl: item.imageUrl,
             productUrl: item.productUrl,
             category: item.category,
@@ -223,20 +303,20 @@ export async function importProducts(req: DashboardAuthRequest, res: Response): 
 
         await executeRawNeonQuery(
           `UPDATE "Product" SET embedding = $1 WHERE id = $2`,
-          [vector, created.id]
+          [vector, created.id],
         );
         createdCount++;
       }
     }
 
     res.json({
-      message: 'Import complete',
+      message: "Import complete",
       createdCount,
       updatedCount,
       totalProcessed: createdCount + updatedCount,
     });
   } catch (error) {
-    logger.error('Import Products Error:', error);
-    res.status(500).json({ error: 'Failed to import catalog.' });
+    logger.error("Import Products Error:", error);
+    res.status(500).json({ error: "Failed to import catalog." });
   }
 }

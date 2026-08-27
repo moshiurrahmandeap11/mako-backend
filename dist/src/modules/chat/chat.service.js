@@ -12,7 +12,7 @@ const searchProducts_tool_1 = require("./tools/searchProducts.tool");
 const webSearch_tool_1 = require("./tools/webSearch.tool");
 const cartActionParser_1 = require("./utils/cartActionParser");
 const chatCache_1 = require("./utils/chatCache");
-async function processChatMessage(merchantId, sessionId, userMessage, botMode = "shopping", provider, customPrompt, template, imageUrl) {
+async function processChatMessage(merchantId, sessionId, userMessage, botMode = "shopping", provider, customPrompt, template, imageUrl, requestDomain) {
     // Enforce strict 250 character limit on all prompts
     userMessage = (userMessage || "").trim().slice(0, 250);
     // Fetch merchant profile for branding & domain identity
@@ -22,9 +22,9 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
     });
     // Dynamically resolve clean business identity
     let merchantName = "our company";
-    const primaryDomain = merchant?.allowedDomains?.[0] || "";
-    if (primaryDomain) {
-        const rawDomain = primaryDomain
+    const effectiveDomain = requestDomain || merchant?.allowedDomains?.[0] || "";
+    if (effectiveDomain) {
+        const rawDomain = effectiveDomain
             .replace(/^https?:\/\//, "")
             .split("/")[0]
             .split(":")[0]
@@ -197,8 +197,8 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
         const ragTimeout = new Promise((resolve) => setTimeout(() => resolve([[], []]), 1200));
         let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
             Promise.all([
-                (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage || "general", undefined, 6),
-                (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage || "general", 8, primaryDomain),
+                (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage || "general", undefined, 6, effectiveDomain),
+                (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage || "general", 8, effectiveDomain),
             ]),
             ragTimeout,
         ]);
@@ -236,7 +236,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
         }
         if (retrievedProducts.length === 0 && retrievedKnowledgeRes.length === 0) {
             ragContext = `\n\n### Website Context:
-Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ""}.
+Company/Website Name: ${merchantName}${effectiveDomain ? ` (${effectiveDomain})` : ""}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
         }
     }
@@ -244,7 +244,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
         logger_1.logger.error("RAG Search Error:", err);
     }
     const hasStoreProducts = retrievedProducts.length > 0;
-    const systemPrompt = (0, systemPromptBuilder_1.buildSystemPrompt)(merchantName, primaryDomain, botMode, customPrompt, template, hasStoreProducts);
+    const systemPrompt = (0, systemPromptBuilder_1.buildSystemPrompt)(merchantName, effectiveDomain, botMode, customPrompt, template, hasStoreProducts);
     // Execute Cascading LLM Provider Runner
     const llmResult = await (0, llmRunner_1.executeLlmCascade)(merchantId, userMessage, systemPrompt + ragContext, conversation.messages, imageUrl, provider, botMode, template);
     thoughts.push(...llmResult.thoughts);
@@ -317,16 +317,16 @@ Currently, no specific catalog items or knowledge base articles matched this que
 /**
  * Real-time SSE Streaming Chat Processor (ChatGPT / Claude style live tokens & thoughts).
  */
-async function processChatMessageStream(merchantId, sessionId, userMessage, onThought, onToken, botMode = "shopping", provider, customPrompt, template, imageUrl) {
+async function processChatMessageStream(merchantId, sessionId, userMessage, onThought, onToken, botMode = "shopping", provider, customPrompt, template, imageUrl, requestDomain) {
     userMessage = (userMessage || "").trim().slice(0, 250);
     const merchant = await db_1.prisma.user.findUnique({
         where: { id: merchantId },
         select: { name: true, allowedDomains: true, widgetConfig: true },
     });
     let merchantName = "our company";
-    const primaryDomain = merchant?.allowedDomains?.[0] || "";
-    if (primaryDomain) {
-        const rawDomain = primaryDomain
+    const effectiveDomain = requestDomain || merchant?.allowedDomains?.[0] || "";
+    if (effectiveDomain) {
+        const rawDomain = effectiveDomain
             .replace(/^https?:\/\//, "")
             .split("/")[0]
             .split(":")[0]
@@ -502,8 +502,8 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
         const ragTimeout = new Promise((resolve) => setTimeout(() => resolve([[], []]), 1200));
         let [retrievedProductsRes, retrievedKnowledgeRes] = await Promise.race([
             Promise.all([
-                (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage || "general", undefined, 6),
-                (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage || "general", 8, primaryDomain),
+                (0, searchProducts_tool_1.searchProductsTool)(merchantId, userMessage || "general", undefined, 6, effectiveDomain),
+                (0, searchKnowledge_tool_1.searchKnowledgeTool)(merchantId, userMessage || "general", 8),
             ]),
             ragTimeout,
         ]);
@@ -562,7 +562,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
             retrievedKnowledgeRes.length === 0 &&
             !ragContext.includes("Live Web Search Results")) {
             ragContext = `\n\n### Website Context:
-Company/Website Name: ${merchantName}${primaryDomain ? ` (${primaryDomain})` : ""}.
+Company/Website Name: ${merchantName}${effectiveDomain ? ` (${effectiveDomain})` : ""}.
 Currently, no specific catalog items or knowledge base articles matched this query. Continue assisting the user based on your primary persona and website identity.`;
         }
     }
@@ -570,7 +570,7 @@ Currently, no specific catalog items or knowledge base articles matched this que
         logger_1.logger.error("RAG Search Error:", err);
     }
     const hasStoreProducts = retrievedProducts.length > 0;
-    const systemPrompt = (0, systemPromptBuilder_1.buildSystemPrompt)(merchantName, primaryDomain, botMode, customPrompt, template, hasStoreProducts);
+    const systemPrompt = (0, systemPromptBuilder_1.buildSystemPrompt)(merchantName, effectiveDomain, botMode, customPrompt, template, hasStoreProducts);
     // Execute Streaming LLM Cascade
     const llmResult = await (0, llmRunner_1.executeLlmCascadeStream)(merchantId, userMessage, systemPrompt + ragContext, conversation.messages, onToken, imageUrl, provider, botMode, template);
     thoughts.push(...llmResult.thoughts);

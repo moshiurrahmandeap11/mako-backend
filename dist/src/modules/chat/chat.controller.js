@@ -170,7 +170,7 @@ async function chat(req, res) {
                 // Fallback
             }
             try {
-                const response = await (0, chat_service_1.processChatMessageStream)(merchantId, effectiveSessionId, rawMessage.slice(0, 250), (thought) => sendEvent("thought", { thought }), (token) => sendEvent("token", { token }), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl);
+                const response = await (0, chat_service_1.processChatMessageStream)(merchantId, effectiveSessionId, rawMessage.slice(0, 250), (thought) => sendEvent("thought", { thought }), (token) => sendEvent("token", { token }), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl, req.detectedDomain);
                 sendEvent("done", response);
                 res.end();
             }
@@ -206,7 +206,7 @@ async function chat(req, res) {
         catch (maintCheckErr) {
             // Fallback
         }
-        const response = await (0, chat_service_1.processChatMessage)(merchantId, effectiveSessionId, rawMessage.slice(0, 250), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl);
+        const response = await (0, chat_service_1.processChatMessage)(merchantId, effectiveSessionId, rawMessage.slice(0, 250), botMode, provider, req.apiKeyRecord?.systemPrompt, req.apiKeyRecord?.template, imageUrl, req.detectedDomain);
         res.json(response);
     }
     catch (error) {

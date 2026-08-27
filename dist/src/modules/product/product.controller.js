@@ -48,6 +48,7 @@ async function listProducts(req, res) {
         const page = parseInt(req.query.page || '1', 10);
         const limit = parseInt(req.query.limit || '20', 10);
         const search = (req.query.search || '').trim();
+        const domain = (req.query.domain || '').trim();
         const skip = (page - 1) * limit;
         const where = { merchantId };
         if (search) {
@@ -57,7 +58,10 @@ async function listProducts(req, res) {
                 { category: { contains: search, mode: 'insensitive' } },
             ];
         }
-        const [products, total] = await Promise.all([
+        if (domain && domain !== 'all') {
+            where.productUrl = { contains: domain, mode: 'insensitive' };
+        }
+        const [products, total, allProductUrls, merchantUser] = await Promise.all([
             db_1.prisma.product.findMany({
                 where,
                 skip,
@@ -65,9 +69,32 @@ async function listProducts(req, res) {
                 orderBy: { updatedAt: 'desc' },
             }),
             db_1.prisma.product.count({ where }),
+            db_1.prisma.product.findMany({
+                where: { merchantId },
+                select: { productUrl: true },
+            }),
+            db_1.prisma.user.findUnique({
+                where: { id: merchantId },
+                select: { allowedDomains: true },
+            }),
         ]);
+        const rawProductDomains = allProductUrls
+            .map((p) => {
+            try {
+                return new URL(p.productUrl).hostname;
+            }
+            catch {
+                return '';
+            }
+        })
+            .filter(Boolean);
+        const availableDomains = Array.from(new Set([
+            ...(merchantUser?.allowedDomains || []),
+            ...rawProductDomains,
+        ])).filter((d) => Boolean(d) && d !== '*' && d !== 'localhost' && d !== '127.0.0.1');
         res.json({
             products,
+            domains: availableDomains,
             pagination: {
                 total,
                 page,

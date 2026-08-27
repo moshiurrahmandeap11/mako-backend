@@ -659,16 +659,39 @@ async function indexPageContent(
         ),
       ).length > 0;
 
-    if (isSingleProductPage) {
+    const isArchiveOrUtilityPage =
+      /\/shop\/?$|\/cart\/?$|\/checkout\/?$|\/my-account\/?$|\/product-category\/|\/category\//i.test(
+        currentUrlStr,
+      );
+
+    if (isSingleProductPage && !isArchiveOrUtilityPage) {
       const singleTitle =
         $("h1").first().text().trim() || pageTitle.split(/[-–|]/)[0].trim();
 
       let singlePrice = 0;
-      const priceMatch = $("body")
-        .text()
-        .match(/\$\s*(\d+(?:\.\d{1,2})?)/);
-      if (priceMatch) {
-        singlePrice = parseFloat(priceMatch[1]);
+
+      // 1. Try WooCommerce and standard ecommerce price DOM selectors
+      const wcPriceEl = $(
+        '.woocommerce-Price-amount bdi, .woocommerce-Price-amount, ins .amount, .price ins, .price .amount, [class*="product-price" i], .summary .price, [itemprop="price"], [data-price]',
+      ).first();
+      if (wcPriceEl.length > 0) {
+        const wcText = (wcPriceEl.attr("data-price") || wcPriceEl.text())
+          .replace(/,/g, "")
+          .trim();
+        const m = wcText.match(/(\d+(?:\.\d{1,2})?)/);
+        if (m) {
+          singlePrice = parseFloat(m[1]);
+        }
+      }
+
+      // 2. Fallback to full body currency regex
+      if (singlePrice === 0) {
+        const priceMatch = $("body")
+          .text()
+          .match(/(?:\$|USD|৳|Tk|€|£|₹)\s*(\d+(?:\.\d{1,2})?)/i);
+        if (priceMatch) {
+          singlePrice = parseFloat(priceMatch[1]);
+        }
       }
 
       const singleImg =
@@ -947,12 +970,15 @@ async function indexPageContent(
       if (
         title &&
         title.length > 2 &&
+        !/^(sale|on\s*sale|view|buy\s*now|add\s*to\s*cart|details|read\s*more|quick\s*view)$/i.test(
+          title,
+        ) &&
         !productsFound.some((p) => p.productUrl === fullUrl)
       ) {
         productsFound.push({
           externalId: extId,
           title,
-          description: `${title} - Details at ${fullUrl}`,
+          description: `${title} - Details available at ${fullUrl}`,
           price,
           currency: "USD",
           imageUrl: img
