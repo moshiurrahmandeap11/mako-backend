@@ -49,9 +49,9 @@ async function sendEmailViaResendOrSmtp({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: process.env.SMTP_FROM || "Labto AI <support@ahsanul.dev>",
+          from: process.env.SMTP_FROM || "Labto AI <support@labtoai.com>",
           to: [to],
-          reply_to: "support@ahsanul.dev",
+          reply_to: "support@labtoai.com",
           subject,
           html,
           text: textFallback,
@@ -338,7 +338,7 @@ export async function sendMaintenanceBroadcastEmail({
         </div>
         <div class="footer">
           &copy; ${new Date().getFullYear()} Labto AI Inc. All rights reserved.<br>
-          Need urgent assistance? Contact us at support@ahsanul.dev
+          Need urgent assistance? Contact us at support@labtoai.com
         </div>
       </div>
     </body>

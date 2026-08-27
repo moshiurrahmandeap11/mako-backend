@@ -20,7 +20,7 @@ export async function subscribeNewsletter(req: Request, res: Response): Promise<
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const emailRegex = /^[^s@]+@[^s@]+.[^s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(cleanEmail)) {
       res.status(400).json({
         success: false,

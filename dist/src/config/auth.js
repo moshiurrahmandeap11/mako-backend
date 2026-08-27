@@ -69,6 +69,9 @@ exports.auth = (0, better_auth_1.betterAuth)({
     },
     trustedOrigins: [
         env_1.env.FRONTEND_URL,
+        'https://labtoai.com',
+        'https://www.labtoai.com',
+        'https://api.labtoai.com',
         'https://mako-frontend.vercel.app',
         'http://localhost:3000',
         'http://127.0.0.1:3000',

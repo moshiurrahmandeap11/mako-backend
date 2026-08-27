@@ -100,7 +100,7 @@ async function fetchRobotsSitemaps(origin: string): Promise<string[]> {
     const res = await fetch(robotsUrl, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; LabtoBot/2.0; +https://labto.ahsanul.dev)",
+          "Mozilla/5.0 (compatible; LabtoBot/2.0; +https://labtoai.com)",
       },
       signal: AbortSignal.timeout(5000),
     });
@@ -133,7 +133,7 @@ async function fetchSitemapUrls(
     const res = await fetch(sitemapUrl, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; LabtoBot/2.0; +https://labto.ahsanul.dev)",
+          "Mozilla/5.0 (compatible; LabtoBot/2.0; +https://labtoai.com)",
         Accept: "application/xml,text/xml,*/*",
       },
       signal: AbortSignal.timeout(6000),
