@@ -284,12 +284,14 @@ function renderMarkdownText(text: string) {
     if (match[1] && match[2]) {
       let linkTitle = match[1].replace(/^\*+|\*+$/g, "").trim();
       const linkUrl = match[2];
+      const isEmail = linkUrl.startsWith("mailto:") || linkTitle.includes("@");
 
-      // Fix Problem 2: If link title is a raw MongoDB/Prisma object ID or hostname domain, replace with clean title
       if (
-        /^[a-f0-9]{24}$/i.test(linkTitle) ||
-        linkTitle.endsWith("-frontend") ||
-        linkTitle.includes("vercel.app")
+        !isEmail &&
+        (/^[a-f0-9]{24}$/i.test(linkTitle) ||
+          (!linkTitle.includes(" ") &&
+            (linkTitle.endsWith("-frontend") ||
+              linkTitle.includes("vercel.app"))))
       ) {
         try {
           const u = new URL(linkUrl);
@@ -316,7 +318,7 @@ function renderMarkdownText(text: string) {
       parts.push(
         <a
           href={linkUrl}
-          target="_blank"
+          target={isEmail ? "_self" : "_blank"}
           rel="noopener noreferrer"
           style={{
             color: "#0284c7",
@@ -346,24 +348,27 @@ function renderMarkdownText(text: string) {
     } else if (match[4]) {
       const rawUrl = match[4];
       let displayLabel = rawUrl;
-      try {
-        const u = new URL(rawUrl);
-        if (u.pathname && u.pathname.length > 1) {
-          const lastSegment = u.pathname.split("/").filter(Boolean).pop() || "";
-          displayLabel = lastSegment
-            .replace(/[-_]/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase());
-        } else {
-          displayLabel = u.hostname
-            .replace(".vercel.app", "")
-            .replace(".com", "");
-        }
-      } catch {}
+      const isRawEmail = rawUrl.startsWith("mailto:") || rawUrl.includes("@");
+      if (!isRawEmail) {
+        try {
+          const u = new URL(rawUrl);
+          if (u.pathname && u.pathname.length > 1) {
+            const lastSegment = u.pathname.split("/").filter(Boolean).pop() || "";
+            displayLabel = lastSegment
+              .replace(/[-_]/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase());
+          } else {
+            displayLabel = u.hostname
+              .replace(".vercel.app", "")
+              .replace(".com", "");
+          }
+        } catch {}
+      }
 
       parts.push(
         <a
           href={rawUrl}
-          target="_blank"
+          target={isRawEmail ? "_self" : "_blank"}
           rel="noopener noreferrer"
           style={{
             color: "#0284c7",
