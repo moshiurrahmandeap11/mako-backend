@@ -19,7 +19,8 @@ const pricing_1 = require("../../config/pricing");
 async function createCheckoutSession(req, res) {
     try {
         const merchantId = req.merchant?.id;
-        const { tier } = req.body;
+        const { tier, billingType } = req.body;
+        const resolvedBillingType = billingType === 'onetime' ? 'onetime' : 'monthly';
         if (!polar_1.polar) {
             res.status(500).json({ error: 'Polar billing system not configured on server.' });
             return;
@@ -28,9 +29,21 @@ async function createCheckoutSession(req, res) {
             res.status(400).json({ error: 'Valid plan tier required (STARTER or PRO).' });
             return;
         }
-        const productId = tier === 'STARTER' ? env_1.env.POLAR_STARTER_PRODUCT_ID : env_1.env.POLAR_PRO_PRODUCT_ID;
+        let productId = '';
+        if (tier === 'STARTER') {
+            productId =
+                resolvedBillingType === 'onetime'
+                    ? env_1.env.POLAR_STARTER_ONETIME_PRODUCT_ID || '22a1c6b5-4392-401c-9767-9b2cb6e33049'
+                    : env_1.env.POLAR_STARTER_PRODUCT_ID || 'eb079bce-d1af-4280-a77d-0318e7b7bde6';
+        }
+        else if (tier === 'PRO') {
+            productId =
+                resolvedBillingType === 'onetime'
+                    ? env_1.env.POLAR_PRO_ONETIME_PRODUCT_ID || '51e49a61-74c8-4ecf-b45f-f1e2424ab9dc'
+                    : env_1.env.POLAR_PRO_PRODUCT_ID || 'b97a3f4f-d036-4ceb-a26f-77fe0bf3d07d';
+        }
         if (!productId) {
-            res.status(500).json({ error: `Polar product ID for tier ${tier} is missing in environment variables.` });
+            res.status(500).json({ error: `Polar product ID for tier ${tier} (${resolvedBillingType}) is missing.` });
             return;
         }
         // Fetch full merchant user from database
@@ -49,10 +62,11 @@ async function createCheckoutSession(req, res) {
             metadata: {
                 merchantId: merchant.id,
                 tier: tier,
+                billingType: resolvedBillingType,
             },
-            successUrl: `${env_1.env.FRONTEND_URL}/billing?session_id={CHECKOUT_ID}&tier=${tier}`,
+            successUrl: `${env_1.env.FRONTEND_URL}/billing?session_id={CHECKOUT_ID}&tier=${tier}&billingType=${resolvedBillingType}`,
         });
-        logger_1.logger.info(`Polar: Created checkout session for Merchant ${merchantId} -> Tier: ${tier} -> URL: ${checkout.url}`);
+        logger_1.logger.info(`Polar: Created checkout session for Merchant ${merchantId} -> Tier: ${tier} (${resolvedBillingType}) -> URL: ${checkout.url}`);
         res.json({ url: checkout.url });
     }
     catch (error) {
@@ -201,10 +215,21 @@ async function handleWebhook(req, res) {
         const metadata = data.metadata || data.custom_field_data || {};
         let merchantId = metadata.merchantId;
         let resolvedTier = 'FREE';
-        if (productId === env_1.env.POLAR_STARTER_PRODUCT_ID || String(productId).includes('4bbbaba8')) {
+        const isStarterOneTime = productId === env_1.env.POLAR_STARTER_ONETIME_PRODUCT_ID ||
+            String(productId).includes('22a1c6b5');
+        const isProOneTime = productId === env_1.env.POLAR_PRO_ONETIME_PRODUCT_ID ||
+            String(productId).includes('51e49a61');
+        const isStarterMonthly = productId === env_1.env.POLAR_STARTER_PRODUCT_ID ||
+            String(productId).includes('eb079bce') ||
+            String(productId).includes('4bbbaba8');
+        const isProMonthly = productId === env_1.env.POLAR_PRO_PRODUCT_ID ||
+            String(productId).includes('b97a3f4f') ||
+            String(productId).includes('1ca781e4');
+        const isOneTime = isStarterOneTime || isProOneTime || metadata.billingType === 'onetime';
+        if (isStarterOneTime || isStarterMonthly) {
             resolvedTier = 'STARTER';
         }
-        else if (productId === env_1.env.POLAR_PRO_PRODUCT_ID || String(productId).includes('1ca781e4')) {
+        else if (isProOneTime || isProMonthly) {
             resolvedTier = 'PRO';
         }
         switch (event.type) {
@@ -228,18 +253,37 @@ async function handleWebhook(req, res) {
                     }
                     const targetTier = resolvedTier !== 'FREE' ? resolvedTier : metadata.tier || 'STARTER';
                     const plan = (0, pricing_1.getPlanConfig)(targetTier);
-                    await db_1.prisma.user.update({
-                        where: { id: merchant.id },
-                        data: {
-                            planTier: targetTier,
-                            subscriptionStatus: 'active',
-                            subscriptionStart: new Date(),
-                            stripeCustomerId: customerId || merchant.stripeCustomerId,
-                            stripeSubscriptionId: data.id || merchant.stripeSubscriptionId,
-                        },
-                    });
-                    (0, authenticateDashboard_1.clearPlanTierCache)(merchant.id);
-                    logger_1.logger.info(`🎉 Polar Webhook Success: Activated Tier [${targetTier}] for Merchant [${merchant.email}] (${plan.monthlyCredits.toLocaleString()} credits/mo with rollover)`);
+                    const creditsToAdd = targetTier === 'PRO' ? 30000 : 10000;
+                    if (isOneTime) {
+                        // One-Time Top-Up Refill Pack
+                        await db_1.prisma.user.update({
+                            where: { id: merchant.id },
+                            data: {
+                                planTier: merchant.planTier === 'PRO' ? 'PRO' : targetTier,
+                                subscriptionStatus: 'active',
+                                subscriptionStart: new Date(),
+                                stripeCustomerId: customerId || merchant.stripeCustomerId,
+                                rolloverCredits: { increment: creditsToAdd },
+                            },
+                        });
+                        (0, authenticateDashboard_1.clearPlanTierCache)(merchant.id);
+                        logger_1.logger.info(`🎉 Polar Webhook Success: One-Time Refill (+${creditsToAdd.toLocaleString()} credits) for Merchant [${merchant.email}]`);
+                    }
+                    else {
+                        // Monthly Recurring Subscription
+                        await db_1.prisma.user.update({
+                            where: { id: merchant.id },
+                            data: {
+                                planTier: targetTier,
+                                subscriptionStatus: 'active',
+                                subscriptionStart: new Date(),
+                                stripeCustomerId: customerId || merchant.stripeCustomerId,
+                                stripeSubscriptionId: data.id || merchant.stripeSubscriptionId,
+                            },
+                        });
+                        (0, authenticateDashboard_1.clearPlanTierCache)(merchant.id);
+                        logger_1.logger.info(`🎉 Polar Webhook Success: Activated Monthly Tier [${targetTier}] for Merchant [${merchant.email}] (${plan.monthlyCredits.toLocaleString()} credits/mo with rollover)`);
+                    }
                 }
                 else {
                     logger_1.logger.warn(`Polar Webhook: Could not find merchant for email: ${customerEmail} / merchantId: ${merchantId}`);
@@ -282,20 +326,40 @@ async function handleWebhook(req, res) {
 }
 async function verifyCheckout(req, res) {
     try {
-        const { session_id, tier } = req.query;
+        const { session_id, tier, billingType } = req.query;
         const merchantId = req.merchant?.id;
         if (tier && ['STARTER', 'PRO'].includes(tier)) {
             const resolvedTier = tier;
-            await db_1.prisma.user.update({
+            const isOneTime = billingType === 'onetime';
+            const creditsToAdd = resolvedTier === 'PRO' ? 30000 : 10000;
+            const merchant = await db_1.prisma.user.findUnique({
                 where: { id: merchantId },
-                data: {
-                    subscriptionStatus: 'active',
-                    planTier: resolvedTier,
-                },
             });
-            (0, authenticateDashboard_1.clearPlanTierCache)(merchantId);
-            logger_1.logger.info(`Verified Polar checkout for merchant ${merchantId} -> Tier: ${tier}`);
-            res.json({ success: true, tier });
+            if (merchant) {
+                if (isOneTime) {
+                    await db_1.prisma.user.update({
+                        where: { id: merchantId },
+                        data: {
+                            subscriptionStatus: 'active',
+                            planTier: merchant.planTier === 'PRO' ? 'PRO' : resolvedTier,
+                            rolloverCredits: { increment: creditsToAdd },
+                        },
+                    });
+                    logger_1.logger.info(`Verified Polar One-Time checkout (+${creditsToAdd} credits) for merchant ${merchantId}`);
+                }
+                else {
+                    await db_1.prisma.user.update({
+                        where: { id: merchantId },
+                        data: {
+                            subscriptionStatus: 'active',
+                            planTier: resolvedTier,
+                        },
+                    });
+                    logger_1.logger.info(`Verified Polar Monthly checkout for merchant ${merchantId} -> Tier: ${tier}`);
+                }
+                (0, authenticateDashboard_1.clearPlanTierCache)(merchantId);
+            }
+            res.json({ success: true, tier, billingType: isOneTime ? 'onetime' : 'monthly' });
             return;
         }
         res.json({ success: true });
