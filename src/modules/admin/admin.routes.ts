@@ -13,6 +13,7 @@ import { getAdminScraperOverview, triggerAdminForceScrape } from './adminScraper
 import { getAdminInquiries, updateInquiryStatus, deleteInquiry } from './adminInquiries.controller';
 import { getAdminBugReports, updateBugStatus, deleteBugReport } from './adminBugs.controller';
 import { getAdminPlatformSettings, updateAdminPlatformSetting } from './adminSettings.controller';
+import { getAdminSubscribers, toggleSubscriberStatus, deleteSubscriber } from './adminSubscribers.controller';
 
 export const adminRouter = Router();
 
@@ -31,24 +32,30 @@ adminRouter.patch('/merchants/:merchantId/plan', updateMerchantPlan);
 adminRouter.patch('/merchants/:merchantId/credits', updateMerchantCredits);
 adminRouter.patch('/merchants/:merchantId/role', toggleMerchantRole);
 
-// 3. AI Tokens & Key Pools Health
+// 3. Subscribers / Waitlist
+adminRouter.get('/subscribers', getAdminSubscribers);
+adminRouter.patch('/subscribers/:subscriberId/status', toggleSubscriberStatus);
+adminRouter.delete('/subscribers/:subscriberId', deleteSubscriber);
+
+// 4. AI Tokens & Key Pools Health
 adminRouter.get('/token-usage', getAdminTokenUsage);
 adminRouter.get('/key-pools', getAdminKeyPoolsHealth);
 
-// 4. Scraper & Crawler Jobs
+// 5. Scraper & Crawler Jobs
 adminRouter.get('/scraper/overview', getAdminScraperOverview);
 adminRouter.post('/scraper/trigger', triggerAdminForceScrape);
 
-// 5. Inquiries
+// 6. Inquiries
 adminRouter.get('/inquiries', getAdminInquiries);
 adminRouter.patch('/inquiries/:inquiryId/status', updateInquiryStatus);
 adminRouter.delete('/inquiries/:inquiryId', deleteInquiry);
 
-// 6. Bug Reports
+// 7. Bug Reports
 adminRouter.get('/bugs', getAdminBugReports);
 adminRouter.patch('/bugs/:bugId/status', updateBugStatus);
 adminRouter.delete('/bugs/:bugId', deleteBugReport);
 
-// 7. Platform Settings
+// 8. Platform Settings
 adminRouter.get('/settings', getAdminPlatformSettings);
 adminRouter.post('/settings', updateAdminPlatformSetting);
+

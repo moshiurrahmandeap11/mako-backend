@@ -103,9 +103,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
         return {
             sessionId,
             reply: hijackReply,
-            thoughts: [
-                `🛡️ Security Guard: Prevented role hijacking / prompt injection attempt.`,
-            ],
+            thoughts: [`Verified assistant persona & safety policies`],
             cartAction: undefined,
             recommendedProducts: [],
             tokensUsed: 15,
@@ -133,9 +131,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
         return {
             sessionId,
             reply: declineReply,
-            thoughts: [
-                `🛡️ Policy Guard: Declining out-of-scope coding/homework request.`,
-            ],
+            thoughts: [`Verified website scope & store policies`],
             cartAction: undefined,
             recommendedProducts: [],
             tokensUsed: 12,
@@ -170,10 +166,7 @@ async function processChatMessage(merchantId, sessionId, userMessage, botMode = 
             reply: cached.reply,
             products: cached.products || [],
             cartAction: null,
-            thoughts: [
-                "⚡ Instant High-Speed Cached Response (~2ms).",
-                ...cached.thoughts,
-            ],
+            thoughts: ["Retrieved verified instant response", ...cached.thoughts],
         };
     }
     let recommendedProducts = [];
@@ -397,7 +390,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
         else {
             hijackReply = `I am the official AI assistant dedicated exclusively to ${merchantName}. I cannot change my role or act as a personal assistant. How can I help you with our services today?`;
         }
-        onThought(`🛡️ Security Guard: Prevented role hijacking attempt.`);
+        onThought(`Verified assistant persona & safety policies`);
         onToken(hijackReply);
         await db_1.prisma.message.create({
             data: {
@@ -409,7 +402,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
         return {
             sessionId,
             reply: hijackReply,
-            thoughts: [`🛡️ Security Guard: Prevented role hijacking attempt.`],
+            thoughts: [`Verified assistant persona & safety policies`],
             cartAction: undefined,
             products: [],
         };
@@ -426,7 +419,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
         else {
             declineReply = `I am the AI assistant dedicated to ${merchantName}. I can only assist you with our services, portfolio projects, and company information.`;
         }
-        onThought(`🛡️ Policy Guard: Declining out-of-scope request.`);
+        onThought(`Verified website scope & store policies`);
         onToken(declineReply);
         await db_1.prisma.message.create({
             data: {
@@ -438,7 +431,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
         return {
             sessionId,
             reply: declineReply,
-            thoughts: [`🛡️ Policy Guard: Declining out-of-scope request.`],
+            thoughts: [`Verified website scope & store policies`],
             cartAction: undefined,
             products: [],
         };
@@ -456,7 +449,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
     // Fast-path 4: Cached Response
     const cached = !imageUrl ? (0, chatCache_1.getCachedResponse)(merchantId, userMessage) : null;
     if (cached) {
-        onThought("⚡ Instant High-Speed Cached Response (~2ms).");
+        onThought("Retrieved verified instant response");
         onToken(cached.reply);
         await db_1.prisma.message.create({
             data: {
@@ -474,10 +467,7 @@ async function processChatMessageStream(merchantId, sessionId, userMessage, onTh
             reply: cached.reply,
             products: cached.products || [],
             cartAction: null,
-            thoughts: [
-                "⚡ Instant High-Speed Cached Response (~2ms).",
-                ...cached.thoughts,
-            ],
+            thoughts: ["Retrieved verified instant response", ...cached.thoughts],
         };
     }
     let recommendedProducts = [];

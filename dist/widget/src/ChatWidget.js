@@ -86,10 +86,9 @@ function renderMarkdownText(text) {
         if (match[1] && match[2]) {
             let linkTitle = match[1].replace(/^\*+|\*+$/g, "").trim();
             const linkUrl = match[2];
-            // Fix Problem 2: If link title is a raw MongoDB/Prisma object ID or hostname domain, replace with clean title
-            if (/^[a-f0-9]{24}$/i.test(linkTitle) ||
-                linkTitle.endsWith("-frontend") ||
-                linkTitle.includes("vercel.app")) {
+            const isEmail = linkUrl.startsWith("mailto:") || linkTitle.includes("@");
+            // Only clean raw 24-character hexadecimal MongoDB/Prisma object IDs
+            if (!isEmail && /^[a-f0-9]{24}$/i.test(linkTitle)) {
                 try {
                     const u = new URL(linkUrl);
                     if (u.pathname &&
@@ -110,7 +109,7 @@ function renderMarkdownText(text) {
                     linkTitle = "View Item";
                 }
             }
-            parts.push((0, jsx_runtime_1.jsxs)("a", { href: linkUrl, target: "_blank", rel: "noopener noreferrer", style: {
+            parts.push((0, jsx_runtime_1.jsxs)("a", { href: linkUrl, target: isEmail ? "_self" : "_blank", rel: "noopener noreferrer", style: {
                     color: "#0284c7",
                     backgroundColor: "#f0f9ff",
                     border: "1px solid #bae6fd",
@@ -132,22 +131,23 @@ function renderMarkdownText(text) {
         else if (match[4]) {
             const rawUrl = match[4];
             let displayLabel = rawUrl;
-            try {
-                const u = new URL(rawUrl);
-                if (u.pathname && u.pathname.length > 1) {
-                    const lastSegment = u.pathname.split("/").filter(Boolean).pop() || "";
-                    displayLabel = lastSegment
-                        .replace(/[-_]/g, " ")
-                        .replace(/\b\w/g, (c) => c.toUpperCase());
+            const isRawEmail = rawUrl.startsWith("mailto:") || rawUrl.includes("@");
+            if (!isRawEmail) {
+                try {
+                    const u = new URL(rawUrl);
+                    if (u.pathname && u.pathname.length > 1) {
+                        const lastSegment = u.pathname.split("/").filter(Boolean).pop() || "";
+                        displayLabel = lastSegment
+                            .replace(/[-_]/g, " ")
+                            .replace(/\b\w/g, (c) => c.toUpperCase());
+                    }
+                    else {
+                        displayLabel = u.hostname.replace(/^www\./, "");
+                    }
                 }
-                else {
-                    displayLabel = u.hostname
-                        .replace(".vercel.app", "")
-                        .replace(".com", "");
-                }
+                catch { }
             }
-            catch { }
-            parts.push((0, jsx_runtime_1.jsxs)("a", { href: rawUrl, target: "_blank", rel: "noopener noreferrer", style: {
+            parts.push((0, jsx_runtime_1.jsxs)("a", { href: rawUrl, target: isRawEmail ? "_self" : "_blank", rel: "noopener noreferrer", style: {
                     color: "#0284c7",
                     backgroundColor: "#f0f9ff",
                     border: "1px solid #bae6fd",
