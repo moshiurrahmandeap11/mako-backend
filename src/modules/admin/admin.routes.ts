@@ -14,6 +14,14 @@ import { getAdminInquiries, updateInquiryStatus, deleteInquiry } from './adminIn
 import { getAdminBugReports, updateBugStatus, deleteBugReport } from './adminBugs.controller';
 import { getAdminPlatformSettings, updateAdminPlatformSetting } from './adminSettings.controller';
 import { getAdminSubscribers, toggleSubscriberStatus, deleteSubscriber } from './adminSubscribers.controller';
+import {
+  getAdminBlogs,
+  getAdminBlogById,
+  createAdminBlog,
+  updateAdminBlog,
+  toggleAdminBlogStatus,
+  deleteAdminBlog,
+} from './adminBlog.controller';
 
 export const adminRouter = Router();
 
@@ -59,3 +67,11 @@ adminRouter.delete('/bugs/:bugId', deleteBugReport);
 adminRouter.get('/settings', getAdminPlatformSettings);
 adminRouter.post('/settings', updateAdminPlatformSetting);
 
+
+// 9. Blog Management
+adminRouter.get('/blogs', getAdminBlogs);
+adminRouter.get('/blogs/:id', getAdminBlogById);
+adminRouter.post('/blogs', createAdminBlog);
+adminRouter.put('/blogs/:id', updateAdminBlog);
+adminRouter.patch('/blogs/:id/status', toggleAdminBlogStatus);
+adminRouter.delete('/blogs/:id', deleteAdminBlog);

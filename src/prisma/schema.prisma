@@ -247,3 +247,35 @@ model NewsletterSubscriber {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model BlogPost {
+  id              String    @id @default(cuid())
+  title           String
+  slug            String    @unique
+  excerpt         String?
+  content         String    @db.Text
+  coverImage      String?
+  category        String    @default("AI & E-commerce")
+  tags            String[]  @default([])
+  authorName      String    @default("Labto AI Team")
+  authorAvatar    String?
+  authorRole      String?   @default("AI Research & Product")
+  published       Boolean   @default(false)
+  publishedAt     DateTime?
+  readTime        String?   @default("4 min read")
+  views           Int       @default(0)
+
+  // SEO Fields
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  canonicalUrl    String?
+  ogImage         String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([published])
+  @@index([category])
+}

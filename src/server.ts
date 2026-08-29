@@ -12,6 +12,7 @@ import { auth } from "./config/auth";
 
 import { initCronJobs } from "./jobs/cron";
 import { adminRouter } from "./modules/admin/admin.routes";
+import { blogRouter } from "./modules/blog/blog.routes";
 import { getPublicPlatformSettings } from "./modules/admin/adminSettings.controller";
 import analyticsRoutes from "./modules/analytics/analytics.routes";
 import apiKeyRoutes from "./modules/apiKey/apiKey.routes";
@@ -106,6 +107,7 @@ app.use("/api/subscribe", newsletterRouter);
 app.use("/api/newsletter", newsletterRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/blog", blogRouter);
 app.get("/api/settings/public", getPublicPlatformSettings);
 
 // Global Error Handler
