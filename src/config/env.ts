@@ -5,15 +5,15 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
-  PORT: parseInt(process.env.PORT || "4000", 10),
+  PORT: parseInt(process.env.PORT || "5005", 10),
   DATABASE_URL: process.env.DATABASE_URL || "",
   JWT_SECRET:
     process.env.JWT_SECRET || "fallback_jwt_secret_dev_key_32chars_min",
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || "localhost",
-  API_BASE_URL: process.env.API_BASE_URL || "http://localhost:4000",
-  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",
+  API_BASE_URL: process.env.API_BASE_URL || "http://localhost:5005",
+  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3005",
   WIDGET_CDN_URL:
-    process.env.WIDGET_CDN_URL || "http://localhost:4000/widget.js",
+    process.env.WIDGET_CDN_URL || "http://localhost:5005/widget.js",
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
@@ -73,7 +73,7 @@ export const env = {
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",
   BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || "",
   BETTER_AUTH_URL:
-    process.env.BETTER_AUTH_URL || "http://localhost:4000/api/auth",
+    process.env.BETTER_AUTH_URL || "http://localhost:5005/api/auth",
   SMTP_HOST: process.env.SMTP_HOST || "smtp.gmail.com",
   SMTP_PORT: parseInt(process.env.SMTP_PORT || "587", 10),
   SMTP_USER: process.env.SMTP_USER || "",
