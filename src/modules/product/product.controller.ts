@@ -229,6 +229,63 @@ export async function deleteProduct(
   }
 }
 
+export async function deleteBulkProducts(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: "Product IDs array is required." });
+      return;
+    }
+
+    const deleteResult = await prisma.product.deleteMany({
+      where: {
+        id: { in: ids },
+        merchantId,
+      },
+    });
+
+    res.json({
+      message: `Successfully deleted ${deleteResult.count} products.`,
+      count: deleteResult.count,
+    });
+  } catch (error) {
+    logger.error("Bulk Delete Products Error:", error);
+    res.status(500).json({ error: "Failed to delete products." });
+  }
+}
+
+export async function clearAllProducts(
+  req: DashboardAuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const merchantId = req.merchant?.id!;
+    const domain = req.query.domain as string | undefined;
+
+    const whereClause: any = { merchantId };
+    if (domain && domain !== "all") {
+      whereClause.productUrl = { contains: domain };
+    }
+
+    const deleteResult = await prisma.product.deleteMany({
+      where: whereClause,
+    });
+
+    res.json({
+      message: `Successfully cleared ${deleteResult.count} products.`,
+      count: deleteResult.count,
+    });
+  } catch (error) {
+    logger.error("Clear All Products Error:", error);
+    res.status(500).json({ error: "Failed to clear products." });
+  }
+}
+
 export async function importProducts(
   req: DashboardAuthRequest,
   res: Response,
