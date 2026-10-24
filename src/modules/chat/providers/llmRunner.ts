@@ -65,9 +65,9 @@ export async function executeLlmCascade(
 
   let selectedProvider = preferredProvider || "";
   if (!selectedProvider) {
-    if (keyRotator.hasGeminiKeys()) selectedProvider = "gemini";
+    if (keyRotator.hasOpenRouterKeys()) selectedProvider = "openrouter";
+    else if (keyRotator.hasGeminiKeys()) selectedProvider = "gemini";
     else if (keyRotator.hasGroqKeys()) selectedProvider = "groq";
-    else if (keyRotator.hasOpenRouterKeys()) selectedProvider = "openrouter";
     else if (keyRotator.hasAnthropicKeys()) selectedProvider = "claude";
   }
 
@@ -77,7 +77,30 @@ export async function executeLlmCascade(
     imageUrl,
   );
 
-  // Attempt 1: Google Gemini 1.5 Flash
+  // Attempt 1: OpenRouter Pool (Meta LLaMA 3.3 70B - Fast, natural, human & warm)
+  if (
+    !executionSuccess &&
+    (selectedProvider === "openrouter" || keyRotator.hasOpenRouterKeys())
+  ) {
+    try {
+      const result = await keyRotator.executeOpenRouterCompletion(
+        "meta-llama/llama-3.3-70b-instruct",
+        [{ role: "system", content: systemPromptWithRag }, ...messagesParam],
+        850,
+      );
+      finalReply = result.content;
+      estimatedTokens = result.tokensUsed;
+      executionSuccess = true;
+    } catch (error) {
+      logger.error(
+        "OpenRouter provider pool failed, falling back to Gemini:",
+        error,
+      );
+      selectedProvider = "gemini";
+    }
+  }
+
+  // Attempt 2: Google Gemini 1.5 Flash
   if (
     (selectedProvider === "gemini" || keyRotator.hasGeminiKeys()) &&
     !executionSuccess
@@ -100,7 +123,7 @@ export async function executeLlmCascade(
     }
   }
 
-  // Attempt 2: Groq Pool
+  // Attempt 3: Groq Pool
   if (
     !executionSuccess &&
     (selectedProvider === "groq" || keyRotator.hasGroqKeys())
@@ -119,30 +142,7 @@ export async function executeLlmCascade(
       executionSuccess = true;
     } catch (error) {
       logger.error(
-        "Groq provider pool failed, falling back to OpenRouter pool:",
-        error,
-      );
-      selectedProvider = "openrouter";
-    }
-  }
-
-  // Attempt 3: OpenRouter Pool
-  if (
-    !executionSuccess &&
-    (selectedProvider === "openrouter" || keyRotator.hasOpenRouterKeys())
-  ) {
-    try {
-      const result = await keyRotator.executeOpenRouterCompletion(
-        "meta-llama/llama-3.3-70b-instruct",
-        [{ role: "system", content: systemPromptWithRag }, ...messagesParam],
-        850,
-      );
-      finalReply = result.content;
-      estimatedTokens = result.tokensUsed;
-      executionSuccess = true;
-    } catch (error) {
-      logger.error(
-        "OpenRouter provider pool failed, falling back to Anthropic:",
+        "Groq provider pool failed, falling back to Anthropic:",
         error,
       );
       selectedProvider = "claude";
@@ -228,9 +228,9 @@ export async function executeLlmCascadeStream(
 
   let selectedProvider = preferredProvider || "";
   if (!selectedProvider) {
-    if (keyRotator.hasGeminiKeys()) selectedProvider = "gemini";
+    if (keyRotator.hasOpenRouterKeys()) selectedProvider = "openrouter";
+    else if (keyRotator.hasGeminiKeys()) selectedProvider = "gemini";
     else if (keyRotator.hasGroqKeys()) selectedProvider = "groq";
-    else if (keyRotator.hasOpenRouterKeys()) selectedProvider = "openrouter";
     else if (keyRotator.hasAnthropicKeys()) selectedProvider = "claude";
   }
 
@@ -240,7 +240,31 @@ export async function executeLlmCascadeStream(
     imageUrl,
   );
 
-  // Attempt 1: Google Gemini Flash Stream
+  // Attempt 1: OpenRouter Stream (Meta LLaMA 3.3 70B - Fast, natural, human & warm)
+  if (
+    !executionSuccess &&
+    (selectedProvider === "openrouter" || keyRotator.hasOpenRouterKeys())
+  ) {
+    try {
+      const result = await keyRotator.executeOpenRouterStream(
+        "meta-llama/llama-3.3-70b-instruct",
+        [{ role: "system", content: systemPromptWithRag }, ...messagesParam],
+        onToken,
+        850,
+      );
+      finalReply = result.content;
+      estimatedTokens = result.tokensUsed;
+      executionSuccess = true;
+    } catch (error) {
+      logger.error(
+        "OpenRouter stream pool failed, falling back to Gemini stream:",
+        error,
+      );
+      selectedProvider = "gemini";
+    }
+  }
+
+  // Attempt 2: Google Gemini Flash Stream
   if (
     (selectedProvider === "gemini" || keyRotator.hasGeminiKeys()) &&
     !executionSuccess
@@ -264,7 +288,7 @@ export async function executeLlmCascadeStream(
     }
   }
 
-  // Attempt 2: Groq Stream
+  // Attempt 3: Groq Stream
   if (
     !executionSuccess &&
     (selectedProvider === "groq" || keyRotator.hasGroqKeys())
@@ -284,31 +308,7 @@ export async function executeLlmCascadeStream(
       executionSuccess = true;
     } catch (error) {
       logger.error(
-        "Groq stream pool failed, falling back to OpenRouter stream:",
-        error,
-      );
-      selectedProvider = "openrouter";
-    }
-  }
-
-  // Attempt 3: OpenRouter Stream
-  if (
-    !executionSuccess &&
-    (selectedProvider === "openrouter" || keyRotator.hasOpenRouterKeys())
-  ) {
-    try {
-      const result = await keyRotator.executeOpenRouterStream(
-        "meta-llama/llama-3.3-70b-instruct",
-        [{ role: "system", content: systemPromptWithRag }, ...messagesParam],
-        onToken,
-        850,
-      );
-      finalReply = result.content;
-      estimatedTokens = result.tokensUsed;
-      executionSuccess = true;
-    } catch (error) {
-      logger.error(
-        "OpenRouter stream pool failed, falling back to Anthropic stream:",
+        "Groq stream pool failed, falling back to Anthropic stream:",
         error,
       );
       selectedProvider = "claude";
