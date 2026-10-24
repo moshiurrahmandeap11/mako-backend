@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateDeterministicExternalId = generateDeterministicExternalId;
 exports.isSafeUrl = isSafeUrl;
 exports.decodeCloudflareEmail = decodeCloudflareEmail;
+exports.isClientSideSpa = isClientSideSpa;
 exports.fetchRenderedHtmlWithPuppeteer = fetchRenderedHtmlWithPuppeteer;
 exports.scrapeWebsite = scrapeWebsite;
 exports.scrapeSingleUrl = scrapeSingleUrl;
@@ -944,6 +945,38 @@ async function indexPageContent(currentUrlStr, html, merchantId, origin, isMainD
     };
 }
 /**
+ * Detects whether the fetched HTML is an un-hydrated Single Page Application (SPA),
+ * such as React (Vite/CRA), Next.js client bailout, or Vue/Nuxt,
+ * even when Cloudflare, Google Tag Manager, or widget scripts have been injected.
+ */
+function isClientSideSpa(html) {
+    if (!html)
+        return false;
+    if (html.includes("BAILOUT_TO_CLIENT_SIDE_RENDERING") ||
+        html.includes('data-dgst="BAILOUT')) {
+        return true;
+    }
+    // Check for common SPA root container tags (React, Vite, Next.js, Vue)
+    const hasRootDiv = /<div\s+[^>]*id=["'](root|__next|app)["'][^>]*>/i.test(html);
+    if (!hasRootDiv)
+        return false;
+    // 1. Explicit empty root container (e.g. <div id="root"></div> or with comments)
+    if (/<div\s+[^>]*id=["'](root|__next|app)["'][^>]*>\s*(<!--[\s\S]*?-->\s*)*<\/div>/i.test(html)) {
+        return true;
+    }
+    // 2. Unhydrated shell even with injected Cloudflare/analytics scripts (< 12000 bytes)
+    if (html.length < 12000) {
+        return true;
+    }
+    // 3. Fallback: Contains root container but has almost no semantic links/paragraphs
+    const linkCount = (html.match(/<a\s+[^>]*href=/gi) || []).length;
+    const paragraphCount = (html.match(/<p\b/gi) || []).length;
+    if (linkCount <= 2 && paragraphCount <= 1) {
+        return true;
+    }
+    return false;
+}
+/**
  * Headless Browser SPA Hydration (Smart Puppeteer Scraper)
  * Used when a modern client-rendered SPA (Next.js, React, Vue) has missing or client-rendered DOM.
  */
@@ -1069,10 +1102,7 @@ async function scrapeWebsite(targetUrl, merchantId) {
                 continue;
             let html = await response.text();
             // Detect Client-Side React/Next.js SPA or SSR Bailout
-            const isSpaBailout = html.includes("BAILOUT_TO_CLIENT_SIDE_RENDERING") ||
-                html.includes('data-dgst="BAILOUT') ||
-                (html.includes('id="__next"') && html.length < 2500) ||
-                (html.includes('id="root"') && html.length < 1500);
+            const isSpaBailout = isClientSideSpa(html);
             if (isSpaBailout) {
                 logger_1.logger.info(`[Scraper] SPA / Client-Side Rendering detected on ${currentUrlStr}. Running Headless Hydration...`);
                 const hydratedHtml = await fetchRenderedHtmlWithPuppeteer(currentUrlStr);
@@ -1184,10 +1214,7 @@ async function scrapeSingleUrl(targetUrl, merchantId) {
         throw new Error(`Failed to fetch URL: HTTP ${response.status} ${response.statusText}`);
     }
     let html = await response.text();
-    const isSpaBailout = html.includes("BAILOUT_TO_CLIENT_SIDE_RENDERING") ||
-        html.includes('data-dgst="BAILOUT') ||
-        (html.includes('id="__next"') && html.length < 2500) ||
-        (html.includes('id="root"') && html.length < 1500);
+    const isSpaBailout = isClientSideSpa(html);
     if (isSpaBailout) {
         const hydratedHtml = await fetchRenderedHtmlWithPuppeteer(parsedUrl.href);
         if (hydratedHtml && hydratedHtml.length > html.length) {

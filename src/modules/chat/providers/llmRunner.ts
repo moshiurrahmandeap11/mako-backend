@@ -108,7 +108,7 @@ export async function executeLlmCascade(
     try {
       const model = imageUrl
         ? "llama-3.2-11b-vision-preview"
-        : "llama-3.3-70b-versatile";
+        : "openai/gpt-oss-120b";
       const result = await keyRotator.executeGroqCompletion(
         model,
         [{ role: "system", content: systemPromptWithRag }, ...messagesParam],
@@ -272,7 +272,7 @@ export async function executeLlmCascadeStream(
     try {
       const model = imageUrl
         ? "llama-3.2-11b-vision-preview"
-        : "llama-3.3-70b-versatile";
+        : "openai/gpt-oss-120b";
       const result = await keyRotator.executeGroqStream(
         model,
         [{ role: "system", content: systemPromptWithRag }, ...messagesParam],

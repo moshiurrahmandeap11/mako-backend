@@ -89,8 +89,8 @@ export class KeyRotator {
     return {
       groq: formatPool(
         this.groqClients,
-        "Groq LLaMA 3.3",
-        "llama-3.3-70b-versatile",
+        "Groq GPT-OSS 120B",
+        "openai/gpt-oss-120b",
         "~200ms TTFB",
       ),
       openrouter: formatPool(
@@ -132,7 +132,7 @@ export class KeyRotator {
       this.groqIndex = (this.groqIndex + 1) % this.groqClients.length;
 
       try {
-        const targetModel = "llama-3.3-70b-versatile";
+        const targetModel = "openai/gpt-oss-120b";
         const completion = await client.chat.completions.create(
           {
             model: targetModel,
@@ -366,7 +366,7 @@ export class KeyRotator {
       this.groqIndex = (this.groqIndex + 1) % this.groqClients.length;
 
       try {
-        const targetModel = "llama-3.3-70b-versatile";
+        const targetModel = "openai/gpt-oss-120b";
         const stream = await client.chat.completions.create(
           {
             model: targetModel,

@@ -4,6 +4,8 @@ exports.createProduct = createProduct;
 exports.listProducts = listProducts;
 exports.updateProduct = updateProduct;
 exports.deleteProduct = deleteProduct;
+exports.deleteBulkProducts = deleteBulkProducts;
+exports.clearAllProducts = clearAllProducts;
 exports.importProducts = importProducts;
 const db_1 = require("../../config/db");
 const embeddings_1 = require("../../utils/embeddings");
@@ -169,6 +171,51 @@ async function deleteProduct(req, res) {
     catch (error) {
         logger_1.logger.error("Delete Product Error:", error);
         res.status(500).json({ error: "Failed to delete product." });
+    }
+}
+async function deleteBulkProducts(req, res) {
+    try {
+        const merchantId = req.merchant?.id;
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            res.status(400).json({ error: "Product IDs array is required." });
+            return;
+        }
+        const deleteResult = await db_1.prisma.product.deleteMany({
+            where: {
+                id: { in: ids },
+                merchantId,
+            },
+        });
+        res.json({
+            message: `Successfully deleted ${deleteResult.count} products.`,
+            count: deleteResult.count,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error("Bulk Delete Products Error:", error);
+        res.status(500).json({ error: "Failed to delete products." });
+    }
+}
+async function clearAllProducts(req, res) {
+    try {
+        const merchantId = req.merchant?.id;
+        const domain = req.query.domain;
+        const whereClause = { merchantId };
+        if (domain && domain !== "all") {
+            whereClause.productUrl = { contains: domain };
+        }
+        const deleteResult = await db_1.prisma.product.deleteMany({
+            where: whereClause,
+        });
+        res.json({
+            message: `Successfully cleared ${deleteResult.count} products.`,
+            count: deleteResult.count,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error("Clear All Products Error:", error);
+        res.status(500).json({ error: "Failed to clear products." });
     }
 }
 async function importProducts(req, res) {

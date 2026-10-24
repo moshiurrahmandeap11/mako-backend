@@ -21,7 +21,7 @@ function initWidget() {
         return;
     }
     // Derive API base URL from script src domain or fallback
-    let baseUrl = 'http://localhost:4000';
+    let baseUrl = 'http://localhost:5005';
     try {
         const srcUrl = new URL(currentScript.src);
         baseUrl = `${srcUrl.protocol}//${srcUrl.host}`;

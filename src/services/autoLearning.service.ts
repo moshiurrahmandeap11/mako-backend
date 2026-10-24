@@ -59,7 +59,7 @@ If NO reusable store factual knowledge exists in this transcript, return an empt
       extractedJsonStr = res.content;
     } else if (keyRotator.hasGroqKeys()) {
       const res = await keyRotator.executeGroqCompletion(
-        'llama-3.3-70b-versatile',
+        'openai/gpt-oss-120b',
         [{ role: 'user', content: extractionPrompt }],
         450
       );

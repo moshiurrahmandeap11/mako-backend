@@ -15,6 +15,7 @@ const node_1 = require("better-auth/node");
 const auth_1 = require("./config/auth");
 const cron_1 = require("./jobs/cron");
 const admin_routes_1 = require("./modules/admin/admin.routes");
+const blog_routes_1 = require("./modules/blog/blog.routes");
 const adminSettings_controller_1 = require("./modules/admin/adminSettings.controller");
 const analytics_routes_1 = __importDefault(require("./modules/analytics/analytics.routes"));
 const apiKey_routes_1 = __importDefault(require("./modules/apiKey/apiKey.routes"));
@@ -98,6 +99,7 @@ app.use("/api/subscribe", newsletter_routes_1.newsletterRouter);
 app.use("/api/newsletter", newsletter_routes_1.newsletterRouter);
 app.use("/api/reports", reports_routes_1.reportsRouter);
 app.use("/api/admin", admin_routes_1.adminRouter);
+app.use("/api/blog", blog_routes_1.blogRouter);
 app.get("/api/settings/public", adminSettings_controller_1.getPublicPlatformSettings);
 // Global Error Handler
 app.use((err, req, res, next) => {
